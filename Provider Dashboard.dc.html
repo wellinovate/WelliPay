@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./styles.css">
+<style>
+body{margin:0}
+.wp-shell{max-width:1180px;margin:0 auto;padding:0 var(--space-6) var(--space-8)}
+.wp-head{display:flex;align-items:baseline;justify-content:space-between;margin:var(--space-6) 0 var(--space-2)}
+.wp-sub{color:var(--color-text);opacity:.65;font-size:14px;margin:0 0 var(--space-6)}
+.wp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-6);margin-bottom:var(--space-6)}
+.wp-kpi-num{font-family:var(--font-heading);font-weight:600;font-size:32px;line-height:1.1}
+.wp-kpi-lbl{font-size:12px;letter-spacing:.06em;text-transform:uppercase;opacity:.55;margin-top:4px}
+.wp-alert{margin-bottom:var(--space-6);font-size:14px}
+.wp-alert .tag{margin-right:var(--space-2)}
+.wp-desc{color:var(--color-text)}
+.tag-accent{border:1px solid var(--color-accent-300)}
+.tag-accent-2{border:1px solid var(--color-accent-2-300)}
+.tag-neutral{border:1px solid var(--color-neutral-300)}
+</style>
+</helmet>
+
+<div class="wp-shell">
+<nav class="nav" style="border-bottom:1px solid var(--color-divider)">
+  <span class="nav-brand">WelliPay</span>
+  <a href="#" aria-current="page">Dashboard</a>
+  <a href="#">Reconciliation</a>
+  <a href="#">Claims</a>
+  <a href="#">Invoices</a>
+  <a href="#">Patients</a>
+  <a href="#">Settings</a>
+  <span style="margin-left:auto;font-size:13px;opacity:.65">Lagoon Specialist Hospital</span>
+</nav>
+
+<div class="wp-head">
+  <h1>Dashboard</h1>
+  <span class="text-muted" style="font-size:13px">₦2.84M today · 4 channels active</span>
+</div>
+<p class="wp-sub">Today's revenue by source, outstanding receivables, and anything that needs attention before it becomes a loss.</p>
+
+<div class="wp-kpis">
+  <div><div class="wp-kpi-num">₦2.84M</div><div class="wp-kpi-lbl">Total today</div></div>
+  <div><div class="wp-kpi-num">₦640K</div><div class="wp-kpi-lbl">Patient</div></div>
+  <div><div class="wp-kpi-num">₦1.9M</div><div class="wp-kpi-lbl">HMO</div></div>
+  <div><div class="wp-kpi-num">₦300K</div><div class="wp-kpi-lbl">Corporate</div></div>
+</div>
+
+<p class="wp-alert"><span class="tag tag-accent-2">Revenue leakage</span>17 laboratory services completed with no corresponding invoice — estimated exposure ₦340,000.</p>
+
+<h4 style="margin-bottom:var(--space-3)">Recent transactions</h4>
+<table class="table">
+  <thead>
+    <tr><th>Time</th><th>Patient / service</th><th>Amount</th><th>Channel</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="text-muted">09:14</td><td class="wp-desc">J. Adeyemi — Consultation</td><td>₦2,000</td><td>USSD</td><td><span class="tag tag-accent">Paid</span></td></tr>
+    <tr><td class="text-muted">09:22</td><td class="wp-desc">ABC Diagnostics — Lab claim</td><td>₦12,000</td><td>HMO</td><td><span class="tag tag-neutral">Pending</span></td></tr>
+    <tr><td class="text-muted">09:40</td><td class="wp-desc">F. Okon — Deposit</td><td>₦50,000</td><td>Transfer</td><td><span class="tag tag-accent">Paid</span></td></tr>
+    <tr><td class="text-muted">10:05</td><td class="wp-desc">M. Bello — Pharmacy</td><td>₦8,500</td><td>Card</td><td><span class="tag tag-accent-2">Failed</span></td></tr>
+    <tr><td class="text-muted">10:21</td><td class="wp-desc">T. Yusuf — Ultrasound</td><td>₦8,000</td><td>Bank transfer</td><td><span class="tag tag-accent">Paid</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+</x-dc>
+</body>
+</html>

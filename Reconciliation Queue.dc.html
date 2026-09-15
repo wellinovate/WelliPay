@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./styles.css">
+<style>
+body{margin:0}
+.wp-shell{max-width:1180px;margin:0 auto;padding:0 var(--space-6) var(--space-8)}
+.wp-head{display:flex;align-items:baseline;justify-content:space-between;margin:var(--space-6) 0 var(--space-2)}
+.wp-sub{color:var(--color-text);opacity:.65;font-size:14px;margin:0 0 var(--space-6)}
+.wp-filters{display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4)}
+.wp-search{max-width:260px;margin-left:auto}
+.wp-bulkbar{display:flex;align-items:center;justify-content:space-between;margin-top:var(--space-4);padding-top:var(--space-3);border-top:1px solid var(--color-divider)}
+.wp-count{font-size:13px;opacity:.7}
+.wp-desc{color:var(--color-text)}
+.wp-desc .raw{opacity:.55;font-size:12px;display:block;margin-top:2px}
+.wp-actions{display:flex;gap:var(--space-1)}
+.wp-conf{font-family:var(--font-heading);font-weight:600}
+.tag-accent{border:1px solid var(--color-accent-300)}
+.tag-accent-2{border:1px solid var(--color-accent-2-300)}
+.tag-neutral{border:1px solid var(--color-neutral-300)}
+</style>
+</helmet>
+
+<div class="wp-shell">
+<nav class="nav" style="border-bottom:1px solid var(--color-divider)">
+  <span class="nav-brand">WelliPay</span>
+  <a href="#">Dashboard</a>
+  <a href="#" aria-current="page">Reconciliation</a>
+  <a href="#">Claims</a>
+  <a href="#">Invoices</a>
+  <a href="#">Patients</a>
+  <a href="#">Settings</a>
+  <span style="margin-left:auto;font-size:13px;opacity:.65">Lagoon Specialist Hospital</span>
+</nav>
+
+<div class="wp-head">
+  <h1>Reconciliation</h1>
+  <span class="text-muted" style="font-size:13px">32 confirmed this week · 14 unmatched</span>
+</div>
+<p class="wp-sub">Match incoming payments to patients, invoices and providers. AI suggests a match with a confidence score — confirm or correct it.</p>
+
+<div class="wp-filters">
+  <div class="seg">
+    <label class="seg-opt"><input type="radio" name="status" checked><span>Unmatched (14)</span></label>
+    <label class="seg-opt"><input type="radio" name="status"><span>Suggested (6)</span></label>
+    <label class="seg-opt"><input type="radio" name="status"><span>Confirmed (32)</span></label>
+  </div>
+  <span class="tag tag-outline">Channel ▾</span>
+  <span class="tag tag-outline">Last 7 days ▾</span>
+  <span class="tag tag-outline">Amount ▾</span>
+  <input class="input wp-search" placeholder="Search reference, name, amount…">
+</div>
+
+<table class="table">
+  <thead>
+    <tr>
+      <th style="width:28px"><input type="checkbox"></th>
+      <th>Date</th>
+      <th>Amount</th>
+      <th>Description</th>
+      <th>AI suggested match</th>
+      <th style="width:140px"></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><input type="checkbox"></td>
+      <td class="text-muted">Sep 12</td>
+      <td>₦25,000</td>
+      <td class="wp-desc">Bank transfer<span class="raw">"JOHN U."</span></td>
+      <td><span class="tag tag-accent"><span class="wp-conf">94%</span>&nbsp;→ J. Umar, INV-92831</span></td>
+      <td class="wp-actions"><button type="button" class="btn btn-primary">Confirm</button><button type="button" class="btn btn-ghost">Reject</button></td>
+    </tr>
+    <tr>
+      <td><input type="checkbox" checked></td>
+      <td class="text-muted">Sep 12</td>
+      <td>₦8,500</td>
+      <td class="wp-desc">POS card<span class="raw">txn 44231</span></td>
+      <td><span class="tag tag-accent"><span class="wp-conf">88%</span>&nbsp;→ M. Bello, INV-93010</span></td>
+      <td class="wp-actions"><button type="button" class="btn btn-primary">Confirm</button><button type="button" class="btn btn-ghost">Reject</button></td>
+    </tr>
+    <tr>
+      <td><input type="checkbox" checked></td>
+      <td class="text-muted">Sep 13</td>
+      <td>₦12,000</td>
+      <td class="wp-desc">Bank transfer<span class="raw">"ABC DIAG"</span></td>
+      <td><span class="tag tag-accent"><span class="wp-conf">97%</span>&nbsp;→ ABC Diagnostics, INV-93044</span></td>
+      <td class="wp-actions"><button type="button" class="btn btn-primary">Confirm</button><button type="button" class="btn btn-ghost">Reject</button></td>
+    </tr>
+    <tr>
+      <td><input type="checkbox"></td>
+      <td class="text-muted">Sep 13</td>
+      <td>₦3,200</td>
+      <td class="wp-desc">USSD<span class="raw">ref *737*...</span></td>
+      <td><span class="tag tag-neutral">Low confidence</span></td>
+      <td class="wp-actions"><button type="button" class="btn btn-secondary">Search manually</button></td>
+    </tr>
+    <tr>
+      <td><input type="checkbox"></td>
+      <td class="text-muted">Sep 14</td>
+      <td>₦1,500</td>
+      <td class="wp-desc">Cash — agent network<span class="raw">Ikorodu agent #0231</span></td>
+      <td><span class="tag tag-neutral">No match found</span></td>
+      <td class="wp-actions"><button type="button" class="btn btn-secondary">Search manually</button></td>
+    </tr>
+    <tr>
+      <td><input type="checkbox"></td>
+      <td class="text-muted">Sep 14</td>
+      <td>₦40,000</td>
+      <td class="wp-desc">Bank transfer<span class="raw">no reference</span></td>
+      <td><span class="tag tag-neutral">No match found</span></td>
+      <td class="wp-actions"><button type="button" class="btn btn-secondary">Search manually</button></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="wp-bulkbar">
+  <span class="wp-count">2 selected</span>
+  <button type="button" class="btn btn-primary">Bulk confirm matches</button>
+</div>
+</div>
+
+</x-dc>
+</body>
+</html>

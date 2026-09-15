@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&family=Patrick+Hand+SC&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#eeece6;font-family:'Patrick Hand',cursive}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.12);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 11px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 16px 'Patrick Hand SC',cursive;color:#1a1a1a}
+.dv-opts{display:flex;flex-wrap:wrap;gap:30px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:9px;scroll-margin-top:16px}
+.dv-oid{font:600 11px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:16px 'Patrick Hand',cursive;color:rgba(0,0,0,.65)}
+.dv-card{max-width:100%;background:#fdfcf9;border:2.5px solid #2a2a2a;border-radius:8px 11px 9px 10px;box-shadow:3px 4px 0 rgba(0,0,0,.12);overflow:hidden}
+.dv-opt:target .dv-oid{background:#2a6fd6;color:#fff}
+.dv-next{margin:22px 0 0;font:16px 'Patrick Hand',cursive;color:rgba(0,0,0,.6)}
+.dv-next a{color:#2a6fd6}
+.approved{font:15px 'Patrick Hand',cursive;color:#2a9d5c;background:#eafaf0;border:2px solid #2a9d5c;border-radius:14px;padding:3px 10px;display:inline-flex;align-items:center;gap:5px}
+.scr-head{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:2px solid #2a2a2a;background:#f3f1ea}
+.scr-head .logo{font:700 18px 'Patrick Hand SC',cursive;color:#1a1a1a}
+.scr-head .who{display:flex;align-items:center;gap:8px;font-size:14px;color:#444}
+.avatar{width:26px;height:26px;border-radius:50%;border:2px solid #2a2a2a;display:flex;align-items:center;justify-content:center;font-size:11px;background:#fff}
+.scr-body{display:flex;min-height:520px}
+.side{width:150px;border-right:2px solid #2a2a2a;padding:14px 0;background:#f7f6f1;flex-shrink:0}
+.navitem{padding:9px 16px;font-size:15px;color:#333;display:flex;align-items:center;gap:8px;border-left:4px solid transparent}
+.navitem .dot{width:9px;height:9px;border-radius:50%;border:1.5px solid #2a2a2a;flex-shrink:0}
+.navitem.active{background:#fff;border-left:4px solid #2a6fd6;font-weight:700;color:#111}
+.navitem.active .dot{background:#2a6fd6}
+.content{flex:1;padding:18px 20px;overflow:auto}
+.sec-label{font:16px 'Patrick Hand SC',cursive;color:#333;margin:0 0 8px;text-transform:uppercase;letter-spacing:.5px}
+.box{border:2px solid #2a2a2a;border-radius:7px 9px 8px 10px;background:#fff;padding:10px 12px}
+.kpi-row{display:grid;gap:12px;margin-bottom:16px}
+.kpi{border:2px solid #2a2a2a;border-radius:8px 6px 9px 7px;background:#fff;padding:10px 12px}
+.kpi .num{font:26px 'Patrick Hand SC',cursive;color:#111}
+.kpi .lbl{font-size:13px;color:#555}
+.alert{border:2px dashed #d6564a;border-radius:8px;background:#fdf0ee;color:#a5372c;padding:9px 12px;font-size:14px;display:flex;align-items:center;gap:8px;margin-bottom:14px}
+.chip{display:inline-flex;align-items:center;gap:5px;border:2px solid #2a2a2a;border-radius:20px;padding:4px 10px;font-size:13px;background:#fff}
+.chip.blue{border-color:#2a6fd6;color:#1a4f9c;background:#eaf1fb}
+.chip.red{border-color:#d6564a;color:#a5372c;background:#fdf0ee}
+.trow{display:grid;grid-template-columns:70px 1fr 90px 90px 70px;gap:8px;padding:6px 4px;font-size:13px;border-bottom:1px solid rgba(0,0,0,.15);align-items:center}
+.thead{font-weight:700;color:#333;border-bottom:2px solid #2a2a2a}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.btn-sk{border:2px solid #2a2a2a;border-radius:14px;padding:4px 12px;font-size:13px;background:#fff;font-family:inherit;cursor:default}
+.btn-sk.primary{background:#2a6fd6;color:#fff;border-color:#1a4f9c}
+.filter-bar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center}
+.filter-chip{border:2px solid #2a2a2a;border-radius:16px;padding:4px 10px;font-size:13px;background:#f3f1ea}
+.recon-row{display:grid;grid-template-columns:20px 60px 55px 1fr 130px 30px;gap:6px;padding:6px 4px;font-size:12.5px;border-bottom:1px solid rgba(0,0,0,.15);align-items:center}
+</style>
+</helmet>
+
+<section class="dv-turn" id="t3">
+<div class="dv-thd"><a class="dv-tid" href="#t3">3</a><span class="dv-tname">HMO/payer dashboard — approved direction</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="3a"><div class="dv-olabel"><a class="dv-oid" href="#3a">3a</a>KPI row + claims table + dispute alert <span class="approved">✓ approved</span></div>
+<div class="dv-card" style="width:1000px">
+<div class="scr-head"><span class="logo">WelliPay</span><span class="who">Reliance HMO <span class="avatar">RH</span></span></div>
+<div class="scr-body">
+<div class="side">
+<div class="navitem active"><span class="dot"></span>Claims</div>
+<div class="navitem"><span class="dot"></span>Eligibility</div>
+<div class="navitem"><span class="dot"></span>Remittances</div>
+<div class="navitem"><span class="dot"></span>Providers</div>
+<div class="navitem"><span class="dot"></span>Reports</div>
+<div class="navitem"><span class="dot"></span>Settings</div>
+</div>
+<div class="content">
+<div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+<div class="kpi"><div class="num">₦18.2M</div><div class="lbl">Total claimed (30d)</div></div>
+<div class="kpi"><div class="num">₦14.6M</div><div class="lbl">Approved</div></div>
+<div class="kpi"><div class="num">₦11.1M</div><div class="lbl">Paid</div></div>
+<div class="kpi"><div class="num">₦3.5M</div><div class="lbl">Outstanding</div></div>
+</div>
+<div class="alert">⚠ 5 claims rejected this month — ₦640,000 disputed, oldest 9 days overdue</div>
+<div class="filter-bar"><span class="filter-chip">Payer: Private HMO ▾</span><span class="filter-chip">Status ▾</span><span class="filter-chip">Provider ▾</span><span class="chip" style="margin-left:auto">Silver plan · 20% copay · pre-auth &gt;₦100K</span></div>
+<div style="display:grid;grid-template-columns:90px 1fr 90px 100px 110px 90px;gap:8px;font-size:13px;font-weight:700;border-bottom:2px solid #2a2a2a;padding-bottom:6px;margin-bottom:4px"><span>Claim</span><span>Provider</span><span>Amount</span><span>Status</span><span>Denial risk</span><span>Age</span></div>
+<div style="display:grid;grid-template-columns:90px 1fr 90px 100px 110px 90px;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.15)"><span>CLM-4471</span><span>ABC Diagnostics</span><span>₦12,000</span><span><span class="status-dot" style="background:#d6a92a"></span> Submitted</span><span class="chip red" style="padding:2px 8px">High</span><span>2d</span></div>
+<div style="display:grid;grid-template-columns:90px 1fr 90px 100px 110px 90px;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.15)"><span>CLM-4472</span><span>Lagoon Hospital</span><span>₦45,000</span><span><span class="status-dot" style="background:#2a9d5c"></span> Approved</span><span class="chip" style="padding:2px 8px">Low</span><span>5d</span></div>
+<div style="display:grid;grid-template-columns:90px 1fr 90px 100px 110px 90px;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid rgba(0,0,0,.15)"><span>CLM-4473</span><span>Sunrise Clinic</span><span>₦8,200</span><span><span class="status-dot" style="background:#d6564a"></span> Rejected — disputed</span><span class="chip red" style="padding:2px 8px">Missing auth</span><span>9d</span></div>
+<div style="display:grid;grid-template-columns:90px 1fr 90px 100px 110px 90px;gap:8px;font-size:13px;padding:6px 0"><span>CLM-4474</span><span>ABC Diagnostics</span><span>₦21,500</span><span><span class="status-dot" style="background:#2a9d5c"></span> Paid</span><span class="chip" style="padding:2px 8px">Low</span><span>14d</span></div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Approved: dashboard = <a class="dv-oid" href="#1a">1a</a>, reconciliation = <a class="dv-oid" href="#1d">1d</a>, HMO = <a class="dv-oid" href="#3a">3a</a>. Visual design moving to Broadsheet next, starting with reconciliation.</p>
+</section>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Provider dashboard &amp; reconciliation queue — approved directions</span></div>
+<div class="dv-opts">
+
+<div class="dv-opt" id="1a"><div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Dashboard — KPI row + alerts + table <span class="approved">✓ approved</span></div>
+<div class="dv-card" style="width:960px">
+<div class="scr-head"><span class="logo">WelliPay</span><span class="who">Lagoon Specialist Hospital <span class="avatar">LS</span></span></div>
+<div class="scr-body">
+<div class="side">
+<div class="navitem active"><span class="dot"></span>Dashboard</div>
+<div class="navitem"><span class="dot"></span>Reconciliation</div>
+<div class="navitem"><span class="dot"></span>Claims</div>
+<div class="navitem"><span class="dot"></span>Invoices</div>
+<div class="navitem"><span class="dot"></span>Patients</div>
+<div class="navitem"><span class="dot"></span>Settings</div>
+</div>
+<div class="content">
+<p class="sec-label">Today's revenue by source</p>
+<div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+<div class="kpi"><div class="num">₦2.84M</div><div class="lbl">Total today</div></div>
+<div class="kpi"><div class="num">₦640K</div><div class="lbl">Patient</div></div>
+<div class="kpi"><div class="num">₦1.9M</div><div class="lbl">HMO</div></div>
+<div class="kpi"><div class="num">₦300K</div><div class="lbl">Corporate</div></div>
+</div>
+<div class="alert">⚠ 17 lab services with no invoice — est. exposure ₦340,000</div>
+<p class="sec-label">Recent transactions</p>
+<div class="trow thead"><span>Time</span><span>Patient / Service</span><span>Amount</span><span>Channel</span><span>Status</span></div>
+<div class="trow"><span>09:14</span><span>J. Adeyemi — Consultation</span><span>₦2,000</span><span>USSD</span><span><span class="status-dot" style="background:#2a9d5c"></span> Paid</span></div>
+<div class="trow"><span>09:22</span><span>ABC Diagnostics — Lab claim</span><span>₦12,000</span><span>HMO</span><span><span class="status-dot" style="background:#d6a92a"></span> Pending</span></div>
+<div class="trow"><span>09:40</span><span>F. Okon — Deposit</span><span>₦50,000</span><span>Transfer</span><span><span class="status-dot" style="background:#2a9d5c"></span> Paid</span></div>
+<div class="trow"><span>10:05</span><span>M. Bello — Pharmacy</span><span>₦8,500</span><span>Card</span><span><span class="status-dot" style="background:#d6564a"></span> Failed</span></div>
+</div>
+</div>
+</div>
+</div>
+
+<div class="dv-opt" id="1d"><div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Reconciliation — table + AI match + bulk confirm <span class="approved">✓ approved</span></div>
+<div class="dv-card" style="width:960px">
+<div class="scr-head"><span class="logo">WelliPay</span><span class="who">Lagoon Specialist Hospital <span class="avatar">LS</span></span></div>
+<div class="scr-body">
+<div class="side">
+<div class="navitem"><span class="dot"></span>Dashboard</div>
+<div class="navitem active"><span class="dot"></span>Reconciliation</div>
+<div class="navitem"><span class="dot"></span>Claims</div>
+<div class="navitem"><span class="dot"></span>Invoices</div>
+<div class="navitem"><span class="dot"></span>Patients</div>
+<div class="navitem"><span class="dot"></span>Settings</div>
+</div>
+<div class="content">
+<div class="filter-bar">
+<span class="filter-chip">Channel ▾</span><span class="filter-chip">Date: last 7 days ▾</span><span class="filter-chip">Amount ▾</span><span class="filter-chip" style="border-color:#2a6fd6;color:#1a4f9c">Status: Unmatched ▾</span>
+<input class="box" style="margin-left:auto;font-family:inherit;font-size:13px;padding:4px 8px" placeholder="Search reference…">
+</div>
+<div class="recon-row thead"><span></span><span>Date</span><span>Amount</span><span>Description</span><span>AI suggested match</span><span></span></div>
+<div class="recon-row"><span>☐</span><span>Sep 12</span><span>₦25,000</span><span>"JOHN U." — transfer</span><span class="chip blue">94% → J. Umar, INV-92831</span><span>✓</span></div>
+<div class="recon-row"><span>☑</span><span>Sep 12</span><span>₦8,500</span><span>POS — card txn 44231</span><span class="chip blue">88% → M. Bello, INV-93010</span><span>✓</span></div>
+<div class="recon-row"><span>☑</span><span>Sep 13</span><span>₦12,000</span><span>"ABC DIAG" — transfer</span><span class="chip blue">97% → ABC Diagnostics</span><span>✓</span></div>
+<div class="recon-row"><span>☐</span><span>Sep 13</span><span>₦3,200</span><span>USSD ref *737*...</span><span class="chip red">Low confidence</span><span>?</span></div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+<span style="font-size:13px;color:#555">2 selected</span>
+<span class="btn-sk primary">Bulk confirm matches</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Cut from this round: dashboard's <a class="dv-oid" href="#1a">1a</a> alternates and reconciliation's list/detail and kanban alternates, plus the patient portal exploration — all out of scope. Next: Broadsheet visual design of reconciliation queue, then dashboard, then HMO dashboard.</p>
+</section>
+
+</x-dc>
+</body>
+</html>

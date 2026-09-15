@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<link rel="stylesheet" href="./styles.css">
+<style>
+body{margin:0}
+.wp-shell{max-width:1180px;margin:0 auto;padding:0 var(--space-6) var(--space-8)}
+.wp-head{display:flex;align-items:baseline;justify-content:space-between;margin:var(--space-6) 0 var(--space-2)}
+.wp-sub{color:var(--color-text);opacity:.65;font-size:14px;margin:0 0 var(--space-4)}
+.wp-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-6);margin-bottom:var(--space-6)}
+.wp-kpi-num{font-family:var(--font-heading);font-weight:600;font-size:32px;line-height:1.1}
+.wp-kpi-lbl{font-size:12px;letter-spacing:.06em;text-transform:uppercase;opacity:.55;margin-top:4px}
+.wp-alert{margin-bottom:var(--space-3);font-size:14px}
+.wp-alert .tag{margin-right:var(--space-2)}
+.wp-terms{font-size:13px;opacity:.7;margin-bottom:var(--space-6)}
+.wp-desc{color:var(--color-text)}
+.tag-accent{border:1px solid var(--color-accent-300)}
+.tag-accent-2{border:1px solid var(--color-accent-2-300)}
+.tag-neutral{border:1px solid var(--color-neutral-300)}
+</style>
+</helmet>
+
+<div class="wp-shell">
+<nav class="nav" style="border-bottom:1px solid var(--color-divider)">
+  <span class="nav-brand">WelliPay</span>
+  <a href="#" aria-current="page">Claims</a>
+  <a href="#">Eligibility</a>
+  <a href="#">Remittances</a>
+  <a href="#">Providers</a>
+  <a href="#">Reports</a>
+  <a href="#">Settings</a>
+  <span style="margin-left:auto;font-size:13px;opacity:.65">Reliance HMO</span>
+</nav>
+
+<div class="wp-head">
+  <h1>Claims</h1>
+  <span class="text-muted" style="font-size:13px">₦18.2M claimed (30d) · 5 disputed</span>
+</div>
+<p class="wp-sub">Claim financials by status and payer, and anything at risk of denial or already disputed.</p>
+
+<div class="wp-kpis">
+  <div><div class="wp-kpi-num">₦18.2M</div><div class="wp-kpi-lbl">Total claimed (30d)</div></div>
+  <div><div class="wp-kpi-num">₦14.6M</div><div class="wp-kpi-lbl">Approved</div></div>
+  <div><div class="wp-kpi-num">₦11.1M</div><div class="wp-kpi-lbl">Paid</div></div>
+  <div><div class="wp-kpi-num">₦3.5M</div><div class="wp-kpi-lbl">Outstanding</div></div>
+</div>
+
+<p class="wp-alert"><span class="tag tag-accent-2">Disputed</span>5 claims rejected this month — ₦640,000 disputed, oldest 9 days overdue.</p>
+<p class="wp-terms">Silver plan · 20% consultation copay · pre-authorization required above ₦100,000</p>
+
+<h4 style="margin-bottom:var(--space-3)">Claims</h4>
+<table class="table">
+  <thead>
+    <tr><th>Claim</th><th>Provider</th><th>Amount</th><th>Status</th><th>Denial risk</th><th>Age</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="text-muted">CLM-4471</td><td class="wp-desc">ABC Diagnostics</td><td>₦12,000</td><td><span class="tag tag-neutral">Submitted</span></td><td><span class="tag tag-accent-2">High</span></td><td class="text-muted">2d</td></tr>
+    <tr><td class="text-muted">CLM-4472</td><td class="wp-desc">Lagoon Hospital</td><td>₦45,000</td><td><span class="tag tag-accent">Approved</span></td><td><span class="tag tag-neutral">Low</span></td><td class="text-muted">5d</td></tr>
+    <tr><td class="text-muted">CLM-4473</td><td class="wp-desc">Sunrise Clinic</td><td>₦8,200</td><td><span class="tag tag-accent-2">Rejected — disputed</span></td><td><span class="tag tag-accent-2">Missing auth</span></td><td class="text-muted">9d</td></tr>
+    <tr><td class="text-muted">CLM-4474</td><td class="wp-desc">ABC Diagnostics</td><td>₦21,500</td><td><span class="tag tag-accent">Paid</span></td><td><span class="tag tag-neutral">Low</span></td><td class="text-muted">14d</td></tr>
+  </tbody>
+</table>
+</div>
+
+</x-dc>
+</body>
+</html>
