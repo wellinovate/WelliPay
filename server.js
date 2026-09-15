@@ -23,8 +23,8 @@ app.get('/api/health', (req, res) => {
 // Serve static files from Vite production build
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// SPA Client-Side Routing Fallback
-app.get('*', (req, res) => {
+// SPA Client-Side Routing Fallback (Express 5 compatible wildcard)
+app.get('/*splat', (req, res) => {
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
