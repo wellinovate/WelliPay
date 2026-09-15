@@ -104,6 +104,36 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
+  // Database auto-hydration and health check on mount
+  React.useEffect(() => {
+    fetch('/api/database/status')
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.connected) {
+          addNotification(`PostgreSQL database connected (${data.database}). Real-time ledger active.`, 'success');
+          
+          fetch('/api/reconciliation')
+            .then(r => r.json())
+            .then(recData => {
+              if (recData && recData.items && recData.items.length > 0) {
+                setReconciliationItems(recData.items);
+              }
+            })
+            .catch(() => {});
+
+          fetch('/api/claims')
+            .then(r => r.json())
+            .then(claimData => {
+              if (claimData && claimData.claims && claimData.claims.length > 0) {
+                setHmoClaims(claimData.claims);
+              }
+            })
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   // Reconciliation Actions
   const toggleSelectReconItem = (id: string) => {
     setReconciliationItems(prev => prev.map(item => 
@@ -136,6 +166,13 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     ));
 
     addNotification(`Matched ${target.formattedAmount} (${target.description}) to ${target.aiMatch.targetName} (${target.aiMatch.invoiceNumber || 'Account'})`, 'success');
+
+    // Sync to PostgreSQL backend
+    fetch('/api/reconciliation/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id })
+    }).catch(() => {});
   };
 
   const rejectReconItem = (id: string, reason: string = 'Cashier flag for manual review') => {
@@ -160,6 +197,7 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     const totalAmount = selected.reduce((sum, item) => sum + item.amount, 0);
     const count = selected.length;
+    const ids = selected.map(i => i.id);
 
     setReconciliationItems(prev => prev.map(item => 
       item.selected && item.status === 'unmatched'
@@ -173,6 +211,13 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     ));
 
     addNotification(`Bulk reconciled ${count} transactions totaling ₦${totalAmount.toLocaleString()} directly into hospital ledger.`, 'success');
+
+    // Sync atomic bulk confirmation to PostgreSQL
+    fetch('/api/reconciliation/bulk-confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ids })
+    }).catch(() => {});
   };
 
   // Provider Actions
