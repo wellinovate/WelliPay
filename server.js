@@ -285,21 +285,20 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
         LIMIT 50
       `);
 
-      // 1. Total collections today across all payment channels in provider_transactions
+      // 1. Total collections today across ALL payment channels in provider_transactions (Card, POS, USSD, Transfers, HMO remittances)
       const totalTodayRes = await query(`
         SELECT COALESCE(SUM(amount), 0) as total
         FROM provider_transactions
         WHERE status = 'paid'
-          AND channel IN ('Card', 'POS card', 'USSD', 'Transfer', 'Bank transfer')
       `);
       const totalToday = parseFloat(totalTodayRes.rows[0]?.total || 0);
 
-      // 2. Patient direct collections (standalone metric from direct payment channels)
+      // 2. Patient direct collections (out-of-pocket only: Card, POS, USSD, Transfers; excludes HMO)
       const patientDirectRes = await query(`
         SELECT COALESCE(SUM(amount), 0) as total
         FROM provider_transactions
         WHERE status = 'paid'
-          AND channel IN ('Card', 'POS card', 'USSD', 'Transfer', 'Bank transfer')
+          AND channel != 'HMO'
       `);
       const patientDirect = parseFloat(patientDirectRes.rows[0]?.total || 0);
 
