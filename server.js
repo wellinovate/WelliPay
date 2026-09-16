@@ -256,6 +256,22 @@ app.post('/api/claims/:id/resolve', requireAuth, async (req, res) => {
   res.json({ success: true, id, resolution, mode: 'demo' });
 });
 
+// Currency formatter helper (e.g. 57000 -> ₦57K, 1900000 -> ₦1.9M)
+function formatNaira(amount) {
+  const num = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
+  if (num >= 1000000) {
+    const m = num / 1000000;
+    const formatted = m % 1 === 0 ? m.toFixed(0) : parseFloat(m.toFixed(2)).toString();
+    return `₦${formatted}M`;
+  }
+  if (num >= 1000) {
+    const k = num / 1000;
+    const formatted = k % 1 === 0 ? k.toFixed(0) : parseFloat(k.toFixed(1)).toString();
+    return `₦${formatted}K`;
+  }
+  return `₦${Math.round(num).toLocaleString()}`;
+}
+
 // 6. Get Provider Dashboard KPIs, Leakage Audit & Transactions
 app.get('/api/dashboard', requireAuth, async (req, res) => {
   try {
@@ -277,14 +293,14 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
       `);
       const patientDirect = parseFloat(patientDirectRes.rows[0]?.total || 0);
 
-      // HMO receivables
+      // HMO receivables (dynamically sum submitted & approved claims)
       const hmoRes = await query(`
         SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
         FROM hmo_claims
         WHERE status IN ('submitted', 'approved')
       `);
-      const hmoReceivables = parseFloat(hmoRes.rows[0]?.total || 0) || 1900000;
-      const pendingClaimsCount = parseInt(hmoRes.rows[0]?.count || 0, 10) || 6;
+      const hmoReceivables = parseFloat(hmoRes.rows[0]?.total || 0);
+      const pendingClaimsCount = parseInt(hmoRes.rows[0]?.count || 0, 10);
 
       // Corporate retainers
       const corporateRes = await query(`
@@ -314,23 +330,21 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
       }));
 
       const displayPatientDirect = patientDirect > 0 ? patientDirect : 640000;
-      const totalToday = 2840000;
+      const totalToday = displayPatientDirect + hmoReceivables + corporateRetainers;
 
       return res.json({
         source: 'postgresql',
         metrics: {
           totalToday,
-          formattedTotalToday: '₦2.84M',
+          formattedTotalToday: formatNaira(totalToday),
           totalTodayTrend: '+14.2% vs yesterday',
           patientDirect: displayPatientDirect,
-          formattedPatientDirect: displayPatientDirect >= 1000000 
-            ? `₦${(displayPatientDirect / 1000000).toFixed(2)}M` 
-            : `₦${Math.round(displayPatientDirect / 1000)}K`,
+          formattedPatientDirect: formatNaira(displayPatientDirect),
           hmoReceivables,
-          formattedHmoReceivables: '₦1.9M',
+          formattedHmoReceivables: formatNaira(hmoReceivables),
           pendingClaimsCount,
           corporateRetainers,
-          formattedCorporateRetainers: `₦${Math.round(corporateRetainers / 1000)}K`,
+          formattedCorporateRetainers: formatNaira(corporateRetainers),
           corporateCount
         },
         leakage: {
@@ -338,11 +352,7 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
           totalExposure,
           formattedTotalExposure: `₦${totalExposure.toLocaleString()}`,
           isResolved: unbilledCount === 0,
-          breakdown: breakdown.length > 0 ? breakdown : [
-            { name: 'Full Blood Count (8 orders)', orderCount: 8, amount: 96000, formattedAmount: '₦96,000' },
-            { name: 'Electrolytes, Urea & Creatinine (5 orders)', orderCount: 5, amount: 140000, formattedAmount: '₦140,000' },
-            { name: 'Lipid Profile Panels (4 orders)', orderCount: 4, amount: 104000, formattedAmount: '₦104,000' }
-          ]
+          breakdown // Empty array if unbilledCount === 0, populated if > 0
         },
         transactions: txnsRes.rows
       });

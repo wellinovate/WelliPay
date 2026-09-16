@@ -174,7 +174,7 @@ export async function initializeDatabase() {
     const count = parseInt(countRes.rows[0].count, 10);
 
     if (count === 0) {
-      console.log('[DB] Seeding initial WelliPay wireframe records into PostgreSQL...');
+      console.log('[DB] Seeding initial WelliPay payments and organizations into PostgreSQL...');
       
       // Seed Organizations
       await pool.query(`
@@ -196,8 +196,12 @@ export async function initializeDatabase() {
         ('REC-007', 'org-lagoon', 'Bank transfer', 65000, '₦65,000', '"RELIANCE COPAY"', 'HMO remittance', 'unmatched', 'Sep 14', 'Reliance HMO', 'BATCH-892', 95, true, 'Monthly remittance schedule matched electronic claims batch.')
         ON CONFLICT (id) DO NOTHING;
       `);
+    }
 
-      // Seed Initial Claims
+    // 3. Seed HMO Claims if empty
+    const claimCountRes = await pool.query('SELECT COUNT(*) FROM hmo_claims');
+    if (parseInt(claimCountRes.rows[0].count, 10) === 0) {
+      console.log('[DB] Seeding HMO claims...');
       await pool.query(`
         INSERT INTO hmo_claims (id, provider, amount, formatted_amount, status, status_label, is_disputed, denial_risk, age, patient_name, diagnosis, pre_auth_code) VALUES
         ('CLM-4471', 'ABC Diagnostics', 12000, '₦12,000', 'submitted', 'Submitted', false, 'high', '2d', 'Kemi Adeleke', 'Routine lipid profile & HbA1c screening', NULL),
@@ -206,8 +210,12 @@ export async function initializeDatabase() {
         ('CLM-4474', 'ABC Diagnostics', 21500, '₦21,500', 'paid', 'Paid', false, 'low', '14d', 'Babatunde Fashola', 'Comprehensive metabolic panel', NULL)
         ON CONFLICT (id) DO NOTHING;
       `);
+    }
 
-      // Seed Provider Transactions
+    // 4. Seed Provider Transactions if empty
+    const txnCountRes = await pool.query('SELECT COUNT(*) FROM provider_transactions');
+    if (parseInt(txnCountRes.rows[0].count, 10) === 0) {
+      console.log('[DB] Seeding provider transactions...');
       await pool.query(`
         INSERT INTO provider_transactions (id, time_captured, patient_or_service, amount, formatted_amount, channel, status) VALUES
         ('TXN-101', '09:14', 'J. Adeyemi — Consultation', 2000, '₦2,000', 'USSD', 'paid'),
@@ -217,8 +225,12 @@ export async function initializeDatabase() {
         ('TXN-105', '10:21', 'T. Yusuf — Ultrasound', 8000, '₦8,000', 'Bank transfer', 'paid')
         ON CONFLICT (id) DO NOTHING;
       `);
+    }
 
-      // Seed 17 Clinical Service Orders for Revenue Leakage Audit (Total = ₦340,000)
+    // 5. Seed 17 Clinical Service Orders for Revenue Leakage Audit if empty
+    const labCountRes = await pool.query('SELECT COUNT(*) FROM clinical_service_orders');
+    if (parseInt(labCountRes.rows[0].count, 10) === 0) {
+      console.log('[DB] Seeding 17 unbilled clinical service orders...');
       await pool.query(`
         INSERT INTO clinical_service_orders (id, patient_name, service_type, category, amount, status) VALUES
         -- 8 Full Blood Count orders (₦96,000 total, ₦12,000 each)
@@ -243,8 +255,12 @@ export async function initializeDatabase() {
         ('LAB-LIP-04', 'Patient LIP-04', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled')
         ON CONFLICT (id) DO NOTHING;
       `);
+    }
 
-      // Seed Corporate Retainers (3 Enterprise Retainers, ₦300,000 total)
+    // 6. Seed Corporate Retainers if empty
+    const corpCountRes = await pool.query('SELECT COUNT(*) FROM corporate_retainers');
+    if (parseInt(corpCountRes.rows[0].count, 10) === 0) {
+      console.log('[DB] Seeding 3 enterprise corporate retainers...');
       await pool.query(`
         INSERT INTO corporate_retainers (id, company_name, monthly_retainer, status, coverage_details) VALUES
         ('RET-001', 'Dangote Industries Executive Retainer', 120000, 'active', 'Tier 1 Executive Staff Full Medical Coverage'),
@@ -252,11 +268,9 @@ export async function initializeDatabase() {
         ('RET-003', 'Standard Chartered Corporate Retainer', 80000, 'active', 'Executive Health Check & Annual Pathology Retainer')
         ON CONFLICT (id) DO NOTHING;
       `);
-
-      console.log('[DB] Seed data successfully populated in PostgreSQL.');
     }
 
-    return { initialized: true, seeded: count === 0 };
+    return { initialized: true };
   } catch (err) {
     console.error('[DB] Error initializing database tables:', err);
     return { initialized: false, error: err.message };
