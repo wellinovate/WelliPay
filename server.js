@@ -1,5 +1,7 @@
+import 'dotenv/config';
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
@@ -16,14 +18,34 @@ app.use(express.json());
 // Initialize Firebase Admin (ESM modular style)
 let firebaseInitialized = false;
 try {
-  if (process.env.FIREBASE_SERVICE_ACCOUNT && getApps().length === 0) {
+  let credentialData = null;
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+    try {
+      credentialData = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } catch {
+      // It might be a file path
+      const filePath = path.resolve(__dirname, process.env.FIREBASE_SERVICE_ACCOUNT);
+      if (fs.existsSync(filePath)) {
+        credentialData = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+      }
+    }
+  } else {
+    // Check for default service account file in workspace
+    const defaultSaPath = path.resolve(__dirname, 'wellipay-firebase-adminsdk-fbsvc-466aae8605.json');
+    if (fs.existsSync(defaultSaPath)) {
+      credentialData = JSON.parse(fs.readFileSync(defaultSaPath, 'utf8'));
+    }
+  }
+
+  if (credentialData && getApps().length === 0) {
     initializeApp({
-      credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT))
+      credential: cert(credentialData)
     });
   }
+
   firebaseInitialized = getApps().length > 0;
   if (firebaseInitialized) {
-    console.log('[Auth] Firebase Admin initialized with service account.');
+    console.log('[Auth] Firebase Admin initialized with service account successfully.');
   } else if (process.env.NODE_ENV === 'production') {
     console.error('[Auth FATAL] FIREBASE_SERVICE_ACCOUNT is missing in production. Protected API routes will reject requests.');
   } else {

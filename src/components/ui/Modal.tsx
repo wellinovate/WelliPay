@@ -46,24 +46,24 @@ export const Modal: React.FC<ModalProps> = ({
       <div 
         role="dialog"
         aria-modal="true"
-        className={`relative w-full ${maxWidth} bg-[#fdfcf9] border border-[#201e1d]/30 rounded-lg shadow-2xl p-6 z-10 transition-all transform duration-200 animate-in fade-in zoom-in-95`}
+        className={`relative w-full ${maxWidth} bg-white border border-slate-200 rounded-xl shadow-2xl p-6 z-10 transition-all transform duration-200 animate-in fade-in zoom-in-95`}
       >
-        <div className="flex items-start justify-between pb-4 border-b border-[#201e1d]/15">
+        <div className="flex items-start justify-between pb-4 border-b border-slate-100">
           <div>
-            <h3 className="font-heading text-xl font-bold text-[#201e1d]">{title}</h3>
+            <h3 className="font-heading text-xl font-bold text-brand-navy tracking-tight">{title}</h3>
             {subtitle && (
-              <p className="text-xs text-[#605d5d] font-sans mt-0.5">{subtitle}</p>
+              <p className="text-xs text-slate-500 font-sans mt-0.5">{subtitle}</p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="text-[#7d7979] hover:text-[#201e1d] p-1 rounded hover:bg-black/5 transition-colors"
+            className="text-slate-400 hover:text-brand-navy p-1 rounded-lg hover:bg-slate-100 transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="py-4 font-sans text-sm text-[#2d2b2b]">
+        <div className="py-4 font-sans text-sm text-slate-700">
           {children}
         </div>
       </div>

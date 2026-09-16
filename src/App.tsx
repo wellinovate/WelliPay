@@ -28,8 +28,20 @@ export function App() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p>Loading...</p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[#F8FAFC]">
+        <div className="flex flex-col items-center gap-3">
+          <img 
+            src="/wellipay-mark.png" 
+            alt="WelliPay" 
+            className="w-12 h-auto object-contain animate-pulse" 
+          />
+          <div className="flex items-center gap-2 mt-2">
+            <span className="w-1.5 h-1.5 rounded-full bg-brand-teal animate-ping" />
+            <span className="text-xs font-semibold uppercase tracking-wider text-brand-navy/70 font-mono">
+              Loading WelliPay...
+            </span>
+          </div>
+        </div>
       </div>
     );
   }

@@ -81,11 +81,11 @@ export const ReconciliationQueue: React.FC = () => {
   const getChannelIcon = (channel: string) => {
     switch (channel) {
       case 'Bank transfer':
-        return <Building className="w-3.5 h-3.5 text-[#006786]" />;
+        return <Building className="w-3.5 h-3.5 text-brand-teal" />;
       case 'POS card':
-        return <CreditCard className="w-3.5 h-3.5 text-[#605d5d]" />;
+        return <CreditCard className="w-3.5 h-3.5 text-slate-500" />;
       case 'USSD':
-        return <PhoneCall className="w-3.5 h-3.5 text-[#edbb00]" />;
+        return <PhoneCall className="w-3.5 h-3.5 text-amber-500" />;
       default:
         return null;
     }
@@ -96,52 +96,52 @@ export const ReconciliationQueue: React.FC = () => {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-baseline justify-between gap-2">
         <div>
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-[#201e1d]">
+          <h1 className="font-heading text-3xl font-bold tracking-tight text-[#12244D]">
             Reconciliation
           </h1>
-          <p className="text-sm text-[#605d5d] mt-1 font-serif">
-            Match incoming payments to patients, invoices and providers. AI suggests a match with a confidence score — confirm or correct it.
+          <p className="text-sm text-[#475569] mt-1 font-sans">
+            Match incoming multi-channel payments to patients, invoices, and providers. AI calculates a confidence score based on fuzzy name and bill matching.
           </p>
         </div>
-        <div className="font-sans text-xs text-[#605d5d] bg-white px-3 py-1.5 rounded border border-[#d7d3d3] shadow-xs flex items-center gap-1.5">
+        <div className="font-sans text-xs text-[#475569] bg-white px-3.5 py-2 rounded-lg border border-[#e2e8f0] shadow-xs flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span>{confirmedCount} confirmed this week</span>
+          <span className="font-medium">{confirmedCount} confirmed this week</span>
           <span className="opacity-40">·</span>
-          <span className="font-semibold text-[#0088b0]">{unmatchedCount} unmatched</span>
+          <span className="font-bold text-[#0B6B69]">{unmatchedCount} unmatched</span>
         </div>
       </div>
 
       {/* Filter & Search Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
         {/* Status Segmented Control */}
-        <div className="inline-flex rounded border border-[#201e1d]/20 bg-white/70 p-0.5 text-xs font-sans">
+        <div className="inline-flex rounded-lg border border-[#cbd5e1] bg-white p-1 text-xs font-sans shadow-xs">
           <button
             onClick={() => setFilterReconStatus('unmatched')}
-            className={`px-3 py-1.5 rounded font-medium transition-all ${
+            className={`px-3 py-1.5 rounded-md font-semibold transition-all ${
               filterReconStatus === 'unmatched'
-                ? 'bg-[#201e1d] text-white shadow-xs'
-                : 'text-[#444141] hover:text-[#201e1d]'
+                ? 'bg-[#12244D] text-white shadow-xs'
+                : 'text-[#475569] hover:text-[#12244D]'
             }`}
           >
             Unmatched ({unmatchedCount})
           </button>
           <button
             onClick={() => setFilterReconStatus('suggested')}
-            className={`px-3 py-1.5 rounded font-medium transition-all flex items-center gap-1 ${
+            className={`px-3 py-1.5 rounded-md font-semibold transition-all flex items-center gap-1.5 ${
               filterReconStatus === 'suggested'
-                ? 'bg-[#201e1d] text-white shadow-xs'
-                : 'text-[#444141] hover:text-[#201e1d]'
+                ? 'bg-[#0B6B69] text-white shadow-xs'
+                : 'text-[#475569] hover:text-[#0B6B69]'
             }`}
           >
-            <Sparkles className="w-3 h-3 text-[#0088b0]" />
+            <Sparkles className="w-3.5 h-3.5" />
             Suggested ({suggestedCount})
           </button>
           <button
             onClick={() => setFilterReconStatus('confirmed')}
-            className={`px-3 py-1.5 rounded font-medium transition-all ${
+            className={`px-3 py-1.5 rounded-md font-semibold transition-all ${
               filterReconStatus === 'confirmed'
-                ? 'bg-[#201e1d] text-white shadow-xs'
-                : 'text-[#444141] hover:text-[#201e1d]'
+                ? 'bg-[#12244D] text-white shadow-xs'
+                : 'text-[#475569] hover:text-[#12244D]'
             }`}
           >
             Confirmed ({confirmedCount})
@@ -154,7 +154,7 @@ export const ReconciliationQueue: React.FC = () => {
           <select
             value={filterChannel}
             onChange={(e) => setFilterChannel(e.target.value)}
-            className="text-xs font-sans bg-white border border-[#201e1d]/20 rounded px-2.5 py-1.5 text-[#2d2b2b] focus:outline-none focus:border-[#0088b0]"
+            className="text-xs font-sans bg-white border border-[#cbd5e1] rounded-lg px-3 py-1.5 text-[#334155] focus:outline-none focus:border-[#0B6B69] shadow-xs"
           >
             <option value="All">Channel: All</option>
             <option value="Bank transfer">Bank transfer</option>
@@ -163,27 +163,27 @@ export const ReconciliationQueue: React.FC = () => {
           </select>
 
           {/* Time range indicator */}
-          <div className="hidden sm:flex items-center gap-1 text-xs font-sans bg-white border border-[#201e1d]/20 rounded px-2.5 py-1.5 text-[#605d5d]">
-            <Clock className="w-3 h-3 text-[#7d7979]" />
+          <div className="hidden sm:flex items-center gap-1.5 text-xs font-sans bg-white border border-[#cbd5e1] rounded-lg px-3 py-1.5 text-[#475569] shadow-xs">
+            <Clock className="w-3.5 h-3.5 text-[#64748b]" />
             <span>Last 7 days</span>
           </div>
 
           {/* Live Search Input */}
           <div className="relative flex-1 max-w-[280px]">
-            <Search className="w-3.5 h-3.5 text-[#7d7979] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Search className="w-3.5 h-3.5 text-[#94a3b8] absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search reference, name, amount…"
-              className="w-full pl-8 pr-3 py-1.5 text-xs font-sans bg-white border border-[#201e1d]/20 rounded text-[#201e1d] placeholder-[#9b9797] focus:outline-none focus:border-[#0088b0]"
+              className="w-full pl-8 pr-3 py-1.5 text-xs font-sans bg-white border border-[#cbd5e1] rounded-lg text-[#0f172a] placeholder-[#94a3b8] focus:outline-none focus:border-[#0B6B69] shadow-xs"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#7d7979] hover:text-[#201e1d]"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#0f172a]"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -191,18 +191,18 @@ export const ReconciliationQueue: React.FC = () => {
       </div>
 
       {/* Main Table Container */}
-      <div className="bg-white border border-[#201e1d]/20 rounded shadow-sm overflow-hidden">
+      <div className="bg-white border border-[#e2e8f0] rounded-xl shadow-subtle overflow-hidden">
         <div className="overflow-x-auto">
           <table className="broadsheet-table">
             <thead>
-              <tr className="bg-[#fcfbf9]">
+              <tr className="bg-[#f8fafc]">
                 <th style={{ width: '38px' }} className="text-center">
                   <input
                     type="checkbox"
                     checked={allFilteredSelected}
                     onChange={(e) => selectAllReconItems(e.target.checked)}
                     disabled={filterReconStatus === 'confirmed' || displayedItems.length === 0}
-                    className="rounded border-[#bab6b6] text-[#0088b0] focus:ring-[#0088b0] cursor-pointer"
+                    className="rounded border-[#cbd5e1] text-[#0B6B69] focus:ring-[#0B6B69] cursor-pointer"
                   />
                 </th>
                 <th style={{ width: '85px' }}>Date</th>
@@ -215,11 +215,11 @@ export const ReconciliationQueue: React.FC = () => {
             <tbody>
               {displayedItems.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-[#7d7979] font-sans">
+                  <td colSpan={6} className="text-center py-12 text-[#64748b] font-sans">
                     <p className="text-sm">No transactions match the selected filters.</p>
                     <button
                       onClick={() => { setSearchQuery(''); setFilterChannel('All'); }}
-                      className="text-xs text-[#0088b0] hover:underline mt-2 inline-block"
+                      className="text-xs font-semibold text-[#0B6B69] hover:underline mt-2 inline-block"
                     >
                       Clear search filters
                     </button>
@@ -232,8 +232,8 @@ export const ReconciliationQueue: React.FC = () => {
                     <tr
                       key={item.id}
                       className={`transition-colors ${
-                        item.selected ? 'bg-[#e9f8ff]/30' : ''
-                      } ${isConfirmed ? 'opacity-80 bg-[#f9f9f9]' : ''}`}
+                        item.selected ? 'bg-[#ebf7f6]/40' : ''
+                      } ${isConfirmed ? 'opacity-80 bg-[#f8fafc]' : 'hover:bg-[#f8fafc]'}`}
                     >
                       {/* Checkbox */}
                       <td className="text-center">
@@ -242,17 +242,17 @@ export const ReconciliationQueue: React.FC = () => {
                           checked={!!item.selected}
                           disabled={isConfirmed}
                           onChange={() => toggleSelectReconItem(item.id)}
-                          className="rounded border-[#bab6b6] text-[#0088b0] focus:ring-[#0088b0] cursor-pointer"
+                          className="rounded border-[#cbd5e1] text-[#0B6B69] focus:ring-[#0B6B69] cursor-pointer"
                         />
                       </td>
 
                       {/* Date */}
-                      <td className="font-sans text-xs text-[#605d5d]">
+                      <td className="font-sans text-xs text-[#64748b]">
                         {item.date}
                       </td>
 
                       {/* Amount */}
-                      <td className="font-heading font-semibold text-sm text-[#201e1d]">
+                      <td className="font-sans font-bold text-sm text-[#12244D]">
                         {item.formattedAmount}
                       </td>
 
@@ -260,11 +260,11 @@ export const ReconciliationQueue: React.FC = () => {
                       <td>
                         <div className="flex items-center gap-1.5">
                           {getChannelIcon(item.channel)}
-                          <span className="font-medium text-[#201e1d] font-sans text-xs">
+                          <span className="font-medium text-[#0f172a] font-sans text-xs">
                             {item.description}
                           </span>
                         </div>
-                        <span className="block text-[11px] text-[#7d7979] font-mono mt-0.5">
+                        <span className="block text-[11px] text-[#64748b] font-mono mt-0.5">
                           {item.rawDetails}
                         </span>
                       </td>
@@ -292,7 +292,7 @@ export const ReconciliationQueue: React.FC = () => {
                           <button
                             onClick={() => setInspectingItem(item)}
                             title="Inspect AI reasoning and payment metadata"
-                            className="text-[#9b9797] hover:text-[#0088b0] p-1"
+                            className="text-[#94a3b8] hover:text-[#0B6B69] p-1 transition-colors"
                           >
                             <HelpCircle className="w-3.5 h-3.5" />
                           </button>
@@ -302,8 +302,8 @@ export const ReconciliationQueue: React.FC = () => {
                       {/* Action Buttons */}
                       <td className="text-right">
                         {isConfirmed ? (
-                          <span className="inline-flex items-center gap-1 text-xs text-[#1e7e47] font-medium font-sans">
-                            <Check className="w-3.5 h-3.5 text-[#2a9d5c]" />
+                          <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-semibold font-sans">
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
                             Reconciled
                           </span>
                         ) : (
@@ -311,7 +311,7 @@ export const ReconciliationQueue: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => confirmReconItem(item.id)}
-                              className="px-2.5 py-1 text-xs font-medium rounded bg-[#0088b0] hover:bg-[#006786] text-white transition-colors flex items-center gap-1"
+                              className="px-2.5 py-1 text-xs font-semibold rounded-md bg-[#0B6B69] hover:bg-[#074C4A] text-white transition-colors shadow-xs flex items-center gap-1 cursor-pointer"
                             >
                               <Check className="w-3 h-3" />
                               Confirm
@@ -319,7 +319,7 @@ export const ReconciliationQueue: React.FC = () => {
                             <button
                               type="button"
                               onClick={() => rejectReconItem(item.id)}
-                              className="px-2 py-1 text-xs font-medium rounded text-[#605d5d] hover:text-[#d6006c] hover:bg-black/5 transition-colors"
+                              className="px-2 py-1 text-xs font-medium rounded-md text-[#64748b] hover:text-rose-600 hover:bg-rose-50 transition-colors"
                             >
                               Reject
                             </button>
@@ -334,21 +334,21 @@ export const ReconciliationQueue: React.FC = () => {
           </table>
         </div>
 
-        {/* Bottom Bulk Action Bar (Directly matching wireframe) */}
+        {/* Bottom Bulk Action Bar */}
         {filterReconStatus !== 'confirmed' && (
-          <div className="bg-[#fcfbf9] border-t border-[#201e1d]/15 px-6 py-3 flex items-center justify-between font-sans">
-            <span className="text-xs text-[#605d5d]">
-              <span className="font-semibold text-[#201e1d]">{selectedCount}</span> selected for bulk reconciliation
+          <div className="bg-[#f8fafc] border-t border-[#e2e8f0] px-6 py-3 flex items-center justify-between font-sans">
+            <span className="text-xs text-[#475569]">
+              <span className="font-bold text-[#12244D]">{selectedCount}</span> selected for bulk reconciliation
             </span>
 
             <button
               type="button"
               disabled={selectedCount === 0}
               onClick={bulkConfirmSelected}
-              className={`px-4 py-1.5 text-xs font-semibold rounded transition-all flex items-center gap-2 ${
+              className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center gap-2 ${
                 selectedCount > 0
-                  ? 'bg-[#0088b0] text-white hover:bg-[#006786] shadow-sm cursor-pointer'
-                  : 'bg-[#d7d3d3] text-[#7d7979] cursor-not-allowed'
+                  ? 'bg-[#0B6B69] text-white hover:bg-[#074C4A] shadow-card cursor-pointer'
+                  : 'bg-[#e2e8f0] text-[#94a3b8] cursor-not-allowed'
               }`}
             >
               <CheckCheck className="w-3.5 h-3.5" />
@@ -367,25 +367,25 @@ export const ReconciliationQueue: React.FC = () => {
       >
         {inspectingItem && (
           <div className="space-y-4">
-            <div className="p-3 bg-[#f3f2f2] rounded border border-[#201e1d]/10 space-y-2">
+            <div className="p-3.5 bg-[#F0F4FA] rounded-lg border border-[#12244D]/10 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#605d5d] uppercase tracking-wide font-semibold">Payment Source</span>
-                <span className="text-xs font-mono bg-white px-2 py-0.5 rounded border border-[#bab6b6]">
+                <span className="text-xs text-[#64748b] uppercase tracking-wide font-semibold">Payment Source</span>
+                <span className="text-xs font-mono bg-white px-2 py-0.5 rounded border border-[#cbd5e1] font-semibold text-[#12244D]">
                   {inspectingItem.channel}
                 </span>
               </div>
-              <div className="text-sm font-semibold text-[#201e1d]">
-                Raw Note: <span className="font-mono font-normal">{inspectingItem.rawDetails}</span>
+              <div className="text-sm font-semibold text-[#12244D]">
+                Raw Note: <span className="font-mono font-normal text-[#334155]">{inspectingItem.rawDetails}</span>
               </div>
-              <div className="text-xs text-[#605d5d]">
+              <div className="text-xs text-[#64748b]">
                 Date Captured: {inspectingItem.date}, 2026
               </div>
             </div>
 
-            <div className="p-3 bg-white rounded border border-[#0088b0]/30 shadow-xs space-y-2">
+            <div className="p-3.5 bg-white rounded-lg border border-[#0B6B69]/30 shadow-xs space-y-2.5">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-[#006786]">
-                  <Sparkles className="w-3.5 h-3.5" />
+                <div className="flex items-center gap-1.5 text-xs font-bold text-[#0B6B69]">
+                  <Sparkles className="w-3.5 h-3.5 text-[#0B6B69]" />
                   AI Suggested Resolution
                 </div>
                 <StatusChip
@@ -396,17 +396,17 @@ export const ReconciliationQueue: React.FC = () => {
               </div>
 
               <div className="pt-1">
-                <div className="text-sm font-bold text-[#201e1d]">
+                <div className="text-sm font-bold text-[#12244D]">
                   {inspectingItem.aiMatch.targetName}
                 </div>
                 {inspectingItem.aiMatch.invoiceNumber && (
-                  <div className="text-xs text-[#605d5d]">
-                    Matched Invoice: <span className="font-mono text-[#0088b0]">{inspectingItem.aiMatch.invoiceNumber}</span>
+                  <div className="text-xs text-[#64748b] mt-0.5">
+                    Matched Invoice: <span className="font-mono font-semibold text-[#0B6B69]">{inspectingItem.aiMatch.invoiceNumber}</span>
                   </div>
                 )}
               </div>
 
-              <p className="text-xs text-[#444141] bg-[#e9f8ff]/50 p-2 rounded border border-[#99e0ff]/40">
+              <p className="text-xs text-[#334155] bg-[#F0FAF9] p-2.5 rounded-md border border-[#0B6B69]/20 leading-relaxed">
                 {inspectingItem.aiMatch.explanation}
               </p>
             </div>
@@ -418,7 +418,7 @@ export const ReconciliationQueue: React.FC = () => {
                   rejectReconItem(inspectingItem.id, 'Cashier reassigned to unallocated holding');
                   setInspectingItem(null);
                 }}
-                className="px-3 py-1.5 rounded text-xs font-medium text-[#aa0b56] hover:bg-[#fff1f4] border border-[#ffc0d0]"
+                className="px-3 py-1.5 rounded-lg text-xs font-medium text-rose-700 hover:bg-rose-50 border border-rose-200 transition-colors"
               >
                 Reject / Flag
               </button>
@@ -428,7 +428,7 @@ export const ReconciliationQueue: React.FC = () => {
                   confirmReconItem(inspectingItem.id);
                   setInspectingItem(null);
                 }}
-                className="px-4 py-1.5 rounded text-xs font-medium bg-[#0088b0] hover:bg-[#006786] text-white"
+                className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#0B6B69] hover:bg-[#074C4A] text-white shadow-xs transition-colors"
               >
                 Confirm Match
               </button>

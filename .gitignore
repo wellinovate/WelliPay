@@ -38,3 +38,9 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+
+# Service Accounts & Secrets
+*firebase-adminsdk*.json
+*-adminsdk-*.json
+*.pem
+*.key

@@ -3,16 +3,19 @@
 @tailwind utilities;
 
 :root {
-  --color-bg: #f3f2f2;
-  --color-surface: #eae9e9;
-  --color-text: #201e1d;
-  --color-accent: #0088b0;
-  --color-accent-dark: #006786;
+  --color-bg: #f8fafc;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-brand-navy: #12244D;
+  --color-brand-teal: #0B6B69;
+  --color-accent: #0B6B69;
+  --color-accent-dark: #074C4A;
   --color-accent-2: #d6006c;
-  --color-divider: rgba(32, 30, 29, 0.16);
+  --color-divider: #e2e8f0;
 
-  --font-heading: "Source Serif 4", Georgia, serif;
-  --font-body: "Source Serif 4", Georgia, serif;
+  --font-heading: "Plus Jakarta Sans", Inter, system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, sans-serif;
+  --font-serif: "Source Serif 4", Georgia, serif;
 }
 
 body {
@@ -25,25 +28,26 @@ body {
 
 h1, h2, h3, h4, .font-heading {
   font-family: var(--font-heading);
+  color: var(--color-brand-navy);
 }
 
-/* Custom scrollbar matching Broadsheet look */
+/* Custom scrollbar matching WelliPay look */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #eae7e7;
+  background: #f1f5f9;
 }
 ::-webkit-scrollbar-thumb {
-  background: #bab6b6;
+  background: #cbd5e1;
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #9b9797;
+  background: #94a3b8;
 }
 
-/* Table styles adhering to Broadsheet desktop wireframes */
+/* Table styles adhering to WelliPay Broadsheet financial UI */
 .broadsheet-table {
   width: 100%;
   border-collapse: collapse;
@@ -51,21 +55,25 @@ h1, h2, h3, h4, .font-heading {
 }
 
 .broadsheet-table th {
-  padding: 10px 12px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #2d2b2b;
-  border-bottom: 2px solid #201e1d;
-  letter-spacing: 0.02em;
+  padding: 11px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #12244D;
+  background-color: #f8fafc;
+  border-bottom: 2px solid #12244D;
 }
 
 .broadsheet-table td {
-  padding: 12px 12px;
+  padding: 12px 14px;
   font-size: 13px;
-  border-bottom: 1px solid rgba(32, 30, 29, 0.12);
+  border-bottom: 1px solid #e2e8f0;
   vertical-align: middle;
+  color: #334155;
 }
 
 .broadsheet-table tr:hover td {
-  background-color: rgba(0, 136, 176, 0.02);
+  background-color: rgba(11, 107, 105, 0.03);
 }
+

@@ -2,6 +2,7 @@ import React from 'react';
 import { useWelliPay } from '../../context/WelliPayContext';
 import { useAuth } from '../../context/AuthContext';
 import { NavTab } from '../../types';
+import { Logo } from '../ui/Logo';
 import { 
   Building2, 
   ShieldCheck, 
@@ -52,27 +53,27 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f3f2f2] flex flex-col text-[#201e1d]">
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col text-[#0f172a] font-sans">
       {/* Top Notification / Toast Container */}
       <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-md pointer-events-none">
         {notifications.map((n) => (
           <div
             key={n.id}
-            className={`pointer-events-auto flex items-start gap-3 p-3.5 rounded shadow-lg border text-sm font-sans transition-all duration-300 animate-in slide-in-from-top-2 ${
+            className={`pointer-events-auto flex items-start gap-3 p-3.5 rounded-lg shadow-lg border text-sm font-sans transition-all duration-300 animate-in slide-in-from-top-2 ${
               n.type === 'success'
-                ? 'bg-white border-[#2a9d5c] text-[#1e7e47]'
+                ? 'bg-white border-emerald-500/30 text-emerald-800'
                 : n.type === 'error'
-                ? 'bg-white border-[#d6006c] text-[#a5372c]'
-                : 'bg-white border-[#0088b0] text-[#006786]'
+                ? 'bg-white border-rose-500/30 text-rose-800'
+                : 'bg-white border-[#0B6B69]/30 text-[#074C4A]'
             }`}
           >
-            {n.type === 'success' && <CheckCircle2 className="w-5 h-5 text-[#2a9d5c] flex-shrink-0 mt-0.5" />}
-            {n.type === 'error' && <AlertCircle className="w-5 h-5 text-[#d6006c] flex-shrink-0 mt-0.5" />}
-            {n.type === 'info' && <Info className="w-5 h-5 text-[#0088b0] flex-shrink-0 mt-0.5" />}
-            <span className="flex-1 text-[#201e1d] leading-snug">{n.message}</span>
+            {n.type === 'success' && <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />}
+            {n.type === 'error' && <AlertCircle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />}
+            {n.type === 'info' && <Info className="w-5 h-5 text-[#0B6B69] flex-shrink-0 mt-0.5" />}
+            <span className="flex-1 leading-snug">{n.message}</span>
             <button
               onClick={() => removeNotification(n.id)}
-              className="text-[#605d5d] hover:text-[#201e1d] p-0.5"
+              className="text-[#64748b] hover:text-[#0f172a] p-0.5 transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -81,17 +82,18 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       </div>
 
       {/* Primary Navigation Shell */}
-      <header className="border-b border-[#201e1d]/15 bg-[#f3f2f2] sticky top-0 z-30">
-        <div className="max-w-[1240px] mx-auto px-6 h-14 flex items-center justify-between">
+      <header className="border-b border-[#e2e8f0] bg-white/95 backdrop-blur-md sticky top-0 z-30 shadow-subtle">
+        <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
           
           {/* Brand & Main Tabs */}
           <div className="flex items-center gap-8">
-            <div className="flex items-center gap-2 cursor-pointer" onClick={() => setActiveTab('reconciliation')}>
-              <div className="w-8 h-8 rounded bg-[#0088b0] text-white flex items-center justify-center font-serif font-bold text-lg shadow-sm">
-                W
-              </div>
-              <span className="font-heading text-xl font-bold tracking-tight text-[#201e1d]">
-                WelliPay
+            <div 
+              className="flex items-center gap-3 cursor-pointer group py-1" 
+              onClick={() => setActiveTab('reconciliation')}
+            >
+              <Logo size="md" variant="horizontal" />
+              <span className="hidden xl:inline-block text-[11px] font-sans font-medium text-[#64748b] pl-3 border-l border-[#e2e8f0]">
+                One bill, every payer.
               </span>
             </div>
 
@@ -102,15 +104,19 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`px-3.5 py-1.5 rounded transition-all duration-150 flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-md font-medium text-xs transition-all duration-150 flex items-center gap-1.5 ${
                       isActive
-                        ? 'text-[#201e1d] font-semibold underline underline-offset-8 decoration-2 decoration-[#0088b0]'
-                        : 'text-[#605d5d] hover:text-[#201e1d]'
+                        ? 'text-[#12244D] bg-[#F0F4FA] font-bold shadow-xs border border-[#12244D]/10'
+                        : 'text-[#475569] hover:text-[#12244D] hover:bg-[#F8FAFC]'
                     }`}
                   >
                     <span>{tab.label}</span>
                     {tab.badge !== undefined && tab.badge > 0 && (
-                      <span className="text-[11px] px-1.5 py-0.2 rounded-full bg-[#0088b0]/10 text-[#0088b0] font-medium font-sans">
+                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold font-sans ${
+                        isActive
+                          ? 'bg-[#0B6B69] text-white'
+                          : 'bg-[#0B6B69]/10 text-[#0B6B69] border border-[#0B6B69]/20'
+                      }`}>
                         {tab.badge}
                       </span>
                     )}
@@ -125,20 +131,22 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
             <button
               onClick={togglePersona}
               title="Click to toggle between Lagoon Hospital (Provider) and Reliance HMO (Payer)"
-              className="group flex items-center gap-2.5 px-3 py-1.5 rounded border border-[#d7d3d3] hover:border-[#0088b0] bg-white/80 transition-all text-xs font-sans"
+              className="group flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-[#e2e8f0] hover:border-[#0B6B69] bg-white hover:bg-[#F8FAFC] transition-all text-xs font-sans shadow-xs"
             >
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                persona === 'provider' ? 'bg-[#0088b0]/15 text-[#006786]' : 'bg-[#d6006c]/15 text-[#d6006c]'
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-transform group-hover:scale-105 ${
+                persona === 'provider' 
+                  ? 'bg-[#12244D] text-white' 
+                  : 'bg-[#0B6B69] text-white'
               }`}>
                 {persona === 'provider' ? 'LS' : 'RH'}
               </div>
 
               <div className="text-left">
-                <div className="font-medium text-[#201e1d] flex items-center gap-1">
+                <div className="font-semibold text-[#12244D] flex items-center gap-1">
                   {persona === 'provider' ? 'Lagoon Specialist Hospital' : 'Reliance HMO'}
-                  <ArrowRightLeft className="w-3 h-3 text-[#7d7979] group-hover:text-[#0088b0] transition-colors" />
+                  <ArrowRightLeft className="w-3 h-3 text-[#64748b] group-hover:text-[#0B6B69] transition-colors" />
                 </div>
-                <div className="text-[10px] text-[#7d7979]">
+                <div className="text-[10px] text-[#64748b]">
                   {persona === 'provider' ? 'Healthcare Provider View' : 'Payer & Claims View'}
                 </div>
               </div>
@@ -148,7 +156,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               <button
                 onClick={() => logout()}
                 title={`Sign out (${user.email || 'User'})`}
-                className="p-2 rounded border border-[#d7d3d3] hover:border-[#d6006c] hover:bg-[#fff1f4] text-[#605d5d] hover:text-[#d6006c] transition-colors"
+                className="p-2 rounded-lg border border-[#e2e8f0] hover:border-rose-300 hover:bg-rose-50 text-[#64748b] hover:text-rose-600 transition-colors shadow-xs"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -158,7 +166,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       </header>
 
       {/* Main Screen Content */}
-      <main className="flex-1 max-w-[1240px] w-full mx-auto px-6 py-7">
+      <main className="flex-1 max-w-[1280px] w-full mx-auto px-6 py-7">
         {children}
       </main>
     </div>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   ReconciliationItem,
   ProviderTransaction,
@@ -66,8 +66,19 @@ interface WelliPayContextType {
 const WelliPayContext = createContext<WelliPayContextType | undefined>(undefined);
 
 export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Top priority starts at Reconciliation Queue as specified by user
-  const [activeTab, setActiveTab] = useState<NavTab>('reconciliation');
+  // Active tab persisted to localStorage across page reloads
+  const [activeTab, setActiveTab] = useState<NavTab>(() => {
+    const saved = localStorage.getItem('activeTab');
+    const validTabs: NavTab[] = ['dashboard', 'reconciliation', 'claims', 'invoices', 'patients', 'settings'];
+    if (saved && validTabs.includes(saved as NavTab)) {
+      return saved as NavTab;
+    }
+    return (saved as NavTab) || 'reconciliation';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  }, [activeTab]);
   const [persona, setPersona] = useState<PersonaType>('provider');
 
   // Reconciliation State

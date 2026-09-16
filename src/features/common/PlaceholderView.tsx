@@ -12,18 +12,18 @@ export const PlaceholderView: React.FC<PlaceholderViewProps> = ({ tab }) => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-[#201e1d]">
+          <h1 className="font-heading text-2xl md:text-3xl font-bold tracking-tight text-brand-navy">
             Invoices
           </h1>
-          <p className="text-sm text-[#605d5d] mt-1 font-serif">
+          <p className="text-sm text-slate-500 mt-1 font-sans">
             Hospital billing statements, outstanding balances, and matched payment receipts.
           </p>
         </div>
 
-        <div className="bg-white border border-[#201e1d]/20 rounded shadow-sm overflow-hidden">
-          <table className="broadsheet-table">
+        <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+          <table className="broadsheet-table w-full">
             <thead>
-              <tr className="bg-[#fcfbf9]">
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600">
                 <th>Invoice #</th>
                 <th>Patient / Account</th>
                 <th>Service Details</th>
@@ -31,33 +31,33 @@ export const PlaceholderView: React.FC<PlaceholderViewProps> = ({ tab }) => {
                 <th>Status</th>
               </tr>
             </thead>
-            <tbody>
-              <tr>
-                <td className="font-mono text-xs font-semibold">INV-92831</td>
-                <td>J. Umar</td>
-                <td>Cardiology Consultation & ECG</td>
-                <td className="font-heading font-semibold">₦25,000</td>
+            <tbody className="divide-y divide-slate-100">
+              <tr className="hover:bg-slate-50/70 transition-colors">
+                <td className="font-mono text-xs font-semibold text-brand-navy">INV-92831</td>
+                <td className="font-medium text-slate-800">J. Umar</td>
+                <td className="text-slate-600 text-xs">Cardiology Consultation & ECG</td>
+                <td className="font-heading font-semibold text-brand-navy">₦25,000</td>
                 <td><StatusChip status="paid" label="Reconciled" /></td>
               </tr>
-              <tr>
-                <td className="font-mono text-xs font-semibold">INV-93010</td>
-                <td>M. Bello</td>
-                <td>Pharmacy Prescription Checkout</td>
-                <td className="font-heading font-semibold">₦8,500</td>
+              <tr className="hover:bg-slate-50/70 transition-colors">
+                <td className="font-mono text-xs font-semibold text-brand-navy">INV-93010</td>
+                <td className="font-medium text-slate-800">M. Bello</td>
+                <td className="text-slate-600 text-xs">Pharmacy Prescription Checkout</td>
+                <td className="font-heading font-semibold text-brand-navy">₦8,500</td>
                 <td><StatusChip status="paid" label="Reconciled" /></td>
               </tr>
-              <tr>
-                <td className="font-mono text-xs font-semibold">INV-93044</td>
-                <td>ABC Diagnostics</td>
-                <td>Referred Pathology Panel Batch</td>
-                <td className="font-heading font-semibold">₦12,000</td>
+              <tr className="hover:bg-slate-50/70 transition-colors">
+                <td className="font-mono text-xs font-semibold text-brand-navy">INV-93044</td>
+                <td className="font-medium text-slate-800">ABC Diagnostics</td>
+                <td className="text-slate-600 text-xs">Referred Pathology Panel Batch</td>
+                <td className="font-heading font-semibold text-brand-navy">₦12,000</td>
                 <td><StatusChip status="paid" label="Reconciled" /></td>
               </tr>
-              <tr>
-                <td className="font-mono text-xs font-semibold">INV-93105</td>
-                <td>T. Adeyemi</td>
-                <td>Pediatric Inpatient Observation</td>
-                <td className="font-heading font-semibold">₦11,500</td>
+              <tr className="hover:bg-slate-50/70 transition-colors">
+                <td className="font-mono text-xs font-semibold text-brand-navy">INV-93105</td>
+                <td className="font-medium text-slate-800">T. Adeyemi</td>
+                <td className="text-slate-600 text-xs">Pediatric Inpatient Observation</td>
+                <td className="font-heading font-semibold text-brand-navy">₦11,500</td>
                 <td><StatusChip status="pending" label="Pending Match" /></td>
               </tr>
             </tbody>
@@ -71,18 +71,18 @@ export const PlaceholderView: React.FC<PlaceholderViewProps> = ({ tab }) => {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-[#201e1d]">
+          <h1 className="font-heading text-2xl md:text-3xl font-bold tracking-tight text-brand-navy">
             Patients
           </h1>
-          <p className="text-sm text-[#605d5d] mt-1 font-serif">
+          <p className="text-sm text-slate-500 mt-1 font-sans">
             Patient payment accounts, ledger balance history, and HMO insurance coverage.
           </p>
         </div>
 
-        <div className="bg-white border border-[#201e1d]/20 rounded shadow-sm overflow-hidden">
-          <table className="broadsheet-table">
+        <div className="bg-white border border-slate-200 rounded-xl shadow-xs overflow-hidden">
+          <table className="broadsheet-table w-full">
             <thead>
-              <tr className="bg-[#fcfbf9]">
+              <tr className="bg-slate-50 border-b border-slate-200 text-slate-600">
                 <th>Patient ID</th>
                 <th>Full Name</th>
                 <th>Primary Coverage</th>
@@ -90,33 +90,33 @@ export const PlaceholderView: React.FC<PlaceholderViewProps> = ({ tab }) => {
                 <th>Status</th>
               </tr>
             </thead>
-            <tbody>
-              <tr>
-                <td className="font-mono text-xs font-semibold">PAT-1082</td>
-                <td>J. Adeyemi</td>
-                <td>Self-Pay / Direct USSD</td>
-                <td className="font-heading font-semibold">₦0</td>
+            <tbody className="divide-y divide-slate-100">
+              <tr className="hover:bg-slate-50/70 transition-colors">
+                <td className="font-mono text-xs font-semibold text-brand-navy">PAT-1082</td>
+                <td className="font-medium text-slate-800">J. Adeyemi</td>
+                <td className="text-slate-600 text-xs">Self-Pay / Direct USSD</td>
+                <td className="font-heading font-semibold text-brand-navy">₦0</td>
                 <td><StatusChip status="paid" label="Up to date" /></td>
               </tr>
-              <tr>
-                <td className="font-mono text-xs font-semibold">PAT-1094</td>
-                <td>J. Umar</td>
-                <td>Reliance HMO (Silver Plan)</td>
-                <td className="font-heading font-semibold">₦0</td>
+              <tr className="hover:bg-slate-50/70 transition-colors">
+                <td className="font-mono text-xs font-semibold text-brand-navy">PAT-1094</td>
+                <td className="font-medium text-slate-800">J. Umar</td>
+                <td className="text-slate-600 text-xs">Reliance HMO (Silver Plan)</td>
+                <td className="font-heading font-semibold text-brand-navy">₦0</td>
                 <td><StatusChip status="paid" label="Up to date" /></td>
               </tr>
-              <tr>
-                <td className="font-mono text-xs font-semibold">PAT-1102</td>
-                <td>M. Bello</td>
-                <td>Self-Pay / POS Card</td>
-                <td className="font-heading font-semibold">₦8,500</td>
+              <tr className="hover:bg-slate-50/70 transition-colors">
+                <td className="font-mono text-xs font-semibold text-brand-navy">PAT-1102</td>
+                <td className="font-medium text-slate-800">M. Bello</td>
+                <td className="text-slate-600 text-xs">Self-Pay / POS Card</td>
+                <td className="font-heading font-semibold text-brand-navy">₦8,500</td>
                 <td><StatusChip status="pending" label="Unsettled" /></td>
               </tr>
-              <tr>
-                <td className="font-mono text-xs font-semibold">PAT-1115</td>
-                <td>T. Yusuf</td>
-                <td>Bank Transfer Direct</td>
-                <td className="font-heading font-semibold">₦0</td>
+              <tr className="hover:bg-slate-50/70 transition-colors">
+                <td className="font-mono text-xs font-semibold text-brand-navy">PAT-1115</td>
+                <td className="font-medium text-slate-800">T. Yusuf</td>
+                <td className="text-slate-600 text-xs">Bank Transfer Direct</td>
+                <td className="font-heading font-semibold text-brand-navy">₦0</td>
                 <td><StatusChip status="paid" label="Up to date" /></td>
               </tr>
             </tbody>
@@ -129,40 +129,40 @@ export const PlaceholderView: React.FC<PlaceholderViewProps> = ({ tab }) => {
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
-        <h1 className="font-heading text-3xl font-bold tracking-tight text-[#201e1d]">
+        <h1 className="font-heading text-2xl md:text-3xl font-bold tracking-tight text-brand-navy">
           Settings
         </h1>
-        <p className="text-sm text-[#605d5d] mt-1 font-serif">
+        <p className="text-sm text-slate-500 mt-1 font-sans">
           Payment gateway configurations, automated AI reconciliation parameters, and ledger sync rules.
         </p>
       </div>
 
-      <div className="bg-white border border-[#201e1d]/20 rounded p-6 shadow-sm space-y-6 font-sans">
-        <div className="border-b border-[#201e1d]/10 pb-4">
-          <h3 className="font-heading text-lg font-bold text-[#201e1d] mb-1">
+      <div className="bg-white border border-slate-200 rounded-xl p-6 shadow-xs space-y-6 font-sans">
+        <div className="border-b border-slate-100 pb-5">
+          <h3 className="font-heading text-lg font-bold text-brand-navy mb-1">
             AI Reconciliation Engine Thresholds
           </h3>
-          <p className="text-xs text-[#605d5d]">
+          <p className="text-xs text-slate-500">
             Configure minimum confidence score requirements for one-click and auto-confirm actions.
           </p>
 
           <div className="mt-4 space-y-3 text-xs">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50/70 border border-slate-100">
               <div>
-                <span className="font-semibold text-[#201e1d]">Auto-Suggestion Threshold</span>
-                <span className="block text-[#7d7979]">Mark match candidate as high confidence</span>
+                <span className="font-semibold text-brand-navy">Auto-Suggestion Threshold</span>
+                <span className="block text-slate-500 mt-0.5">Mark match candidate as high confidence</span>
               </div>
-              <span className="px-2.5 py-1 rounded bg-[#e9f8ff] text-[#006786] font-bold border border-[#99e0ff]">
+              <span className="px-2.5 py-1 rounded-full bg-brand-teal/10 text-brand-teal font-bold border border-brand-teal/30">
                 85%
               </span>
             </div>
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50/70 border border-slate-100">
               <div>
-                <span className="font-semibold text-[#201e1d]">Fuzzy Name Matching</span>
-                <span className="block text-[#7d7979]">Permit bank description abbreviation e.g. "JOHN U." → J. Umar</span>
+                <span className="font-semibold text-brand-navy">Fuzzy Name Matching</span>
+                <span className="block text-slate-500 mt-0.5">Permit bank description abbreviation e.g. &quot;JOHN U.&quot; → J. Umar</span>
               </div>
-              <span className="px-2.5 py-1 rounded bg-[#eafaf0] text-[#1e7e47] font-bold border border-[#2a9d5c]/30">
+              <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-200">
                 Enabled
               </span>
             </div>
@@ -170,16 +170,18 @@ export const PlaceholderView: React.FC<PlaceholderViewProps> = ({ tab }) => {
         </div>
 
         <div>
-          <h3 className="font-heading text-lg font-bold text-[#201e1d] mb-1 flex items-center gap-2">
-            <Database className="w-4 h-4 text-[#0088b0]" />
+          <h3 className="font-heading text-lg font-bold text-brand-navy mb-1 flex items-center gap-2">
+            <Database className="w-4 h-4 text-brand-teal" />
             Transactional Integrity (PostgreSQL)
           </h3>
-          <p className="text-xs text-[#605d5d]">
+          <p className="text-xs text-slate-500">
             All payment events and bulk reconciliation actions are recorded with double-entry journal rows and row-level locks.
           </p>
 
-          <div className="mt-3 p-3 bg-[#fcfbf9] rounded border border-[#201e1d]/15 text-xs text-[#444141] font-mono">
-            ENGINE STATUS: ACTIVE · ROW_LOCKS: ENABLED · ISOLATION: SERIALIZABLE
+          <div className="mt-3 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-700 font-mono flex items-center justify-between">
+            <span>ENGINE STATUS: <strong className="text-emerald-700">ACTIVE</strong></span>
+            <span>ROW_LOCKS: <strong className="text-brand-navy">ENABLED</strong></span>
+            <span>ISOLATION: <strong className="text-brand-teal">SERIALIZABLE</strong></span>
           </div>
         </div>
       </div>

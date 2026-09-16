@@ -31,18 +31,18 @@ export const StatusChip: React.FC<StatusChipProps> = ({
 
   switch (normalizedStatus) {
     case 'paid':
-      baseClasses += " bg-[#e9f8ff] text-[#006786] border border-[#99e0ff]";
+      baseClasses += " bg-[#EBF7F6] text-[#0B6B69] border border-[#0B6B69]/30";
       content = label || 'Paid';
       break;
 
     case 'approved':
-      baseClasses += " bg-[#eafaf0] text-[#1e7e47] border border-[#2a9d5c]/40";
+      baseClasses += " bg-[#eafaf0] text-[#166534] border border-[#166534]/30";
       content = label || 'Approved';
       break;
 
     case 'pending':
     case 'submitted':
-      baseClasses += " bg-[#f3f1ea] text-[#605d5d] border border-[#d7d3d3]";
+      baseClasses += " bg-[#f8fafc] text-[#475569] border border-[#cbd5e1]";
       content = label || (normalizedStatus === 'submitted' ? 'Submitted' : 'Pending');
       break;
 
@@ -70,18 +70,18 @@ export const StatusChip: React.FC<StatusChipProps> = ({
       break;
 
     case 'low':
-      baseClasses += " bg-[#f8f4f4] text-[#605d5d] border border-[#d7d3d3]";
+      baseClasses += " bg-[#f8fafc] text-[#64748b] border border-[#e2e8f0]";
       content = label || 'Low';
       break;
 
     case 'high-confidence':
     case 'high_confidence':
-      baseClasses += " bg-[#eaf1fb] text-[#006786] border border-[#0088b0]/30 hover:border-[#0088b0]";
+      baseClasses += " bg-[#F0FAF9] text-[#12244D] border border-[#0B6B69]/30 hover:border-[#0B6B69]";
       content = (
         <>
-          <span className="font-semibold text-[#004961]">{confidence !== undefined ? `${confidence}%` : '94%'}</span>
-          <span className="opacity-80">→</span>
-          <span className="truncate max-w-[210px]">{targetText || label || 'Matched'}</span>
+          <span className="font-bold text-[#0B6B69]">{confidence !== undefined ? `${confidence}%` : '94%'}</span>
+          <span className="opacity-60 text-[#12244D]">→</span>
+          <span className="truncate max-w-[210px] font-medium">{targetText || label || 'Matched'}</span>
         </>
       );
       break;
@@ -98,7 +98,7 @@ export const StatusChip: React.FC<StatusChipProps> = ({
       break;
 
     default:
-      baseClasses += " bg-[#f3f1ea] text-[#444141] border border-[#d7d3d3]";
+      baseClasses += " bg-[#f8fafc] text-[#334155] border border-[#cbd5e1]";
       content = label || status;
   }
 
