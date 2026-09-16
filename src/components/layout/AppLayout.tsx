@@ -161,36 +161,6 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       <main className="flex-1 max-w-[1240px] w-full mx-auto px-6 py-7">
         {children}
       </main>
-
-      {/* Subtle Footer Bar */}
-      <footer className="border-t border-[#201e1d]/10 py-4 px-6 text-xs text-[#7d7979] font-sans">
-        <div className="max-w-[1240px] mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-            <span>WelliPay Core · Real-time AI Matching Active (PostgreSQL Transaction Engine)</span>
-          </div>
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => { setActiveTab('reconciliation'); setPersona('provider'); }}
-              className="hover:text-[#201e1d] underline decoration-dotted"
-            >
-              Reconciliation Queue (Wireframe 1d)
-            </button>
-            <button 
-              onClick={() => { setActiveTab('dashboard'); setPersona('provider'); }}
-              className="hover:text-[#201e1d] underline decoration-dotted"
-            >
-              Provider Dashboard (Wireframe 1a)
-            </button>
-            <button 
-              onClick={() => { setActiveTab('claims'); setPersona('hmo'); }}
-              className="hover:text-[#201e1d] underline decoration-dotted"
-            >
-              HMO Claims (Wireframe 3a)
-            </button>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };
