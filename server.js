@@ -1,7 +1,8 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import admin from 'firebase-admin';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import { pool, checkDatabaseHealth, initializeDatabase, query } from './server/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -12,39 +13,34 @@ const PORT = process.env.PORT || 5174;
 
 app.use(express.json());
 
-// Initialize Firebase Admin
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  try {
-    const serviceAccount = typeof process.env.FIREBASE_SERVICE_ACCOUNT === 'string'
-      ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
-      : process.env.FIREBASE_SERVICE_ACCOUNT;
-
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
+// Initialize Firebase Admin (ESM modular style)
+let firebaseInitialized = false;
+try {
+  if (process.env.FIREBASE_SERVICE_ACCOUNT && getApps().length === 0) {
+    initializeApp({
+      credential: cert(JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT))
     });
-    console.log('[Auth] Firebase Admin initialized with service account.');
-  } catch (err) {
-    console.error('[Auth] Failed to initialize Firebase Admin:', err.message);
   }
-} else {
-  if (process.env.NODE_ENV === 'production') {
+  firebaseInitialized = getApps().length > 0;
+  if (firebaseInitialized) {
+    console.log('[Auth] Firebase Admin initialized with service account.');
+  } else if (process.env.NODE_ENV === 'production') {
     console.error('[Auth FATAL] FIREBASE_SERVICE_ACCOUNT is missing in production. Protected API routes will reject requests.');
   } else {
     console.log('[Auth] FIREBASE_SERVICE_ACCOUNT not set. Running in development demo bypass mode.');
   }
+} catch (err) {
+  console.error('[Auth] Failed to initialize Firebase Admin:', err.message);
 }
 
-// Auth middleware — strictly enforces valid Firebase login token in production
+// Auth middleware — blocks any request without a valid Firebase login token in production
 async function requireAuth(req, res, next) {
-  // Check if Firebase Admin is initialized
-  if (!admin.apps.length) {
-    // Demo-mode bypass only applies in non-production environments
+  if (!firebaseInitialized) {
     if (process.env.NODE_ENV !== 'production') {
       return next();
     }
-    // In production, missing or invalid service account fails immediately with 500
-    return res.status(500).json({ 
-      error: 'Authentication service unavailable: Firebase Admin service account is not configured in production.' 
+    return res.status(500).json({
+      error: 'Authentication service unavailable: Firebase Admin service account is not configured in production.'
     });
   }
 
@@ -55,7 +51,7 @@ async function requireAuth(req, res, next) {
 
   try {
     const token = authHeader.split('Bearer ')[1];
-    req.user = await admin.auth().verifyIdToken(token);
+    req.user = await getAuth().verifyIdToken(token);
     next();
   } catch (err) {
     console.warn('[Auth] Token verification failed:', err.message);
@@ -83,7 +79,7 @@ app.get('/api/health', async (req, res) => {
     port: PORT,
     database: dbHealth,
     auth: {
-      firebaseAdminActive: admin.apps.length > 0,
+      firebaseAdminActive: firebaseInitialized,
       serviceAccountConfigured: !!process.env.FIREBASE_SERVICE_ACCOUNT
     }
   });
