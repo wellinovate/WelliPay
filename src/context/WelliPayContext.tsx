@@ -331,7 +331,9 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             ? `₦${(newPatientDirect / 1000000).toFixed(2)}M` 
             : `₦${Math.round(newPatientDirect / 1000)}K`,
           totalToday: newTotal,
-          formattedTotalToday: `₦${(newTotal / 1000000).toFixed(2)}M`
+          formattedTotalToday: newTotal >= 1000000 
+            ? `₦${(newTotal / 1000000).toFixed(2)}M` 
+            : `₦${Math.round(newTotal / 1000)}K`
         };
       });
     }

@@ -285,15 +285,25 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
         LIMIT 50
       `);
 
-      // Patient direct collection
+      // 1. Total collections today across all payment channels in provider_transactions
+      const totalTodayRes = await query(`
+        SELECT COALESCE(SUM(amount), 0) as total
+        FROM provider_transactions
+        WHERE status = 'paid'
+          AND channel IN ('Card', 'POS card', 'USSD', 'Transfer', 'Bank transfer')
+      `);
+      const totalToday = parseFloat(totalTodayRes.rows[0]?.total || 0);
+
+      // 2. Patient direct collections (standalone metric from direct payment channels)
       const patientDirectRes = await query(`
         SELECT COALESCE(SUM(amount), 0) as total
         FROM provider_transactions
-        WHERE channel IN ('POS card', 'Card', 'USSD', 'Transfer') AND status = 'paid'
+        WHERE status = 'paid'
+          AND channel IN ('Card', 'POS card', 'USSD', 'Transfer', 'Bank transfer')
       `);
       const patientDirect = parseFloat(patientDirectRes.rows[0]?.total || 0);
 
-      // HMO receivables (dynamically sum submitted & approved claims)
+      // 3. HMO receivables (standalone metric: dynamically sum submitted & approved claims)
       const hmoRes = await query(`
         SELECT COALESCE(SUM(amount), 0) as total, COUNT(*) as count
         FROM hmo_claims
@@ -302,7 +312,7 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
       const hmoReceivables = parseFloat(hmoRes.rows[0]?.total || 0);
       const pendingClaimsCount = parseInt(hmoRes.rows[0]?.count || 0, 10);
 
-      // Corporate retainers
+      // 4. Corporate retainers (standalone metric: monthly enterprise contracts)
       const corporateRes = await query(`
         SELECT COALESCE(SUM(monthly_retainer), 0) as total, COUNT(*) as count
         FROM corporate_retainers
@@ -311,7 +321,7 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
       const corporateRetainers = parseFloat(corporateRes.rows[0]?.total || 0) || 300000;
       const corporateCount = parseInt(corporateRes.rows[0]?.count || 0, 10) || 3;
 
-      // Unbilled clinical leakage audit
+      // 5. Unbilled clinical leakage audit
       const leakageRes = await query(`
         SELECT service_type as name, COUNT(*) as "orderCount", SUM(amount) as amount
         FROM clinical_service_orders
@@ -329,17 +339,14 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
         formattedAmount: `₦${parseFloat(r.amount).toLocaleString()}`
       }));
 
-      const displayPatientDirect = patientDirect > 0 ? patientDirect : 640000;
-      const totalToday = displayPatientDirect + hmoReceivables + corporateRetainers;
-
       return res.json({
         source: 'postgresql',
         metrics: {
           totalToday,
           formattedTotalToday: formatNaira(totalToday),
           totalTodayTrend: '+14.2% vs yesterday',
-          patientDirect: displayPatientDirect,
-          formattedPatientDirect: formatNaira(displayPatientDirect),
+          patientDirect,
+          formattedPatientDirect: formatNaira(patientDirect),
           hmoReceivables,
           formattedHmoReceivables: formatNaira(hmoReceivables),
           pendingClaimsCount,
