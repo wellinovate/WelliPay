@@ -4,7 +4,9 @@ import {
   ProviderTransaction,
   HMOClaim,
   PersonaType,
-  NavTab
+  NavTab,
+  DashboardMetrics,
+  RevenueLeakageSummary
 } from '../types';
 import {
   INITIAL_RECONCILIATION_ITEMS,
@@ -47,6 +49,8 @@ interface WelliPayContextType {
 
   // Provider Data & Operations
   providerTransactions: ProviderTransaction[];
+  dashboardMetrics: DashboardMetrics;
+  leakageSummary: RevenueLeakageSummary;
   unbilledExposureResolved: boolean;
   resolveUnbilledExposure: () => void;
   addProviderTransaction: (t: ProviderTransaction) => void;
@@ -62,6 +66,32 @@ interface WelliPayContextType {
   addNotification: (message: string, type?: 'success' | 'info' | 'error') => void;
   removeNotification: (id: string) => void;
 }
+
+const DEFAULT_DASHBOARD_METRICS: DashboardMetrics = {
+  totalToday: 2840000,
+  formattedTotalToday: '₦2.84M',
+  totalTodayTrend: '+14.2% vs yesterday',
+  patientDirect: 640000,
+  formattedPatientDirect: '₦640K',
+  hmoReceivables: 1900000,
+  formattedHmoReceivables: '₦1.9M',
+  pendingClaimsCount: 6,
+  corporateRetainers: 300000,
+  formattedCorporateRetainers: '₦300K',
+  corporateCount: 3,
+};
+
+const DEFAULT_LEAKAGE_SUMMARY: RevenueLeakageSummary = {
+  unbilledCount: 17,
+  totalExposure: 340000,
+  formattedTotalExposure: '₦340,000',
+  isResolved: false,
+  breakdown: [
+    { name: 'Full Blood Count (8 orders)', orderCount: 8, amount: 96000, formattedAmount: '₦96,000' },
+    { name: 'Electrolytes, Urea & Creatinine (5 orders)', orderCount: 5, amount: 140000, formattedAmount: '₦140,000' },
+    { name: 'Lipid Profile Panels (4 orders)', orderCount: 4, amount: 104000, formattedAmount: '₦104,000' }
+  ]
+};
 
 const WelliPayContext = createContext<WelliPayContextType | undefined>(undefined);
 
@@ -89,6 +119,8 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Provider State
   const [providerTransactions, setProviderTransactions] = useState<ProviderTransaction[]>(INITIAL_PROVIDER_TRANSACTIONS);
+  const [dashboardMetrics, setDashboardMetrics] = useState<DashboardMetrics>(DEFAULT_DASHBOARD_METRICS);
+  const [leakageSummary, setLeakageSummary] = useState<RevenueLeakageSummary>(DEFAULT_LEAKAGE_SUMMARY);
   const [unbilledExposureResolved, setUnbilledExposureResolved] = useState<boolean>(false);
 
   // HMO State
@@ -153,6 +185,26 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             .then(claimData => {
               if (claimData && claimData.claims && claimData.claims.length > 0) {
                 setHmoClaims(claimData.claims);
+              }
+            })
+            .catch(() => {});
+
+          fetch('/api/dashboard', { headers })
+            .then(r => r.json())
+            .then(dashData => {
+              if (dashData) {
+                if (dashData.transactions && dashData.transactions.length > 0) {
+                  setProviderTransactions(dashData.transactions);
+                }
+                if (dashData.metrics) {
+                  setDashboardMetrics(dashData.metrics);
+                }
+                if (dashData.leakage) {
+                  setLeakageSummary(dashData.leakage);
+                  if (dashData.leakage.isResolved) {
+                    setUnbilledExposureResolved(true);
+                  }
+                }
               }
             })
             .catch(() => {});
@@ -254,11 +306,43 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Provider Actions
   const resolveUnbilledExposure = () => {
     setUnbilledExposureResolved(true);
+    setLeakageSummary(prev => ({ ...prev, isResolved: true, unbilledCount: 0 }));
     addNotification('Automated charge-capture generated invoices for 17 unbilled lab procedures (₦340,000 exposure mitigated).', 'success');
+
+    getAuthHeaders().then(headers => {
+      fetch('/api/dashboard/resolve-leakage', {
+        method: 'POST',
+        headers
+      }).catch(() => {});
+    });
   };
 
   const addProviderTransaction = (t: ProviderTransaction) => {
     setProviderTransactions(prev => [t, ...prev]);
+
+    if (t.status === 'paid') {
+      setDashboardMetrics(prev => {
+        const newPatientDirect = prev.patientDirect + t.amount;
+        const newTotal = prev.totalToday + t.amount;
+        return {
+          ...prev,
+          patientDirect: newPatientDirect,
+          formattedPatientDirect: newPatientDirect >= 1000000 
+            ? `₦${(newPatientDirect / 1000000).toFixed(2)}M` 
+            : `₦${Math.round(newPatientDirect / 1000)}K`,
+          totalToday: newTotal,
+          formattedTotalToday: `₦${(newTotal / 1000000).toFixed(2)}M`
+        };
+      });
+    }
+
+    getAuthHeaders().then(headers => {
+      fetch('/api/dashboard/transactions', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(t)
+      }).catch(() => {});
+    });
   };
 
   // HMO Actions
@@ -322,6 +406,8 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         confirmedCount,
         selectedCount,
         providerTransactions,
+        dashboardMetrics,
+        leakageSummary,
         unbilledExposureResolved,
         resolveUnbilledExposure,
         addProviderTransaction,

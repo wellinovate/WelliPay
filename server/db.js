@@ -138,7 +138,7 @@ export async function initializeDatabase() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
-      CREATE TABLE IF NOT EXISTS provider_transactions (
+        CREATE TABLE IF NOT EXISTS provider_transactions (
         id VARCHAR(50) PRIMARY KEY,
         time_captured VARCHAR(50) NOT NULL,
         patient_or_service VARCHAR(255) NOT NULL,
@@ -147,6 +147,25 @@ export async function initializeDatabase() {
         channel VARCHAR(50) NOT NULL,
         status VARCHAR(50) NOT NULL,
         created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS clinical_service_orders (
+        id VARCHAR(50) PRIMARY KEY,
+        patient_name VARCHAR(255) NOT NULL,
+        service_type VARCHAR(100) NOT NULL,
+        category VARCHAR(50) DEFAULT 'Laboratory',
+        amount NUMERIC(15, 2) NOT NULL,
+        status VARCHAR(50) DEFAULT 'unbilled',
+        performed_at TIMESTAMPTZ DEFAULT NOW(),
+        invoice_id VARCHAR(50)
+      );
+
+      CREATE TABLE IF NOT EXISTS corporate_retainers (
+        id VARCHAR(50) PRIMARY KEY,
+        company_name VARCHAR(255) NOT NULL,
+        monthly_retainer NUMERIC(15, 2) NOT NULL,
+        status VARCHAR(50) DEFAULT 'active',
+        coverage_details VARCHAR(255)
       );
     `);
 
@@ -196,6 +215,41 @@ export async function initializeDatabase() {
         ('TXN-103', '09:40', 'F. Okon — Deposit', 50000, '₦50,000', 'Transfer', 'paid'),
         ('TXN-104', '10:05', 'M. Bello — Pharmacy', 8500, '₦8,500', 'Card', 'failed'),
         ('TXN-105', '10:21', 'T. Yusuf — Ultrasound', 8000, '₦8,000', 'Bank transfer', 'paid')
+        ON CONFLICT (id) DO NOTHING;
+      `);
+
+      // Seed 17 Clinical Service Orders for Revenue Leakage Audit (Total = ₦340,000)
+      await pool.query(`
+        INSERT INTO clinical_service_orders (id, patient_name, service_type, category, amount, status) VALUES
+        -- 8 Full Blood Count orders (₦96,000 total, ₦12,000 each)
+        ('LAB-FBC-01', 'Patient FBC-01', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-02', 'Patient FBC-02', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-03', 'Patient FBC-03', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-04', 'Patient FBC-04', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-05', 'Patient FBC-05', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-06', 'Patient FBC-06', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-07', 'Patient FBC-07', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-08', 'Patient FBC-08', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        -- 5 Electrolytes, Urea & Creatinine orders (₦140,000 total, ₦28,000 each)
+        ('LAB-EUC-01', 'Patient EUC-01', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
+        ('LAB-EUC-02', 'Patient EUC-02', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
+        ('LAB-EUC-03', 'Patient EUC-03', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
+        ('LAB-EUC-04', 'Patient EUC-04', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
+        ('LAB-EUC-05', 'Patient EUC-05', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
+        -- 4 Lipid Profile Panels (₦104,000 total, ₦26,000 each)
+        ('LAB-LIP-01', 'Patient LIP-01', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
+        ('LAB-LIP-02', 'Patient LIP-02', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
+        ('LAB-LIP-03', 'Patient LIP-03', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
+        ('LAB-LIP-04', 'Patient LIP-04', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled')
+        ON CONFLICT (id) DO NOTHING;
+      `);
+
+      // Seed Corporate Retainers (3 Enterprise Retainers, ₦300,000 total)
+      await pool.query(`
+        INSERT INTO corporate_retainers (id, company_name, monthly_retainer, status, coverage_details) VALUES
+        ('RET-001', 'Dangote Industries Executive Retainer', 120000, 'active', 'Tier 1 Executive Staff Full Medical Coverage'),
+        ('RET-002', 'MTN Nigeria Corporate Health Account', 100000, 'active', 'Enterprise Triage & Outpatient Health Retainer'),
+        ('RET-003', 'Standard Chartered Corporate Retainer', 80000, 'active', 'Executive Health Check & Annual Pathology Retainer')
         ON CONFLICT (id) DO NOTHING;
       `);
 

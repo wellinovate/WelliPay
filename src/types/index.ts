@@ -63,3 +63,39 @@ export interface HMOClaim {
 export type PersonaType = 'provider' | 'hmo';
 
 export type NavTab = 'dashboard' | 'reconciliation' | 'claims' | 'invoices' | 'patients' | 'settings';
+
+export interface DashboardMetrics {
+  totalToday: number;
+  formattedTotalToday: string;
+  totalTodayTrend: string;
+  patientDirect: number;
+  formattedPatientDirect: string;
+  hmoReceivables: number;
+  formattedHmoReceivables: string;
+  pendingClaimsCount: number;
+  corporateRetainers: number;
+  formattedCorporateRetainers: string;
+  corporateCount: number;
+}
+
+export interface LeakageBreakdownItem {
+  name: string;
+  orderCount: number;
+  amount: number;
+  formattedAmount: string;
+}
+
+export interface RevenueLeakageSummary {
+  unbilledCount: number;
+  totalExposure: number;
+  formattedTotalExposure: string;
+  isResolved: boolean;
+  breakdown: LeakageBreakdownItem[];
+}
+
+export interface DashboardResponse {
+  source: 'postgresql' | 'fallback';
+  metrics: DashboardMetrics;
+  leakage: RevenueLeakageSummary;
+  transactions: ProviderTransaction[];
+}

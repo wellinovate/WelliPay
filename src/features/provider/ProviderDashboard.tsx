@@ -18,6 +18,8 @@ import { ProviderTransaction } from '../../types';
 export const ProviderDashboard: React.FC = () => {
   const { 
     providerTransactions, 
+    dashboardMetrics,
+    leakageSummary,
     unbilledExposureResolved, 
     resolveUnbilledExposure,
     addProviderTransaction,
@@ -75,7 +77,7 @@ export const ProviderDashboard: React.FC = () => {
             New Payment
           </button>
           <div className="font-sans text-xs text-[#475569] bg-white px-3 py-2 rounded-lg border border-[#e2e8f0] shadow-xs">
-            <span className="font-bold text-[#12244D]">₦2.84M today</span> · 4 channels active
+            <span className="font-bold text-[#12244D]">{dashboardMetrics.formattedTotalToday} today</span> · 4 channels active
           </div>
         </div>
       </div>
@@ -85,21 +87,21 @@ export const ProviderDashboard: React.FC = () => {
         {/* Total Today */}
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#12244D]/30 transition-all">
           <div className="font-sans text-3xl font-extrabold text-[#12244D] tracking-tight">
-            ₦2.84M
+            {dashboardMetrics.formattedTotalToday}
           </div>
           <div className="text-[11px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-1">
             Total Today
           </div>
           <div className="mt-2 text-xs text-emerald-700 flex items-center gap-1 font-sans font-medium">
             <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-            <span>+14.2% vs yesterday</span>
+            <span>{dashboardMetrics.totalTodayTrend}</span>
           </div>
         </div>
 
         {/* Patient Direct */}
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#12244D]/30 transition-all">
           <div className="font-sans text-3xl font-extrabold text-[#12244D] tracking-tight">
-            ₦640K
+            {dashboardMetrics.formattedPatientDirect}
           </div>
           <div className="text-[11px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-1">
             Patient Direct
@@ -112,7 +114,7 @@ export const ProviderDashboard: React.FC = () => {
         {/* HMO Claims */}
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#0B6B69]/40 transition-all">
           <div className="font-sans text-3xl font-extrabold text-[#0B6B69] tracking-tight">
-            ₦1.9M
+            {dashboardMetrics.formattedHmoReceivables}
           </div>
           <div className="text-[11px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-1">
             HMO Receivables
@@ -121,7 +123,7 @@ export const ProviderDashboard: React.FC = () => {
             className="mt-2 text-xs text-[#0B6B69] font-sans font-semibold cursor-pointer hover:underline flex items-center gap-1" 
             onClick={() => setActiveTab('claims')}
           >
-            <span>View 6 pending claims</span>
+            <span>View {dashboardMetrics.pendingClaimsCount} pending claims</span>
             <ArrowUpRight className="w-3.5 h-3.5" />
           </div>
         </div>
@@ -129,13 +131,13 @@ export const ProviderDashboard: React.FC = () => {
         {/* Corporate */}
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#12244D]/30 transition-all">
           <div className="font-sans text-3xl font-extrabold text-[#12244D] tracking-tight">
-            ₦300K
+            {dashboardMetrics.formattedCorporateRetainers}
           </div>
           <div className="text-[11px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-1">
             Corporate Retainers
           </div>
           <div className="mt-2 text-xs text-[#64748b] font-sans">
-            3 enterprise retainers
+            {dashboardMetrics.corporateCount} enterprise retainers
           </div>
         </div>
       </div>
@@ -148,7 +150,7 @@ export const ProviderDashboard: React.FC = () => {
               Revenue Leakage
             </span>
             <div className="text-[#a5372c] leading-relaxed">
-              <span className="font-bold">17 laboratory services</span> completed with no corresponding invoice — estimated exposure <span className="font-bold">₦340,000</span>.
+              <span className="font-bold">{leakageSummary.unbilledCount} laboratory services</span> completed with no corresponding invoice — estimated exposure <span className="font-bold">{leakageSummary.formattedTotalExposure}</span>.
             </div>
           </div>
 
@@ -225,29 +227,23 @@ export const ProviderDashboard: React.FC = () => {
         isOpen={isLeakageModalOpen}
         onClose={() => setIsLeakageModalOpen(false)}
         title="Unbilled Services Exposure Resolution"
-        subtitle="17 completed lab diagnostics without billed invoices"
+        subtitle={`${leakageSummary.unbilledCount} completed lab diagnostics without billed invoices`}
       >
         <div className="space-y-4">
           <p className="text-xs text-[#475569] leading-relaxed">
-            The automated charge audit identified 17 laboratory diagnostic tests performed over the last 48 hours that had test results logged in the LIS (Laboratory Information System) but no corresponding billing charge entered into the hospital billing ledger.
+            The automated charge audit identified {leakageSummary.unbilledCount} laboratory diagnostic tests performed over the last 48 hours that had test results logged in the LIS (Laboratory Information System) but no corresponding billing charge entered into the hospital billing ledger.
           </p>
 
           <div className="bg-[#F8FAFC] p-3.5 rounded-lg border border-[#e2e8f0] space-y-2 text-xs font-sans">
-            <div className="flex justify-between font-medium text-[#334155]">
-              <span>Full Blood Count (8 orders)</span>
-              <span className="font-bold text-[#12244D]">₦96,000</span>
-            </div>
-            <div className="flex justify-between font-medium text-[#334155]">
-              <span>Electrolytes, Urea & Creatinine (5 orders)</span>
-              <span className="font-bold text-[#12244D]">₦140,000</span>
-            </div>
-            <div className="flex justify-between font-medium text-[#334155]">
-              <span>Lipid Profile Panels (4 orders)</span>
-              <span className="font-bold text-[#12244D]">₦104,000</span>
-            </div>
+            {leakageSummary.breakdown.map((item, idx) => (
+              <div key={idx} className="flex justify-between font-medium text-[#334155]">
+                <span>{item.name}</span>
+                <span className="font-bold text-[#12244D]">{item.formattedAmount}</span>
+              </div>
+            ))}
             <div className="border-t border-[#e2e8f0] pt-2 flex justify-between font-bold text-[#d6006c]">
               <span>Total Unbilled Exposure</span>
-              <span>₦340,000</span>
+              <span>{leakageSummary.formattedTotalExposure}</span>
             </div>
           </div>
 
@@ -267,7 +263,7 @@ export const ProviderDashboard: React.FC = () => {
               }}
               className="px-4 py-2 rounded-lg text-xs font-bold bg-[#d6006c] hover:bg-[#aa0b56] text-white transition-colors shadow-xs cursor-pointer"
             >
-              Generate 17 Invoices & Bill (₦340,000)
+              Generate {leakageSummary.unbilledCount} Invoices & Bill ({leakageSummary.formattedTotalExposure})
             </button>
           </div>
         </div>
