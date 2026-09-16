@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Logo } from './ui/Logo';
-import { ShieldCheck, Lock, Mail, AlertCircle, ArrowRight, Loader2, Sparkles, Building, Shield } from 'lucide-react';
+import { ShieldCheck, Lock, Mail, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 
 export const Login: React.FC = () => {
-  const { login, loginDemo } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +20,7 @@ export const Login: React.FC = () => {
     } catch (err: any) {
       console.error('Login error:', err);
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
-        setError('Invalid email or password. Please check your credentials or use 1-Click Demo Access below.');
+        setError('Invalid email or password. Please check your credentials.');
       } else if (err.code === 'auth/too-many-requests') {
         setError('Too many failed attempts. Please try again in a few moments.');
       } else {
@@ -75,7 +75,7 @@ export const Login: React.FC = () => {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="billing@lagoonhospital.com"
+                  placeholder="billing@hospital.com"
                   className="w-full pl-9 pr-3 py-2 text-xs font-sans bg-white border border-[#cbd5e1] rounded-lg text-[#0f172a] placeholder-[#94a3b8] focus:outline-none focus:border-[#0B6B69] focus:ring-1 focus:ring-[#0B6B69] transition-all"
                 />
               </div>
@@ -118,47 +118,6 @@ export const Login: React.FC = () => {
               )}
             </button>
           </form>
-
-          {/* Quick 1-Click Demo Explorer */}
-          <div className="mt-6 pt-5 border-t border-[#e2e8f0]">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[11px] font-bold text-[#12244D] uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#0B6B69]" />
-                1-Click Instant Demo
-              </span>
-              <span className="text-[10px] text-[#64748b]">Pre-configured</span>
-            </div>
-
-            <div className="grid grid-cols-1 gap-2">
-              <button
-                type="button"
-                onClick={() => loginDemo('admin@lagoonhospital.com', 'Lagoon Specialist Hospital')}
-                className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-[#F0FAF9] hover:bg-[#E0F5F3] text-[#074C4A] border border-[#0B6B69]/30 transition-all flex items-center justify-between group cursor-pointer"
-              >
-                <span className="flex items-center gap-2">
-                  <Building className="w-3.5 h-3.5 text-[#0B6B69]" />
-                  <span>Explore as <strong>Lagoon Hospital</strong></span>
-                </span>
-                <span className="text-[10px] font-medium text-[#0B6B69] group-hover:translate-x-0.5 transition-transform">
-                  Enter →
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => loginDemo('claims@reliancehmo.com', 'Reliance HMO')}
-                className="w-full py-2 px-3 rounded-lg text-xs font-semibold bg-[#F0F4FA] hover:bg-[#E2EAF7] text-[#12244D] border border-[#12244D]/20 transition-all flex items-center justify-between group cursor-pointer"
-              >
-                <span className="flex items-center gap-2">
-                  <Shield className="w-3.5 h-3.5 text-[#12244D]" />
-                  <span>Explore as <strong>Reliance HMO</strong></span>
-                </span>
-                <span className="text-[10px] font-medium text-[#12244D] group-hover:translate-x-0.5 transition-transform">
-                  Enter →
-                </span>
-              </button>
-            </div>
-          </div>
 
           {/* Security Notice */}
           <div className="mt-6 pt-4 border-t border-[#e2e8f0] flex items-center justify-center gap-2 text-[11px] text-[#64748b]">
