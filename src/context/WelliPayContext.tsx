@@ -104,15 +104,31 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
+  // Helper to attach Firebase Bearer token to API calls
+  const getAuthHeaders = async () => {
+    try {
+      const { auth } = await import('../firebase');
+      const token = await auth.currentUser?.getIdToken();
+      return {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+      };
+    } catch {
+      return { 'Content-Type': 'application/json' };
+    }
+  };
+
   // Database auto-hydration and health check on mount
   React.useEffect(() => {
     fetch('/api/database/status')
       .then(res => res.json())
-      .then(data => {
+      .then(async (data) => {
         if (data && data.connected) {
           addNotification(`PostgreSQL database connected (${data.database}). Real-time ledger active.`, 'success');
           
-          fetch('/api/reconciliation')
+          const headers = await getAuthHeaders();
+
+          fetch('/api/reconciliation', { headers })
             .then(r => r.json())
             .then(recData => {
               if (recData && recData.items && recData.items.length > 0) {
@@ -121,7 +137,7 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             })
             .catch(() => {});
 
-          fetch('/api/claims')
+          fetch('/api/claims', { headers })
             .then(r => r.json())
             .then(claimData => {
               if (claimData && claimData.claims && claimData.claims.length > 0) {
@@ -168,11 +184,13 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     addNotification(`Matched ${target.formattedAmount} (${target.description}) to ${target.aiMatch.targetName} (${target.aiMatch.invoiceNumber || 'Account'})`, 'success');
 
     // Sync to PostgreSQL backend
-    fetch('/api/reconciliation/confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id })
-    }).catch(() => {});
+    getAuthHeaders().then(headers => {
+      fetch('/api/reconciliation/confirm', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ id })
+      }).catch(() => {});
+    });
   };
 
   const rejectReconItem = (id: string, reason: string = 'Cashier flag for manual review') => {
@@ -213,11 +231,13 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     addNotification(`Bulk reconciled ${count} transactions totaling ₦${totalAmount.toLocaleString()} directly into hospital ledger.`, 'success');
 
     // Sync atomic bulk confirmation to PostgreSQL
-    fetch('/api/reconciliation/bulk-confirm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ids })
-    }).catch(() => {});
+    getAuthHeaders().then(headers => {
+      fetch('/api/reconciliation/bulk-confirm', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ids })
+      }).catch(() => {});
+    });
   };
 
   // Provider Actions

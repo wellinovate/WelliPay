@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import admin from 'firebase-admin';
 import { pool, checkDatabaseHealth, initializeDatabase, query } from './server/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -11,12 +12,66 @@ const PORT = process.env.PORT || 5174;
 
 app.use(express.json());
 
+// Initialize Firebase Admin
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  try {
+    const serviceAccount = typeof process.env.FIREBASE_SERVICE_ACCOUNT === 'string'
+      ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+      : process.env.FIREBASE_SERVICE_ACCOUNT;
+
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    });
+    console.log('[Auth] Firebase Admin initialized with service account.');
+  } catch (err) {
+    console.error('[Auth] Failed to initialize Firebase Admin:', err.message);
+  }
+} else {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('[Auth FATAL] FIREBASE_SERVICE_ACCOUNT is missing in production. Protected API routes will reject requests.');
+  } else {
+    console.log('[Auth] FIREBASE_SERVICE_ACCOUNT not set. Running in development demo bypass mode.');
+  }
+}
+
+// Auth middleware — strictly enforces valid Firebase login token in production
+async function requireAuth(req, res, next) {
+  // Check if Firebase Admin is initialized
+  if (!admin.apps.length) {
+    // Demo-mode bypass only applies in non-production environments
+    if (process.env.NODE_ENV !== 'production') {
+      return next();
+    }
+    // In production, missing or invalid service account fails immediately with 500
+    return res.status(500).json({ 
+      error: 'Authentication service unavailable: Firebase Admin service account is not configured in production.' 
+    });
+  }
+
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Not authenticated. Bearer token missing.' });
+  }
+
+  try {
+    const token = authHeader.split('Bearer ')[1];
+    req.user = await admin.auth().verifyIdToken(token);
+    next();
+  } catch (err) {
+    console.warn('[Auth] Token verification failed:', err.message);
+    res.status(401).json({ error: 'Invalid or expired session' });
+  }
+}
+
 // Initialize database tables on server start
 initializeDatabase().catch(err => {
   console.error('[Server] Database initialization failed:', err);
 });
 
-// 1. Comprehensive Health Check (checks process, server, and PostgreSQL)
+// ==========================================
+// Public Endpoints (Health & Status Checks)
+// ==========================================
+
 app.get('/api/health', async (req, res) => {
   const dbHealth = await checkDatabaseHealth();
   
@@ -27,17 +82,24 @@ app.get('/api/health', async (req, res) => {
     environment: process.env.NODE_ENV || 'production',
     port: PORT,
     database: dbHealth,
+    auth: {
+      firebaseAdminActive: admin.apps.length > 0,
+      serviceAccountConfigured: !!process.env.FIREBASE_SERVICE_ACCOUNT
+    }
   });
 });
 
-// 2. Database Status Check Endpoint
 app.get('/api/database/status', async (req, res) => {
   const dbHealth = await checkDatabaseHealth();
   res.json(dbHealth);
 });
 
-// 3. API: Get Reconciliation Queue
-app.get('/api/reconciliation', async (req, res) => {
+// ==========================================
+// Protected Routes (Protected with requireAuth)
+// ==========================================
+
+// 1. Get Reconciliation Queue
+app.get('/api/reconciliation', requireAuth, async (req, res) => {
   try {
     if (pool) {
       const result = await query(`
@@ -61,12 +123,11 @@ app.get('/api/reconciliation', async (req, res) => {
     console.error('[API /api/reconciliation] DB error, falling back to mock:', err.message);
   }
 
-  // Graceful fallback if database is not active yet
   res.json({ source: 'fallback', message: 'Database query executed with local state fallback.' });
 });
 
-// 4. API: Single Confirm Reconciliation Item
-app.post('/api/reconciliation/confirm', async (req, res) => {
+// 2. Single Confirm Reconciliation Item
+app.post('/api/reconciliation/confirm', requireAuth, async (req, res) => {
   const { id } = req.body;
   if (!id) return res.status(400).json({ error: 'Missing payment id' });
 
@@ -88,8 +149,8 @@ app.post('/api/reconciliation/confirm', async (req, res) => {
   res.json({ success: true, id, status: 'confirmed', mode: 'demo' });
 });
 
-// 5. API: Bulk Confirm Matches (Row-locked atomic transaction)
-app.post('/api/reconciliation/bulk-confirm', async (req, res) => {
+// 3. Bulk Confirm Matches (Row-locked atomic transaction)
+app.post('/api/reconciliation/bulk-confirm', requireAuth, async (req, res) => {
   const { ids } = req.body;
   if (!ids || !Array.isArray(ids) || ids.length === 0) {
     return res.status(400).json({ error: 'Missing ids array' });
@@ -102,7 +163,6 @@ app.post('/api/reconciliation/bulk-confirm', async (req, res) => {
         await client.query('BEGIN');
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-        // Acquire row lock and update status
         const updateRes = await client.query(`
           UPDATE payments
           SET reconciliation_status = 'confirmed', confirmed_at = $1
@@ -132,8 +192,8 @@ app.post('/api/reconciliation/bulk-confirm', async (req, res) => {
   res.json({ success: true, confirmedCount: ids.length, confirmedIds: ids, mode: 'demo' });
 });
 
-// 6. API: Get HMO Claims
-app.get('/api/claims', async (req, res) => {
+// 4. Get HMO Claims
+app.get('/api/claims', requireAuth, async (req, res) => {
   try {
     if (pool) {
       const result = await query(`
@@ -154,8 +214,8 @@ app.get('/api/claims', async (req, res) => {
   res.json({ source: 'fallback', message: 'HMO claims ready.' });
 });
 
-// 7. API: Resolve Claim Dispute
-app.post('/api/claims/:id/resolve', async (req, res) => {
+// 5. Resolve Claim Dispute
+app.post('/api/claims/:id/resolve', requireAuth, async (req, res) => {
   const { id } = req.params;
   const { resolution } = req.body; // 'approve' or 'reject'
 
@@ -177,6 +237,10 @@ app.post('/api/claims/:id/resolve', async (req, res) => {
 
   res.json({ success: true, id, resolution, mode: 'demo' });
 });
+
+// ==========================================
+// Static Assets & Client-Side SPA Routing
+// ==========================================
 
 // Serve static files from Vite production build
 app.use(express.static(path.join(__dirname, 'dist')));

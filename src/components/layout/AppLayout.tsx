@@ -1,5 +1,6 @@
 import React from 'react';
 import { useWelliPay } from '../../context/WelliPayContext';
+import { useAuth } from '../../context/AuthContext';
 import { NavTab } from '../../types';
 import { 
   Building2, 
@@ -10,7 +11,8 @@ import {
   X, 
   Sparkles,
   Layers,
-  ArrowRightLeft
+  ArrowRightLeft,
+  LogOut
 } from 'lucide-react';
 
 interface AppLayoutProps {
@@ -27,6 +29,8 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     removeNotification,
     unmatchedCount
   } = useWelliPay();
+
+  const { user, logout } = useAuth();
 
   const navItems: { id: NavTab; label: string; badge?: number }[] = [
     { id: 'dashboard', label: 'Dashboard' },
@@ -139,6 +143,16 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 </div>
               </div>
             </button>
+
+            {user && (
+              <button
+                onClick={() => logout()}
+                title={`Sign out (${user.email || 'User'})`}
+                className="p-2 rounded border border-[#d7d3d3] hover:border-[#d6006c] hover:bg-[#fff1f4] text-[#605d5d] hover:text-[#d6006c] transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </header>
