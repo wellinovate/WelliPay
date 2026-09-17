@@ -151,7 +151,8 @@ app.get('/api/reconciliation', requireAuth, async (req, res) => {
     return res.status(503).json({ error: 'Database service unavailable in production.' });
   }
 
-  res.json({ source: 'fallback', message: 'Database query executed with local state fallback.' });
+  const items = SCALED_SEED_DATA?.reconciliationItems || [];
+  res.json({ source: 'fallback', items });
 });
 
 // 2. Single Confirm Reconciliation Item
@@ -222,13 +223,15 @@ app.post('/api/reconciliation/bulk-confirm', requireAuth, async (req, res) => {
 
 // 3b. Export Confirmed Reconciliation Batch as CSV
 app.get('/api/reconciliation/export', requireAuth, async (req, res) => {
+  let confirmedRows = [];
+
   if (pool) {
     try {
       const result = await query(`
         SELECT 
           date_captured as date,
           amount,
-          description,
+          COALESCE(raw_reference, description) as description,
           channel,
           COALESCE(ai_target_name, 'Unassigned') as matched_patient,
           COALESCE(ai_invoice_number, 'N/A') as matched_invoice,
@@ -238,42 +241,48 @@ app.get('/api/reconciliation/export', requireAuth, async (req, res) => {
         WHERE reconciliation_status = 'confirmed'
         ORDER BY id DESC
       `);
-
-      const header = 'Date,Amount,Description,Channel,Matched Patient,Matched Invoice,Confidence,Status\n';
-      const rows = result.rows.map(r =>
-        `"${r.date}",${r.amount},"${(r.description || '').replace(/"/g, '""')}","${r.channel}","${(r.matched_patient || '').replace(/"/g, '""')}","${r.matched_invoice}",${r.confidence_score}%,${r.status}`
-      ).join('\n');
-
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', `attachment; filename="reconciliation-batch-${Date.now()}.csv"`);
-      return res.send(header + rows);
+      console.log('[export] rows returned from query:', result.rows.length);
+      confirmedRows = result.rows;
     } catch (err) {
       console.error('[API /api/reconciliation/export] DB error:', err.message);
       return res.status(500).json({ error: 'Export failed', message: err.message });
     }
-  }
+  } else {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ error: 'Database service unavailable in production.' });
+    }
 
-  if (process.env.NODE_ENV === 'production') {
-    return res.status(503).json({ error: 'Database service unavailable in production.' });
+    const allItems = SCALED_SEED_DATA?.reconciliationItems || [];
+    confirmedRows = allItems
+      .filter(r => r.status === 'confirmed')
+      .map(r => ({
+        date: r.date,
+        amount: r.amount,
+        description: r.rawDetails || r.description,
+        channel: r.channel,
+        matched_patient: r.aiMatch?.targetName || 'Unassigned',
+        matched_invoice: r.aiMatch?.invoiceNumber || 'N/A',
+        confidence_score: r.aiMatch?.confidence || 0,
+        status: r.status
+      }));
+    console.log('[export] rows returned from query:', confirmedRows.length);
   }
-
-  // Fallback demo mode
-  const fallbackConfirmed = [
-    { date: 'Yesterday, 14:30', amount: 45000, description: 'Direct corporate retainer settlement', channel: 'Bank transfer', matched_patient: 'Hygeia HMO', matched_invoice: 'INV-92700', confidence_score: 98, status: 'confirmed' },
-    { date: 'Yesterday, 16:15', amount: 3200, description: 'Card payment at pharmacy counter', channel: 'POS card', matched_patient: 'Walk-in Patient', matched_invoice: 'INV-92715', confidence_score: 92, status: 'confirmed' },
-    { date: 'Sep 15, 11:20', amount: 18500, description: 'Post-op physiotherapy session fee', channel: 'Bank transfer', matched_patient: 'K. Adeleke', matched_invoice: 'INV-92680', confidence_score: 96, status: 'confirmed' },
-    { date: 'Sep 15, 15:00', amount: 80000, description: 'AXA Mansard HMO surgery copay', channel: 'Transfer', matched_patient: 'B. Fashola', matched_invoice: 'INV-92650', confidence_score: 99, status: 'confirmed' }
-  ];
 
   const header = 'Date,Amount,Description,Channel,Matched Patient,Matched Invoice,Confidence,Status\n';
-  const rows = fallbackConfirmed.map(r =>
-    `"${r.date}",${r.amount},"${r.description.replace(/"/g, '""')}","${r.channel}","${r.matched_patient}","${r.matched_invoice}",${r.confidence_score}%,${r.status}`
-  ).join('\n');
+  const rows = confirmedRows.map(r => {
+    const cleanDate = String(r.date || '').replace(/"/g, '""');
+    const cleanDesc = String(r.description || '').replace(/"/g, '""');
+    const cleanChannel = String(r.channel || '').replace(/"/g, '""');
+    const cleanPatient = String(r.matched_patient || '').replace(/"/g, '""');
+    const cleanInvoice = String(r.matched_invoice || '').replace(/"/g, '""');
+    return `"${cleanDate}",${r.amount},"${cleanDesc}","${cleanChannel}","${cleanPatient}","${cleanInvoice}",${r.confidence_score}%,${r.status}`;
+  }).join('\n');
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', `attachment; filename="reconciliation-batch-${Date.now()}.csv"`);
-  res.send(header + rows);
+  return res.send(header + (rows ? rows + '\n' : ''));
 });
+
 
 // 4. Get HMO Claims
 app.get('/api/claims', requireAuth, async (req, res) => {

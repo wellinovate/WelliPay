@@ -451,7 +451,7 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Computed counts
   const unmatchedCount = reconciliationItems.filter(i => i.status === 'unmatched').length;
   const suggestedCount = reconciliationItems.filter(i => i.status === 'unmatched' && i.aiMatch.isHighConfidence).length;
-  const confirmedCount = 32 + reconciliationItems.filter(i => i.status === 'confirmed').length;
+  const confirmedCount = reconciliationItems.filter(i => i.status === 'confirmed').length;
   const selectedCount = reconciliationItems.filter(i => i.selected && i.status === 'unmatched').length;
 
   return (

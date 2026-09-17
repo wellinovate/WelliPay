@@ -1,6 +1,11 @@
-import { ReconciliationItem, ProviderTransaction, HMOClaim } from '../types';
+// ==========================================
+// WelliPay Reconciliation Seed Data
+// Exactly 12 unmatched items + 33 confirmed items = 45 total items
+// Ensures Description (clinical sub-line/reference) and Channel (payment rail)
+// are genuinely distinct and match the onscreen Reconciliation table.
+// ==========================================
 
-export const INITIAL_RECONCILIATION_ITEMS: ReconciliationItem[] = [
+export const UNMATCHED_RECONCILIATION_ITEMS = [
   {
     id: 'REC-001',
     date: 'Sep 12',
@@ -214,8 +219,10 @@ export const INITIAL_RECONCILIATION_ITEMS: ReconciliationItem[] = [
       invoiceNumber: 'INV-93105',
       explanation: 'Direct name match with pediatric ward invoice.'
     }
-  },
-  // Confirmed items (33 items reconciling to the Confirmed (33) tab and CSV export)
+  }
+];
+
+export const CONFIRMED_RECONCILIATION_ITEMS = [
   {
     id: 'REC-050',
     date: 'Today, 14:30',
@@ -845,134 +852,7 @@ export const INITIAL_RECONCILIATION_ITEMS: ReconciliationItem[] = [
   }
 ];
 
-
-export const INITIAL_PROVIDER_TRANSACTIONS: ProviderTransaction[] = [
-  {
-    id: 'TXN-101',
-    time: '09:14',
-    patientOrService: 'J. Adeyemi — Consultation',
-    amount: 2000,
-    formattedAmount: '₦2,000',
-    channel: 'USSD',
-    status: 'paid'
-  },
-  {
-    id: 'TXN-102',
-    time: '09:22',
-    patientOrService: 'ABC Diagnostics — Lab claim',
-    amount: 12000,
-    formattedAmount: '₦12,000',
-    channel: 'HMO',
-    status: 'pending'
-  },
-  {
-    id: 'TXN-103',
-    time: '09:40',
-    patientOrService: 'F. Okon — Deposit',
-    amount: 50000,
-    formattedAmount: '₦50,000',
-    channel: 'Transfer',
-    status: 'paid'
-  },
-  {
-    id: 'TXN-104',
-    time: '10:05',
-    patientOrService: 'M. Bello — Pharmacy',
-    amount: 8500,
-    formattedAmount: '₦8,500',
-    channel: 'Card',
-    status: 'failed'
-  },
-  {
-    id: 'TXN-105',
-    time: '10:21',
-    patientOrService: 'T. Yusuf — Ultrasound',
-    amount: 8000,
-    formattedAmount: '₦8,000',
-    channel: 'Bank transfer',
-    status: 'paid'
-  }
-];
-
-export const INITIAL_HMO_CLAIMS: HMOClaim[] = [
-  {
-    id: 'CLM-4471',
-    provider: 'ABC Diagnostics',
-    amount: 12000,
-    formattedAmount: '₦12,000',
-    status: 'submitted',
-    statusLabel: 'Submitted',
-    isDisputed: false,
-    denialRisk: 'high',
-    age: '2d',
-    patientName: 'Kemi Adeleke',
-    diagnosis: 'Routine lipid profile & HbA1c screening'
-  },
-  {
-    id: 'CLM-4472',
-    provider: 'Lagoon Hospital',
-    amount: 45000,
-    formattedAmount: '₦45,000',
-    status: 'approved',
-    statusLabel: 'Approved',
-    isDisputed: false,
-    denialRisk: 'low',
-    age: '5d',
-    preAuthCode: 'PA-LAG-88219',
-    patientName: 'Emeka Okonkwo',
-    diagnosis: 'Emergency appendectomy pre-auth'
-  },
-  {
-    id: 'CLM-4473',
-    provider: 'Sunrise Clinic',
-    amount: 8200,
-    formattedAmount: '₦8,200',
-    status: 'rejected',
-    statusLabel: 'Rejected — disputed',
-    isDisputed: true,
-    denialRisk: 'missing-auth',
-    age: '9d',
-    patientName: 'Halima Bello',
-    diagnosis: 'Pelvic ultrasound without pre-authorization code'
-  },
-  {
-    id: 'CLM-4474',
-    provider: 'ABC Diagnostics',
-    amount: 21500,
-    formattedAmount: '₦21,500',
-    status: 'paid',
-    statusLabel: 'Paid',
-    isDisputed: false,
-    denialRisk: 'low',
-    age: '14d',
-    patientName: 'Babatunde Fashola',
-    diagnosis: 'Comprehensive metabolic panel'
-  },
-  {
-    id: 'CLM-4475',
-    provider: 'First Care Hospital',
-    amount: 68000,
-    formattedAmount: '₦68,000',
-    status: 'submitted',
-    statusLabel: 'Submitted',
-    isDisputed: false,
-    denialRisk: 'high',
-    age: '1d',
-    patientName: 'Amina Yusuf',
-    diagnosis: 'Inpatient observation & IV antibiotics'
-  },
-  {
-    id: 'CLM-4476',
-    provider: 'Lagoon Specialist Hospital',
-    amount: 115000,
-    formattedAmount: '₦115,000',
-    status: 'approved',
-    statusLabel: 'Approved',
-    isDisputed: false,
-    denialRisk: 'low',
-    age: '3d',
-    preAuthCode: 'PA-LAG-90114',
-    patientName: 'Chidi Amadi',
-    diagnosis: 'Elective laparoscopic cholecystectomy'
-  }
+export const ALL_RECONCILIATION_ITEMS = [
+  ...UNMATCHED_RECONCILIATION_ITEMS,
+  ...CONFIRMED_RECONCILIATION_ITEMS
 ];

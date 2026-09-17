@@ -1,5 +1,6 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
+import { ALL_RECONCILIATION_ITEMS, CONFIRMED_RECONCILIATION_ITEMS, UNMATCHED_RECONCILIATION_ITEMS } from './reconciliationData.js';
 
 dotenv.config();
 
@@ -292,7 +293,6 @@ export function generateScaledSeedData() {
     };
   });
 
-  // Sanity checks — run these before committing the seed
   const totalPaidToday = allTransactions.filter(t => t.status === 'paid').reduce((s, t) => s + t.amount, 0);
   const paidDirect = allTransactions.filter(t => t.status === 'paid' && !['HMO', 'Corporate'].includes(t.channel)).reduce((s, t) => s + t.amount, 0);
   const hmoReceivablesTotal = outstandingClaims.reduce((s, c) => s + c.amount, 0);
@@ -300,8 +300,10 @@ export function generateScaledSeedData() {
   console.log('[Seed Generator] Patient direct total:', paidDirect);
   console.log('[Seed Generator] HMO receivables total:', hmoReceivablesTotal);
   console.log('[Seed Generator] Total patients:', patients.length);
+  console.log('[Seed Generator] Total reconciliation items:', ALL_RECONCILIATION_ITEMS.length);
+  console.log('[Seed Generator] Confirmed reconciliation items:', CONFIRMED_RECONCILIATION_ITEMS.length);
 
-  return { providerTransactions: allTransactions, hmoClaims, patients };
+  return { providerTransactions: allTransactions, hmoClaims, patients, reconciliationItems: ALL_RECONCILIATION_ITEMS };
 }
 
 export const SCALED_SEED_DATA = generateScaledSeedData();
@@ -422,41 +424,49 @@ export async function initializeDatabase() {
       );
     `);
 
-    // 2. Check if payments table has seed data
-    const countRes = await pool.query('SELECT COUNT(*) FROM payments');
-    const count = parseInt(countRes.rows[0].count, 10);
+    // 2. Seed Organizations
+    await pool.query(`
+      INSERT INTO organizations (id, name, type) VALUES 
+      ('org-lagoon', 'Lagoon Specialist Hospital', 'hospital_provider'),
+      ('org-reliance', 'Reliance HMO', 'hmo_payer')
+      ON CONFLICT (id) DO NOTHING;
+    `);
 
-    if (count === 0) {
-      console.log('[DB] Seeding initial WelliPay payments and organizations into PostgreSQL...');
-      
-      // Seed Organizations
-      await pool.query(`
-        INSERT INTO organizations (id, name, type) VALUES 
-        ('org-lagoon', 'Lagoon Specialist Hospital', 'hospital_provider'),
-        ('org-reliance', 'Reliance HMO', 'hmo_payer')
-        ON CONFLICT (id) DO NOTHING;
-      `);
-
-      // Seed Initial Payments
-      await pool.query(`
-        INSERT INTO payments (id, organization_id, channel, amount, formatted_amount, raw_reference, description, reconciliation_status, date_captured, ai_target_name, ai_invoice_number, ai_confidence, ai_is_high_confidence, ai_explanation) VALUES
-        ('REC-001', 'org-lagoon', 'Bank transfer', 25000, '₦25,000', 'REF/2026/09/001', 'Payment from J. Umar', 'unmatched', 'Today, 09:15', 'J. Umar', 'INV-92831', 94, true, 'Exact amount match on outstanding invoice INV-92831; sender name matched patient registry.'),
-        ('REC-002', 'org-lagoon', 'POS card', 8500, '₦8,500', 'POS/STANBIC/4491', 'POS Terminal #4 — Receipt 8821', 'unmatched', 'Today, 09:42', 'M. Bello', 'INV-93010', 88, true, 'Amount matched pharmacy dispense total; terminal timestamp correlated with invoice generation.'),
-        ('REC-003', 'org-lagoon', 'USSD', 12000, '₦12,000', '*737*...REF891', 'Quickteller USSD Collection', 'unmatched', 'Today, 10:05', 'ABC Diagnostics', 'INV-93044', 97, true, 'Payment reference matched electronic lab request identifier.'),
-        ('REC-004', 'org-lagoon', 'Bank transfer', 11500, '₦11,500', 'GTB/NIP/99210041', 'Inpatient admission deposit', 'unmatched', 'Today, 10:18', 'T. Adeyemi', 'INV-93105', 35, false, 'No invoice found for ₦11,500. Partial payment on INV-93105 (₦23,000)? Requires manual review.'),
-        ('REC-005', 'org-lagoon', 'Bank transfer', 45000, '₦45,000', 'FBN/NIP/2209114', 'Direct corporate retainer settlement', 'confirmed', 'Yesterday', 'Hygeia HMO', 'INV-92700', 98, true, 'Remittance matched contracted quarterly corporate retainer schedule.'),
-        ('REC-006', 'org-lagoon', 'POS card', 3200, '₦3,200', 'POS/ZENITH/1102', 'Card payment at pharmacy counter', 'confirmed', 'Yesterday', 'Walk-in Patient', 'INV-92715', 92, true, 'Confirmed by cashier Olumide at counter.'),
-        ('REC-007', 'org-lagoon', 'Bank transfer', 65000, '₦65,000', '"RELIANCE COPAY"', 'HMO remittance', 'unmatched', 'Sep 14', 'Reliance HMO', 'BATCH-892', 95, true, 'Monthly remittance schedule matched electronic claims batch.')
-        ON CONFLICT (id) DO NOTHING;
-      `);
-    }
-
-    // Ensure clean state for scaled seed tables (clears old seed rows so 33 patients don't accumulate to 41)
+    // Ensure clean state for scaled seed tables
     await pool.query(`
       DELETE FROM provider_transactions;
       DELETE FROM hmo_claims;
       DELETE FROM patients;
+      DELETE FROM payments;
     `);
+
+    // Seed Payments (all 45 items: 12 unmatched + 33 confirmed)
+    console.log(`[DB] Seeding ${SCALED_SEED_DATA.reconciliationItems.length} reconciliation payments (${CONFIRMED_RECONCILIATION_ITEMS.length} confirmed)...`);
+    for (const p of SCALED_SEED_DATA.reconciliationItems) {
+      await pool.query(`
+        INSERT INTO payments (id, organization_id, channel, amount, formatted_amount, raw_reference, description, reconciliation_status, date_captured, ai_target_name, ai_invoice_number, ai_confidence, ai_is_high_confidence, ai_explanation, confirmed_at)
+        VALUES ($1, 'org-lagoon', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        ON CONFLICT (id) DO UPDATE SET
+          channel = EXCLUDED.channel,
+          amount = EXCLUDED.amount,
+          formatted_amount = EXCLUDED.formatted_amount,
+          raw_reference = EXCLUDED.raw_reference,
+          description = EXCLUDED.description,
+          reconciliation_status = EXCLUDED.reconciliation_status,
+          date_captured = EXCLUDED.date_captured,
+          ai_target_name = EXCLUDED.ai_target_name,
+          ai_invoice_number = EXCLUDED.ai_invoice_number,
+          ai_confidence = EXCLUDED.ai_confidence,
+          ai_is_high_confidence = EXCLUDED.ai_is_high_confidence,
+          ai_explanation = EXCLUDED.ai_explanation,
+          confirmed_at = EXCLUDED.confirmed_at;
+      `, [
+        p.id, p.channel, p.amount, p.formattedAmount, p.rawDetails, p.description,
+        p.status, p.date, p.aiMatch?.targetName || null, p.aiMatch?.invoiceNumber || null,
+        p.aiMatch?.confidence || 0, p.aiMatch?.isHighConfidence ?? false,
+        p.aiMatch?.explanation || null, p.confirmedAt || null
+      ]);
+    }
 
     // 3. Seed HMO Claims (48 claims scaling to ₦1,900,000 + 12 settled remittances)
     console.log(`[DB] Seeding ${SCALED_SEED_DATA.hmoClaims.length} scaled HMO claims (target ₦1,900,000)...`);
