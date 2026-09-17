@@ -330,6 +330,29 @@ export const HMODashboard: React.FC = () => {
                     Approve with Pre-Auth Override
                   </button>
                 </>
+              ) : selectedClaim.status === 'submitted' ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      rejectClaim(selectedClaim.id, 'Pre-authorization documentation incomplete');
+                      setSelectedClaim(null);
+                    }}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium text-rose-700 border border-rose-200 hover:bg-rose-50 transition-colors"
+                  >
+                    Reject Claim
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      approveClaim(selectedClaim.id);
+                      setSelectedClaim(null);
+                    }}
+                    className="px-4 py-1.5 rounded-lg text-xs font-bold bg-[#0B6B69] hover:bg-[#074C4A] text-white shadow-xs transition-colors"
+                  >
+                    Approve Claim
+                  </button>
+                </>
               ) : (
                 <button
                   type="button"

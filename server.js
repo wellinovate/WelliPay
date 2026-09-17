@@ -232,7 +232,63 @@ app.get('/api/claims', requireAuth, async (req, res) => {
   res.json({ source: 'fallback', message: 'HMO claims ready.' });
 });
 
-// 5. Resolve Claim Dispute
+// 5. Approve HMO Claim
+app.post('/api/claims/:id/approve', requireAuth, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (pool) {
+      const updateRes = await query(`
+        UPDATE hmo_claims
+        SET status = 'approved', status_label = 'Approved', is_disputed = false, denial_risk = 'low'
+        WHERE id = $1
+        RETURNING id, provider, amount, formatted_amount as "formattedAmount", status, status_label as "statusLabel"
+      `, [id]);
+      
+      if (updateRes.rows.length === 0) {
+        return res.status(404).json({ error: `Claim ${id} not found` });
+      }
+
+      return res.json({ success: true, claim: updateRes.rows[0] });
+    }
+  } catch (err) {
+    console.error('[API /api/claims/:id/approve] DB error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+
+  res.json({ success: true, id, status: 'approved', mode: 'demo' });
+});
+
+// 6. Reject HMO Claim
+app.post('/api/claims/:id/reject', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  try {
+    if (pool) {
+      const updateRes = await query(`
+        UPDATE hmo_claims
+        SET status = 'rejected', status_label = 'Rejected', is_disputed = false,
+            diagnosis = CASE WHEN $2::text IS NOT NULL AND $2::text != '' THEN $2 ELSE diagnosis END
+        WHERE id = $1
+        RETURNING id, provider, amount, formatted_amount as "formattedAmount", status, status_label as "statusLabel"
+      `, [id, reason || null]);
+
+      if (updateRes.rows.length === 0) {
+        return res.status(404).json({ error: `Claim ${id} not found` });
+      }
+
+      return res.json({ success: true, claim: updateRes.rows[0], reason });
+    }
+  } catch (err) {
+    console.error('[API /api/claims/:id/reject] DB error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+
+  res.json({ success: true, id, status: 'rejected', reason, mode: 'demo' });
+});
+
+// 7. Resolve Claim Dispute
 app.post('/api/claims/:id/resolve', requireAuth, async (req, res) => {
   const { id } = req.params;
   const { resolution } = req.body; // 'approve' or 'reject'
@@ -241,12 +297,18 @@ app.post('/api/claims/:id/resolve', requireAuth, async (req, res) => {
     if (pool) {
       const newStatus = resolution === 'approve' ? 'approved' : 'rejected';
       const statusLabel = resolution === 'approve' ? 'Approved (Dispute Settled)' : 'Rejected Final';
-      await query(`
+      const updateRes = await query(`
         UPDATE hmo_claims
         SET is_disputed = false, status = $1, status_label = $2, denial_risk = 'low'
         WHERE id = $3
+        RETURNING id, provider, amount, formatted_amount as "formattedAmount", status, status_label as "statusLabel"
       `, [newStatus, statusLabel, id]);
-      return res.json({ success: true, id, status: newStatus, statusLabel });
+
+      if (updateRes.rows.length === 0) {
+        return res.status(404).json({ error: `Claim ${id} not found` });
+      }
+
+      return res.json({ success: true, claim: updateRes.rows[0], status: newStatus, statusLabel });
     }
   } catch (err) {
     console.error('[API /api/claims/:id/resolve] DB error:', err.message);

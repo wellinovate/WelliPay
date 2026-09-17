@@ -348,11 +348,32 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   // HMO Actions
+  const refreshDashboard = () => {
+    getAuthHeaders().then(headers => {
+      fetch('/api/dashboard', { headers })
+        .then(r => r.json())
+        .then(dashData => {
+          if (dashData?.metrics) setDashboardMetrics(dashData.metrics);
+          if (dashData?.leakage) setLeakageSummary(dashData.leakage);
+        })
+        .catch(() => {});
+    });
+  };
+
   const approveClaim = (id: string) => {
     setHmoClaims(prev => prev.map(c => 
       c.id === id ? { ...c, status: 'approved', statusLabel: 'Approved', denialRisk: 'low' } : c
     ));
     addNotification(`Claim ${id} approved for payment processing.`, 'success');
+
+    getAuthHeaders().then(headers => {
+      fetch(`/api/claims/${id}/approve`, {
+        method: 'POST',
+        headers
+      })
+      .then(() => refreshDashboard())
+      .catch(() => {});
+    });
   };
 
   const rejectClaim = (id: string, reason: string = 'Pre-authorization absent') => {
@@ -360,6 +381,16 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       c.id === id ? { ...c, status: 'rejected', statusLabel: 'Rejected', isDisputed: false, diagnosis: reason } : c
     ));
     addNotification(`Claim ${id} rejected: ${reason}`, 'error');
+
+    getAuthHeaders().then(headers => {
+      fetch(`/api/claims/${id}/reject`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ reason })
+      })
+      .then(() => refreshDashboard())
+      .catch(() => {});
+    });
   };
 
   const resolveClaimDispute = (id: string, resolution: 'approve' | 'reject') => {
@@ -376,6 +407,16 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return c;
     }));
     addNotification(`Dispute for ${id} settled: ${resolution === 'approve' ? 'Claim Approved' : 'Rejection Upheld'}.`, 'info');
+
+    getAuthHeaders().then(headers => {
+      fetch(`/api/claims/${id}/resolve`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ resolution })
+      })
+      .then(() => refreshDashboard())
+      .catch(() => {});
+    });
   };
 
   // Computed counts
