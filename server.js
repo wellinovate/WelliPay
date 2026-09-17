@@ -655,22 +655,6 @@ app.post('/api/leakage/bill', requireAuth, async (req, res) => {
         `, [invoiceId, row.order_ids]);
       }
 
-      // Insert audit record into provider transactions
-      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      await client.query(`
-        INSERT INTO provider_transactions (id, time_captured, patient_or_service, amount, formatted_amount, channel, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (id) DO NOTHING
-      `, [
-        `TXN-REC-${Date.now().toString().slice(-4)}`,
-        now,
-        `Charge Audit: ${totalOrdersRecovered} Lab Orders Invoiced (${createdInvoices.length} Batches)`,
-        totalRecovered,
-        `₦${totalRecovered.toLocaleString()}`,
-        'Transfer',
-        'paid'
-      ]);
-
       await client.query('COMMIT');
       return res.json({
         source: 'postgresql',

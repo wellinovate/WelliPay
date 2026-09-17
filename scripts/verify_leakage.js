@@ -4,9 +4,13 @@ async function run() {
     'Content-Type': 'application/json'
   };
 
-  console.log('--- 1. CHECK INITIAL DASHBOARD LEAKAGE ---');
+  console.log('--- 1. CHECK INITIAL DASHBOARD & REVENUE METRICS ---');
   let res = await fetch('http://127.0.0.1:5174/api/dashboard', { headers });
   let data = await res.json();
+  const preTotalToday = data.metrics.totalToday;
+  const prePatientDirect = data.metrics.patientDirect;
+  console.log('Initial totalToday:', preTotalToday, `(${data.metrics.formattedTotalToday})`);
+  console.log('Initial patientDirect:', prePatientDirect, `(${data.metrics.formattedPatientDirect})`);
   console.log('Initial leakage state:', JSON.stringify(data.leakage, null, 2));
 
   console.log('\n--- 2. CALL POST /api/leakage/bill ---');
@@ -18,10 +22,28 @@ async function run() {
   const billData = await res.json();
   console.log('Billing response:', JSON.stringify(billData, null, 2));
 
-  console.log('\n--- 3. CHECK DASHBOARD AFTER BILLING ---');
+  console.log('\n--- 3. CHECK DASHBOARD AFTER BILLING (VERIFY REVENUE DID NOT CHANGE) ---');
   res = await fetch('http://127.0.0.1:5174/api/dashboard', { headers });
   data = await res.json();
+  const postTotalToday = data.metrics.totalToday;
+  const postPatientDirect = data.metrics.patientDirect;
+  console.log('Post-billing totalToday:', postTotalToday, `(${data.metrics.formattedTotalToday})`);
+  console.log('Post-billing patientDirect:', postPatientDirect, `(${data.metrics.formattedPatientDirect})`);
   console.log('Post-billing leakage state:', JSON.stringify(data.leakage, null, 2));
+
+  if (postTotalToday !== preTotalToday) {
+    console.error(`\n>>> FAILURE: totalToday changed from ${preTotalToday} to ${postTotalToday}!`);
+    process.exit(1);
+  } else {
+    console.log(`\n>>> VERIFIED: totalToday remained strictly unchanged at ${postTotalToday}!`);
+  }
+
+  if (postPatientDirect !== prePatientDirect) {
+    console.error(`\n>>> FAILURE: patientDirect changed from ${prePatientDirect} to ${postPatientDirect}!`);
+    process.exit(1);
+  } else {
+    console.log(`>>> VERIFIED: patientDirect remained strictly unchanged at ${postPatientDirect}!`);
+  }
 
   console.log('\n--- 4. CHECK INVOICES LIST & METRICS ---');
   res = await fetch('http://127.0.0.1:5174/api/invoices', { headers });
