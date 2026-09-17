@@ -170,6 +170,14 @@ async function runRegressionSuite() {
     `${channelDupes} duplicate rows found out of ${csvDataRows}`
   );
 
+  // Invariant 4c: Reconciliation Action Queue & Navigation Badge (Unmatched vs Confirmed)
+  const unmatchedItems = reconItems.filter(i => i.status === 'unmatched');
+  assert(
+    'Invariant 4c: Reconciliation Action Queue (Nav Badge) matches exactly 12 Unmatched items',
+    unmatchedItems.length === 12 && reconItems.length === 45,
+    `Unmatched (Nav Badge count): ${unmatchedItems.length} (target: 12), Confirmed: ${confirmedItems.length} (target: 33), Total: ${reconItems.length}`
+  );
+
   // 4. Fetch Remittance PDF Export
   const pdfExportRes = await apiGet('/api/claims/remittance-export');
   assert('Remittance Schedule PDF Export reachable', pdfExportRes.statusCode === 200, `HTTP ${pdfExportRes.statusCode}`);
@@ -196,14 +204,29 @@ async function runRegressionSuite() {
     `Total Patients: ${patientsData.patients.length}`
   );
 
-  // 6. Fetch Invoices
+  // 6. Fetch Invoices & Cross-Check with Leakage Resolution State
   const invoicesRes = await apiGet('/api/invoices');
   assert('Invoices API reachable', invoicesRes.statusCode === 200, `HTTP ${invoicesRes.statusCode}`);
   const invoicesData = JSON.parse(invoicesRes.data);
+
+  const expectedBaseline = 57000; // original 4 seeded baseline invoices
+  const isLeakageResolved = Boolean(dash.leakage && dash.leakage.isResolved);
+  const expectedTotal = isLeakageResolved
+    ? expectedBaseline + 340000
+    : expectedBaseline;
+  const expectedCount = isLeakageResolved ? 7 : 4;
+
+  const actualTotal = invoicesData.metrics?.totalAmount ?? invoicesData.totalInvoiced;
   assert(
-    'Invariant 7: Invoices directory integrity with active billing statements',
-    invoicesData.invoices && invoicesData.invoices.length >= 4,
-    `Total Invoices: ${invoicesData.invoices.length}, Total Invoiced: ₦${invoicesData.metrics.totalAmount.toLocaleString()}`
+    'Invariant 7: Invoices total dynamically aligns with dashboard leakage resolution state',
+    actualTotal === expectedTotal,
+    `Invoices total should be ₦${expectedTotal.toLocaleString()} given leakage.isResolved=${isLeakageResolved} (got ₦${(actualTotal || 0).toLocaleString()})`
+  );
+
+  assert(
+    'Invariant 7b: Invoices count dynamically aligns with leakage billing entries',
+    invoicesData.invoices && invoicesData.invoices.length === expectedCount,
+    `Expected ${expectedCount} invoices given leakage.isResolved=${isLeakageResolved} (got ${invoicesData.invoices ? invoicesData.invoices.length : 0})`
   );
 
   console.log('\n====================================================');
