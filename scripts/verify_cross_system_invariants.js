@@ -5,6 +5,56 @@
 // ==========================================
 
 import http from 'http';
+import { spawn } from 'child_process';
+
+let spawnedServer = null;
+
+function checkServerReady() {
+  return new Promise((resolve) => {
+    const req = http.get({
+      hostname: 'localhost',
+      port: 5174,
+      path: '/api/dashboard',
+      headers: { 'Authorization': 'Bearer dev-token' },
+      timeout: 1000
+    }, (res) => {
+      resolve(res.statusCode === 200);
+    });
+    req.on('error', () => resolve(false));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(false);
+    });
+  });
+}
+
+async function ensureServer() {
+  const isUp = await checkServerReady();
+  if (isUp) {
+    console.log('📡 Connected to active WelliPay server on port 5174.\n');
+    return;
+  }
+
+  console.log('🚀 Spawning WelliPay server for test execution (port 5174)...');
+  spawnedServer = spawn('node', ['server.js'], {
+    env: { ...process.env, PORT: '5174' },
+    stdio: ['ignore', 'pipe', 'inherit']
+  });
+
+  spawnedServer.on('error', (err) => {
+    console.error('Failed to spawn server.js:', err);
+  });
+
+  const start = Date.now();
+  while (Date.now() - start < 15000) {
+    await new Promise((r) => setTimeout(r, 250));
+    if (await checkServerReady()) {
+      console.log('✅ WelliPay server is up and responding.\n');
+      return;
+    }
+  }
+  throw new Error('Timed out waiting for WelliPay server to start on port 5174');
+}
 
 function apiGet(path) {
   return new Promise((resolve, reject) => {
@@ -31,6 +81,8 @@ async function runRegressionSuite() {
   console.log('====================================================');
   console.log('🛡️  WELLIPAY FULL-STACK REGRESSION INVARIANT SUITE');
   console.log('====================================================\n');
+
+  await ensureServer();
 
   let passed = 0;
   let failed = 0;
@@ -158,6 +210,11 @@ async function runRegressionSuite() {
   console.log(`🏁 REGRESSION SUITE COMPLETE: ${passed} PASSED, ${failed} FAILED`);
   console.log('====================================================');
 
+  if (spawnedServer) {
+    console.log('🛑 Shutting down spawned test server...');
+    spawnedServer.kill('SIGTERM');
+  }
+
   if (failed > 0) {
     process.exit(1);
   }
@@ -165,5 +222,8 @@ async function runRegressionSuite() {
 
 runRegressionSuite().catch(err => {
   console.error('Fatal error running regression suite:', err);
+  if (spawnedServer) {
+    spawnedServer.kill('SIGTERM');
+  }
   process.exit(1);
 });
