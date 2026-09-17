@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useWelliPay } from '../../context/WelliPayContext';
 import { StatusChip } from '../../components/ui/StatusChip';
 import { Modal } from '../../components/ui/Modal';
@@ -28,6 +28,15 @@ export const ProviderDashboard: React.FC = () => {
 
   const [isLeakageModalOpen, setIsLeakageModalOpen] = useState(false);
   const [isNewTxnModalOpen, setIsNewTxnModalOpen] = useState(false);
+
+  const activeChannelsCount = useMemo(() => {
+    const channels = new Set(
+      providerTransactions
+        .filter(t => t.status === 'paid')
+        .map(t => t.channel)
+    );
+    return channels.size || 4;
+  }, [providerTransactions]);
 
   // New Transaction Form State
   const [newPatient, setNewPatient] = useState('');
@@ -77,7 +86,7 @@ export const ProviderDashboard: React.FC = () => {
             New Payment
           </button>
           <div className="font-sans text-xs text-[#475569] bg-white px-3 py-2 rounded-lg border border-[#e2e8f0] shadow-xs">
-            <span className="font-bold text-[#12244D]">{dashboardMetrics.formattedTotalToday} today</span> · 4 channels active
+            <span className="font-bold text-[#12244D]">{dashboardMetrics.formattedTotalToday} today</span> · {activeChannelsCount} channels active
           </div>
         </div>
       </div>

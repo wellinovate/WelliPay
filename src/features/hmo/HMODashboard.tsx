@@ -42,8 +42,62 @@ export const HMODashboard: React.FC = () => {
     });
   }, [hmoClaims, statusFilter, denialRiskFilter, claimSearch]);
 
-  const disputedClaims = hmoClaims.filter(c => c.isDisputed);
-  const totalDisputedAmount = disputedClaims.reduce((sum, c) => sum + c.amount, 0);
+  // Financial metrics calculated dynamically from live/hydrated hmoClaims (#1)
+  const totalClaimed = useMemo(() => {
+    return hmoClaims.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  }, [hmoClaims]);
+
+  const totalApproved = useMemo(() => {
+    return hmoClaims
+      .filter(c => c.status === 'approved')
+      .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  }, [hmoClaims]);
+
+  const totalPaid = useMemo(() => {
+    return hmoClaims
+      .filter(c => c.status === 'paid')
+      .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  }, [hmoClaims]);
+
+  const totalOutstanding = useMemo(() => {
+    return hmoClaims
+      .filter(c => c.status === 'submitted' || c.isDisputed)
+      .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  }, [hmoClaims]);
+
+  const accreditedProvidersCount = useMemo(() => {
+    return new Set(hmoClaims.map(c => c.provider)).size;
+  }, [hmoClaims]);
+
+  const approvalRate = useMemo(() => {
+    if (totalClaimed === 0) return '0.0';
+    return ((totalApproved / totalClaimed) * 100).toFixed(1);
+  }, [totalApproved, totalClaimed]);
+
+  const disputedClaims = useMemo(() => hmoClaims.filter(c => c.isDisputed), [hmoClaims]);
+
+  // Explicitly cast to Number to prevent string concatenation bug (#2)
+  const totalDisputedAmount = useMemo(() => {
+    return disputedClaims.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  }, [disputedClaims]);
+
+  const oldestDisputedAge = useMemo(() => {
+    if (disputedClaims.length === 0) return 0;
+    const ages = disputedClaims.map(c => parseInt(c.age, 10) || 0);
+    return Math.max(...ages);
+  }, [disputedClaims]);
+
+  function formatClaimMetric(amount: number): string {
+    if (amount >= 1_000_000) {
+      const val = (amount / 1_000_000).toFixed(1);
+      return `₦${val.endsWith('.0') ? val.slice(0, -2) : val}M`;
+    }
+    if (amount >= 1_000) {
+      const val = (amount / 1_000).toFixed(0);
+      return `₦${val}K`;
+    }
+    return `₦${amount.toLocaleString()}`;
+  }
 
   return (
     <div className="space-y-6">
@@ -58,7 +112,7 @@ export const HMODashboard: React.FC = () => {
           </p>
         </div>
         <div className="font-sans text-xs text-[#475569] bg-white px-3.5 py-2 rounded-lg border border-[#e2e8f0] shadow-xs">
-          <span className="font-bold text-[#12244D]">₦18.2M claimed (30d)</span> · {disputedClaims.length} disputed
+          <span className="font-bold text-[#12244D]">{formatClaimMetric(totalClaimed)} claimed (30d)</span> · {disputedClaims.length} disputed
         </div>
       </div>
 
@@ -66,31 +120,31 @@ export const HMODashboard: React.FC = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#12244D]/30 transition-all">
           <div className="font-sans text-3xl font-extrabold text-[#12244D] tracking-tight">
-            ₦18.2M
+            {formatClaimMetric(totalClaimed)}
           </div>
           <div className="text-[11px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-1">
             Total Claimed (30d)
           </div>
           <div className="mt-2 text-xs text-[#64748b] font-sans">
-            Across 42 accredited providers
+            Across {accreditedProvidersCount} accredited providers
           </div>
         </div>
 
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-emerald-500/30 transition-all">
           <div className="font-sans text-3xl font-extrabold text-[#166534] tracking-tight">
-            ₦14.6M
+            {formatClaimMetric(totalApproved)}
           </div>
           <div className="text-[11px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-1">
             Approved
           </div>
           <div className="mt-2 text-xs text-[#166534] font-sans font-medium">
-            80.2% approval rate
+            {approvalRate}% approval rate
           </div>
         </div>
 
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#0B6B69]/30 transition-all">
           <div className="font-sans text-3xl font-extrabold text-[#0B6B69] tracking-tight">
-            ₦11.1M
+            {formatClaimMetric(totalPaid)}
           </div>
           <div className="text-[11px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-1">
             Paid Remittances
@@ -102,7 +156,7 @@ export const HMODashboard: React.FC = () => {
 
         <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-rose-500/30 transition-all">
           <div className="font-sans text-3xl font-extrabold text-[#d6006c] tracking-tight">
-            ₦3.5M
+            {formatClaimMetric(totalOutstanding)}
           </div>
           <div className="text-[11px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-1">
             Outstanding
@@ -121,7 +175,7 @@ export const HMODashboard: React.FC = () => {
               Disputed
             </span>
             <span className="text-[#a5372c]">
-              <span className="font-bold">{disputedClaims.length} claims</span> rejected this month — <span className="font-bold">₦{totalDisputedAmount.toLocaleString()}</span> disputed, oldest 9 days overdue.
+              <span className="font-bold">{disputedClaims.length} claims</span> rejected this month — <span className="font-bold">₦{totalDisputedAmount.toLocaleString()}</span> disputed{oldestDisputedAge > 0 ? `, oldest ${oldestDisputedAge} days overdue.` : '.'}
             </span>
           </div>
           <button

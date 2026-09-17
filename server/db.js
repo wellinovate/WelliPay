@@ -139,8 +139,7 @@ export function generateScaledSeedData() {
   const patientTxnAmounts = distributeAmount(PATIENT_DIRECT_TARGET, PATIENT_TXN_COUNT, 2000, 60000);
   const CHANNELS = ['POS card', 'USSD', 'Bank transfer', 'Card'];
 
-  const providerTransactions = patientTxnAmounts.map((amount, i) => ({
-    id: `TXN-${String(101 + i)}`,
+  const patientDirectTxns = patientTxnAmounts.map((amount) => ({
     time_captured: randomTimeToday(),
     patient_or_service: `${pick(NIGERIAN_NAMES)} — ${pick(['Consultation', 'Ultrasound', 'Pharmacy', 'Lab work', 'X-ray', 'Deposit', 'Minor procedure'])}`,
     amount,
@@ -149,19 +148,59 @@ export function generateScaledSeedData() {
     status: 'paid', // All 52 paid transactions sum to exactly ₦640,000 for patientDirect
   }));
 
-  // Failed cashier attempts for realistic broadsheet history
-  const failedTxns = [
-    { id: `TXN-${String(101 + PATIENT_TXN_COUNT)}`, time_captured: '10:05', patient_or_service: 'M. Bello — Pharmacy', amount: 8500, formatted_amount: '₦8,500', channel: 'Card', status: 'failed' },
-    { id: `TXN-${String(102 + PATIENT_TXN_COUNT)}`, time_captured: '11:40', patient_or_service: 'Chinedu Eze — Consultation', amount: 15000, formatted_amount: '₦15,000', channel: 'POS card', status: 'failed' },
-    { id: `TXN-${String(103 + PATIENT_TXN_COUNT)}`, time_captured: '14:22', patient_or_service: 'Kemi Adeleke — Lab work', amount: 12000, formatted_amount: '₦12,000', channel: 'USSD', status: 'failed' },
-    { id: `TXN-${String(104 + PATIENT_TXN_COUNT)}`, time_captured: '16:15', patient_or_service: 'Sunday Okafor — Ultrasound', amount: 20000, formatted_amount: '₦20,000', channel: 'Card', status: 'failed' },
+  // 2 HMO remittance transactions received today
+  const hmoRemittanceTxns = [
+    {
+      time_captured: '11:15',
+      patient_or_service: 'Reliance HMO — Capitation Remittance (Batch REL-09)',
+      amount: 1200000,
+      formatted_amount: '₦1,200,000',
+      channel: 'HMO',
+      status: 'paid',
+    },
+    {
+      time_captured: '15:20',
+      patient_or_service: 'Hygeia HMO — Settled Claims Remittance',
+      amount: 700000,
+      formatted_amount: '₦700,000',
+      channel: 'HMO',
+      status: 'paid',
+    },
   ];
-  const allTransactions = [...providerTransactions, ...failedTxns];
 
-  // ---- 2. HMO claims -> target ₦1,900,000 outstanding receivables ----
+  // 1 Corporate retainer payment received today
+  const corporateRetainerTxns = [
+    {
+      time_captured: '13:45',
+      patient_or_service: 'Dangote Industries — Retainer Settlement (Sept)',
+      amount: 300000,
+      formatted_amount: '₦300,000',
+      channel: 'Corporate',
+      status: 'paid',
+    },
+  ];
+
+  // 4 Failed cashier attempts realistically spaced out across the day (not clumped at the top)
+  const failedTxns = [
+    { time_captured: '09:35', patient_or_service: 'M. Bello — Pharmacy checkout', amount: 8500, formatted_amount: '₦8,500', channel: 'Card', status: 'failed' },
+    { time_captured: '11:50', patient_or_service: 'Chinedu Eze — Ultrasound deposit', amount: 15000, formatted_amount: '₦15,000', channel: 'POS card', status: 'failed' },
+    { time_captured: '14:40', patient_or_service: 'Kemi Adeleke — Lab blood panel', amount: 12000, formatted_amount: '₦12,000', channel: 'USSD', status: 'failed' },
+    { time_captured: '17:25', patient_or_service: 'Sunday Okafor — Consultation copay', amount: 20000, formatted_amount: '₦20,000', channel: 'Card', status: 'failed' },
+  ];
+
+  // Combine and sort chronologically DESC so recent transactions show a realistic success mix
+  const rawTransactions = [...patientDirectTxns, ...hmoRemittanceTxns, ...corporateRetainerTxns, ...failedTxns];
+  rawTransactions.sort((a, b) => b.time_captured.localeCompare(a.time_captured));
+
+  const allTransactions = rawTransactions.map((t, idx) => ({
+    id: `TXN-${String(101 + idx)}`,
+    ...t,
+  }));
+
+  // ---- 2. HMO claims -> target ₦1,900,000 outstanding receivables + settled remittances ----
   const HMO_RECEIVABLES_TARGET = 1900000;
-  const CLAIM_COUNT = 48;
-  const claimAmounts = distributeAmount(HMO_RECEIVABLES_TARGET, CLAIM_COUNT, 8000, 90000);
+  const OUTSTANDING_CLAIM_COUNT = 48;
+  const claimAmounts = distributeAmount(HMO_RECEIVABLES_TARGET, OUTSTANDING_CLAIM_COUNT, 8000, 90000);
   const PROVIDERS = ['ABC Diagnostics', 'Lagoon Hospital', 'St. Mary Clinic', 'Wellness Point Lab', 'Trust Care Hospital'];
   const DIAGNOSES = [
     'Routine lipid profile & HbA1c screening',
@@ -176,7 +215,7 @@ export function generateScaledSeedData() {
     'Ophthalmic consult & tonometry'
   ];
 
-  const hmoClaims = claimAmounts.map((amount, i) => {
+  const outstandingClaims = claimAmounts.map((amount, i) => {
     const submittedAt = randomPastDate(21); // spread over last 3 weeks
     const ageDays = Math.max(1, Math.floor((Date.now() - submittedAt.getTime()) / 86400000));
     const isDisputed = i === 2 || i === 15 || i === 29; // ~6% disputed (3 of 48)
@@ -200,6 +239,29 @@ export function generateScaledSeedData() {
       pre_auth_code: isDisputed ? null : (isApproved ? `PA-${randInt(10000, 99999)}-E` : (Math.random() < 0.3 ? `PA-${randInt(10000, 99999)}-E` : null)),
     };
   });
+
+  // Historical settled/paid claims for Paid Remittances metrics
+  const settledClaimAmounts = distributeAmount(850000, 12, 10000, 120000);
+  const settledClaims = settledClaimAmounts.map((amount, i) => {
+    const submittedAt = randomPastDate(28);
+    const ageDays = Math.max(7, Math.floor((Date.now() - submittedAt.getTime()) / 86400000));
+    return {
+      id: `CLM-${4520 + i}`,
+      provider: pick(PROVIDERS),
+      amount,
+      formatted_amount: `₦${amount.toLocaleString()}`,
+      status: 'paid',
+      status_label: 'Paid Remittance',
+      is_disputed: false,
+      denial_risk: 'low',
+      age: `${ageDays}d`,
+      patient_name: pick(NIGERIAN_NAMES),
+      diagnosis: pick(DIAGNOSES),
+      pre_auth_code: `PA-${randInt(10000, 99999)}-E`,
+    };
+  });
+
+  const hmoClaims = [...outstandingClaims, ...settledClaims];
 
   // ---- 3. Patients table: expand to back every claim + named transaction ----
   // Build from the union of names used above so nothing is orphaned.
@@ -231,10 +293,12 @@ export function generateScaledSeedData() {
   });
 
   // Sanity checks — run these before committing the seed
-  const paidDirect = providerTransactions.reduce((s, t) => s + t.amount, 0);
-  const hmoTotal = hmoClaims.reduce((s, c) => s + c.amount, 0);
+  const totalPaidToday = allTransactions.filter(t => t.status === 'paid').reduce((s, t) => s + t.amount, 0);
+  const paidDirect = allTransactions.filter(t => t.status === 'paid' && !['HMO', 'Corporate'].includes(t.channel)).reduce((s, t) => s + t.amount, 0);
+  const hmoReceivablesTotal = outstandingClaims.reduce((s, c) => s + c.amount, 0);
+  console.log('[Seed Generator] Total today ledger:', totalPaidToday);
   console.log('[Seed Generator] Patient direct total:', paidDirect);
-  console.log('[Seed Generator] HMO receivables total:', hmoTotal);
+  console.log('[Seed Generator] HMO receivables total:', hmoReceivablesTotal);
   console.log('[Seed Generator] Total patients:', patients.length);
 
   return { providerTransactions: allTransactions, hmoClaims, patients };
@@ -387,47 +451,48 @@ export async function initializeDatabase() {
       `);
     }
 
-    // 3. Seed HMO Claims (48 claims scaling to ₦1,900,000)
-    const claimCountRes = await pool.query('SELECT COUNT(*) FROM hmo_claims');
-    if (parseInt(claimCountRes.rows[0].count, 10) <= 4) {
-      console.log(`[DB] Seeding ${SCALED_SEED_DATA.hmoClaims.length} scaled HMO claims (target ₦1,900,000)...`);
-      for (const c of SCALED_SEED_DATA.hmoClaims) {
-        await pool.query(`
-          INSERT INTO hmo_claims (id, provider, amount, formatted_amount, status, status_label, is_disputed, denial_risk, age, patient_name, diagnosis, pre_auth_code)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-          ON CONFLICT (id) DO UPDATE SET
-            provider = EXCLUDED.provider,
-            amount = EXCLUDED.amount,
-            formatted_amount = EXCLUDED.formatted_amount,
-            status = EXCLUDED.status,
-            status_label = EXCLUDED.status_label,
-            is_disputed = EXCLUDED.is_disputed,
-            denial_risk = EXCLUDED.denial_risk,
-            age = EXCLUDED.age,
-            patient_name = EXCLUDED.patient_name,
-            diagnosis = EXCLUDED.diagnosis,
-            pre_auth_code = EXCLUDED.pre_auth_code;
-        `, [c.id, c.provider, c.amount, c.formatted_amount, c.status, c.status_label, c.is_disputed, c.denial_risk, c.age, c.patient_name, c.diagnosis, c.pre_auth_code]);
-      }
+    // Ensure clean state for scaled seed tables (clears old seed rows so 33 patients don't accumulate to 41)
+    await pool.query(`
+      DELETE FROM provider_transactions;
+      DELETE FROM hmo_claims;
+      DELETE FROM patients;
+    `);
+
+    // 3. Seed HMO Claims (48 claims scaling to ₦1,900,000 + 12 settled remittances)
+    console.log(`[DB] Seeding ${SCALED_SEED_DATA.hmoClaims.length} scaled HMO claims (target ₦1,900,000)...`);
+    for (const c of SCALED_SEED_DATA.hmoClaims) {
+      await pool.query(`
+        INSERT INTO hmo_claims (id, provider, amount, formatted_amount, status, status_label, is_disputed, denial_risk, age, patient_name, diagnosis, pre_auth_code)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        ON CONFLICT (id) DO UPDATE SET
+          provider = EXCLUDED.provider,
+          amount = EXCLUDED.amount,
+          formatted_amount = EXCLUDED.formatted_amount,
+          status = EXCLUDED.status,
+          status_label = EXCLUDED.status_label,
+          is_disputed = EXCLUDED.is_disputed,
+          denial_risk = EXCLUDED.denial_risk,
+          age = EXCLUDED.age,
+          patient_name = EXCLUDED.patient_name,
+          diagnosis = EXCLUDED.diagnosis,
+          pre_auth_code = EXCLUDED.pre_auth_code;
+      `, [c.id, c.provider, c.amount, c.formatted_amount, c.status, c.status_label, c.is_disputed, c.denial_risk, c.age, c.patient_name, c.diagnosis, c.pre_auth_code]);
     }
 
-    // 4. Seed Provider Transactions (52 transactions scaling to ₦640,000 + 4 failed)
-    const txnCountRes = await pool.query('SELECT COUNT(*) FROM provider_transactions');
-    if (parseInt(txnCountRes.rows[0].count, 10) <= 5) {
-      console.log(`[DB] Seeding ${SCALED_SEED_DATA.providerTransactions.length} scaled provider transactions (target ₦640,000)...`);
-      for (const t of SCALED_SEED_DATA.providerTransactions) {
-        await pool.query(`
-          INSERT INTO provider_transactions (id, time_captured, patient_or_service, amount, formatted_amount, channel, status)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-          ON CONFLICT (id) DO UPDATE SET
-            time_captured = EXCLUDED.time_captured,
-            patient_or_service = EXCLUDED.patient_or_service,
-            amount = EXCLUDED.amount,
-            formatted_amount = EXCLUDED.formatted_amount,
-            channel = EXCLUDED.channel,
-            status = EXCLUDED.status;
-        `, [t.id, t.time_captured, t.patient_or_service, t.amount, t.formatted_amount, t.channel, t.status]);
-      }
+    // 4. Seed Provider Transactions (52 patient direct + 2 HMO remittances + 1 corporate retainer + 4 failed)
+    console.log(`[DB] Seeding ${SCALED_SEED_DATA.providerTransactions.length} scaled provider transactions (target ₦640,000 direct, ₦2.84M total)...`);
+    for (const t of SCALED_SEED_DATA.providerTransactions) {
+      await pool.query(`
+        INSERT INTO provider_transactions (id, time_captured, patient_or_service, amount, formatted_amount, channel, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        ON CONFLICT (id) DO UPDATE SET
+          time_captured = EXCLUDED.time_captured,
+          patient_or_service = EXCLUDED.patient_or_service,
+          amount = EXCLUDED.amount,
+          formatted_amount = EXCLUDED.formatted_amount,
+          channel = EXCLUDED.channel,
+          status = EXCLUDED.status;
+      `, [t.id, t.time_captured, t.patient_or_service, t.amount, t.formatted_amount, t.channel, t.status]);
     }
 
     // 5. Seed 17 Clinical Service Orders for Revenue Leakage Audit if empty
@@ -474,28 +539,25 @@ export async function initializeDatabase() {
     }
 
     // 7. Seed Patients (backing all claims and transactions)
-    const patientCountRes = await pool.query('SELECT COUNT(*) FROM patients');
-    if (parseInt(patientCountRes.rows[0].count, 10) <= 8) {
-      console.log(`[DB] Seeding ${SCALED_SEED_DATA.patients.length} scaled patient records...`);
-      for (const p of SCALED_SEED_DATA.patients) {
-        await pool.query(`
-          INSERT INTO patients (id, mrn, full_name, phone, email, gender, date_of_birth, primary_coverage, hmo_name, hmo_policy_number, hmo_enrollee_id, outstanding_copay, status)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-          ON CONFLICT (id) DO UPDATE SET
-            mrn = EXCLUDED.mrn,
-            full_name = EXCLUDED.full_name,
-            phone = EXCLUDED.phone,
-            email = EXCLUDED.email,
-            gender = EXCLUDED.gender,
-            date_of_birth = EXCLUDED.date_of_birth,
-            primary_coverage = EXCLUDED.primary_coverage,
-            hmo_name = EXCLUDED.hmo_name,
-            hmo_policy_number = EXCLUDED.hmo_policy_number,
-            hmo_enrollee_id = EXCLUDED.hmo_enrollee_id,
-            outstanding_copay = EXCLUDED.outstanding_copay,
-            status = EXCLUDED.status;
-        `, [p.id, p.mrn, p.full_name, p.phone, p.email, p.gender, p.date_of_birth, p.primary_coverage, p.hmo_name, p.hmo_policy_number, p.hmo_enrollee_id, p.outstanding_copay, p.status]);
-      }
+    console.log(`[DB] Seeding ${SCALED_SEED_DATA.patients.length} scaled patient records...`);
+    for (const p of SCALED_SEED_DATA.patients) {
+      await pool.query(`
+        INSERT INTO patients (id, mrn, full_name, phone, email, gender, date_of_birth, primary_coverage, hmo_name, hmo_policy_number, hmo_enrollee_id, outstanding_copay, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ON CONFLICT (id) DO UPDATE SET
+          mrn = EXCLUDED.mrn,
+          full_name = EXCLUDED.full_name,
+          phone = EXCLUDED.phone,
+          email = EXCLUDED.email,
+          gender = EXCLUDED.gender,
+          date_of_birth = EXCLUDED.date_of_birth,
+          primary_coverage = EXCLUDED.primary_coverage,
+          hmo_name = EXCLUDED.hmo_name,
+          hmo_policy_number = EXCLUDED.hmo_policy_number,
+          hmo_enrollee_id = EXCLUDED.hmo_enrollee_id,
+          outstanding_copay = EXCLUDED.outstanding_copay,
+          status = EXCLUDED.status;
+      `, [p.id, p.mrn, p.full_name, p.phone, p.email, p.gender, p.date_of_birth, p.primary_coverage, p.hmo_name, p.hmo_policy_number, p.hmo_enrollee_id, p.outstanding_copay, p.status]);
     }
 
     // 8. Seed Invoices if empty
