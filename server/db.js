@@ -85,6 +85,163 @@ export async function checkDatabaseHealth() {
   }
 }
 
+// ---- Seed data generator: scales to Lagoon Hospital wireframe targets ----
+
+const NIGERIAN_NAMES = [
+  'Kemi Adeleke', 'Chinedu Eze', 'Amina Bello', 'Babatunde Fashola',
+  'Ngozi Okoro', 'Yusuf Danladi', 'Funmilayo Adebayo', 'Emeka Obi',
+  'Halima Suleiman', 'Tunde Bakare', 'Chiamaka Nwosu', 'Ibrahim Musa',
+  'Folake Adeyemi', 'Sunday Okafor', 'Zainab Aliyu', 'Kelechi Anyanwu',
+  'Grace Effiong', 'Musa Abubakar', 'Blessing Uche', 'Segun Ogundipe',
+  'Aisha Garba', 'Chukwuemeka Nnaji', 'Bisi Ogunleye', 'David Etim',
+  'Rukayat Bello', 'Obinna Chukwu', 'Fatima Yakubu', 'Wale Ojo',
+  'Comfort Ekpo', 'Ahmed Sani', 'J. Umar', 'M. Bello', 'J. Adeyemi', 'T. Yusuf', 'T. Adeyemi'
+];
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+// Distributes a target total across `count` rows with realistic variance,
+// forcing the last row to absorb rounding so the sum matches exactly.
+function distributeAmount(targetTotal, count, minAmt, maxAmt) {
+  const amounts = [];
+  let remaining = targetTotal;
+  for (let i = 0; i < count - 1; i++) {
+    const roomLeft = count - i - 1;
+    const avgRemaining = remaining / (roomLeft + 1);
+    const low = Math.max(minAmt, Math.floor(avgRemaining * 0.5));
+    const high = Math.min(maxAmt, Math.ceil(avgRemaining * 1.5));
+    const amt = randInt(low, high);
+    amounts.push(amt);
+    remaining -= amt;
+  }
+  amounts.push(Math.max(minAmt, remaining)); // last row absorbs remainder
+  return amounts;
+}
+
+function randomTimeToday() {
+  const h = randInt(9, 21);
+  const m = randInt(0, 59);
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function randomPastDate(daysBackMax) {
+  const d = new Date();
+  d.setDate(d.getDate() - randInt(0, daysBackMax));
+  return d;
+}
+
+export function generateScaledSeedData() {
+  // ---- 1. Patient-direct transactions -> target ₦640,000 ----
+  const PATIENT_DIRECT_TARGET = 640000;
+  const PATIENT_TXN_COUNT = 52;
+  const patientTxnAmounts = distributeAmount(PATIENT_DIRECT_TARGET, PATIENT_TXN_COUNT, 2000, 60000);
+  const CHANNELS = ['POS card', 'USSD', 'Bank transfer', 'Card'];
+
+  const providerTransactions = patientTxnAmounts.map((amount, i) => ({
+    id: `TXN-${String(101 + i)}`,
+    time_captured: randomTimeToday(),
+    patient_or_service: `${pick(NIGERIAN_NAMES)} — ${pick(['Consultation', 'Ultrasound', 'Pharmacy', 'Lab work', 'X-ray', 'Deposit', 'Minor procedure'])}`,
+    amount,
+    formatted_amount: `₦${amount.toLocaleString()}`,
+    channel: pick(CHANNELS),
+    status: 'paid', // All 52 paid transactions sum to exactly ₦640,000 for patientDirect
+  }));
+
+  // Failed cashier attempts for realistic broadsheet history
+  const failedTxns = [
+    { id: `TXN-${String(101 + PATIENT_TXN_COUNT)}`, time_captured: '10:05', patient_or_service: 'M. Bello — Pharmacy', amount: 8500, formatted_amount: '₦8,500', channel: 'Card', status: 'failed' },
+    { id: `TXN-${String(102 + PATIENT_TXN_COUNT)}`, time_captured: '11:40', patient_or_service: 'Chinedu Eze — Consultation', amount: 15000, formatted_amount: '₦15,000', channel: 'POS card', status: 'failed' },
+    { id: `TXN-${String(103 + PATIENT_TXN_COUNT)}`, time_captured: '14:22', patient_or_service: 'Kemi Adeleke — Lab work', amount: 12000, formatted_amount: '₦12,000', channel: 'USSD', status: 'failed' },
+    { id: `TXN-${String(104 + PATIENT_TXN_COUNT)}`, time_captured: '16:15', patient_or_service: 'Sunday Okafor — Ultrasound', amount: 20000, formatted_amount: '₦20,000', channel: 'Card', status: 'failed' },
+  ];
+  const allTransactions = [...providerTransactions, ...failedTxns];
+
+  // ---- 2. HMO claims -> target ₦1,900,000 outstanding receivables ----
+  const HMO_RECEIVABLES_TARGET = 1900000;
+  const CLAIM_COUNT = 48;
+  const claimAmounts = distributeAmount(HMO_RECEIVABLES_TARGET, CLAIM_COUNT, 8000, 90000);
+  const PROVIDERS = ['ABC Diagnostics', 'Lagoon Hospital', 'St. Mary Clinic', 'Wellness Point Lab', 'Trust Care Hospital'];
+  const DIAGNOSES = [
+    'Routine lipid profile & HbA1c screening',
+    'Echocardiography & Doppler imaging',
+    'Appendectomy emergency intervention',
+    'Comprehensive metabolic panel',
+    'Hypertension management & ECG',
+    'Antenatal triage & ultrasound',
+    'Pediatric observation & malaria test',
+    'Full blood count & differential',
+    'Renal function panel (E/U/Cr)',
+    'Ophthalmic consult & tonometry'
+  ];
+
+  const hmoClaims = claimAmounts.map((amount, i) => {
+    const submittedAt = randomPastDate(21); // spread over last 3 weeks
+    const ageDays = Math.max(1, Math.floor((Date.now() - submittedAt.getTime()) / 86400000));
+    const isDisputed = i === 2 || i === 15 || i === 29; // ~6% disputed (3 of 48)
+    const denialRisk = isDisputed ? 'missing-auth' : (amount > 50000 ? pick(['high', 'low']) : 'low');
+    const isApproved = !isDisputed && (i % 4 === 0); // ~25% approved, rest submitted
+    const status = isApproved ? 'approved' : 'submitted'; // Counted in hmoReceivables (status IN ('submitted', 'approved'))
+    const statusLabel = isDisputed ? 'Flagged for Review' : (isApproved ? 'Approved' : 'Submitted');
+
+    return {
+      id: `CLM-${4470 + i}`,
+      provider: pick(PROVIDERS),
+      amount,
+      formatted_amount: `₦${amount.toLocaleString()}`,
+      status,
+      status_label: statusLabel,
+      is_disputed: isDisputed,
+      denial_risk: denialRisk,
+      age: `${ageDays}d`,
+      patient_name: pick(NIGERIAN_NAMES),
+      diagnosis: pick(DIAGNOSES),
+      pre_auth_code: isDisputed ? null : (isApproved ? `PA-${randInt(10000, 99999)}-E` : (Math.random() < 0.3 ? `PA-${randInt(10000, 99999)}-E` : null)),
+    };
+  });
+
+  // ---- 3. Patients table: expand to back every claim + named transaction ----
+  // Build from the union of names used above so nothing is orphaned.
+  const allPatientNames = [...new Set([
+    ...hmoClaims.map(c => c.patient_name),
+    ...allTransactions.map(t => t.patient_or_service.split(' — ')[0].trim()),
+    'J. Umar', 'M. Bello', 'J. Adeyemi', 'T. Yusuf', 'Kemi Adeleke', 'Amina Bello', 'Babatunde Fashola', 'Chinedu Eze'
+  ])];
+
+  const patients = allPatientNames.map((name, i) => {
+    const hasHmo = Math.random() < 0.7; // ~70% insured, rest self-pay
+    const outstandingCopay = hasHmo && Math.random() < 0.25 ? randInt(2, 15) * 1000 : 0;
+    const hmoName = hasHmo ? pick(['Hygeia HMO', 'Reliance HMO', 'AXA Mansard', 'Avon HMO', 'Leadway Health']) : null;
+    return {
+      id: `PAT-${String(1000 + i)}`,
+      mrn: `MRN-LSH-${String(10000 + i)}`,
+      full_name: name,
+      phone: `+234 ${pick(['802', '803', '805', '809', '813', '814', '818'])} ${randInt(100, 999)} ${randInt(1000, 9999)}`,
+      email: `${name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@lagoonhealth.ng`,
+      gender: pick(['female', 'male']),
+      date_of_birth: `19${randInt(65, 99)}-${String(randInt(1, 12)).padStart(2, '0')}-${String(randInt(1, 28)).padStart(2, '0')}`,
+      primary_coverage: hasHmo ? `${hmoName} (${pick(['Silver Plan', 'Gold Plan', 'Executive', 'Premium'])})` : 'Self-Pay / Direct',
+      hmo_name: hmoName,
+      hmo_policy_number: hasHmo ? `POL-${randInt(100000, 999999)}` : null,
+      hmo_enrollee_id: hasHmo ? `ENR-${randInt(10000, 99999)}` : null,
+      outstanding_copay: outstandingCopay,
+      status: 'active',
+    };
+  });
+
+  // Sanity checks — run these before committing the seed
+  const paidDirect = providerTransactions.reduce((s, t) => s + t.amount, 0);
+  const hmoTotal = hmoClaims.reduce((s, c) => s + c.amount, 0);
+  console.log('[Seed Generator] Patient direct total:', paidDirect);
+  console.log('[Seed Generator] HMO receivables total:', hmoTotal);
+  console.log('[Seed Generator] Total patients:', patients.length);
+
+  return { providerTransactions: allTransactions, hmoClaims, patients };
+}
+
+export const SCALED_SEED_DATA = generateScaledSeedData();
+
 export async function initializeDatabase() {
   if (!pool) {
     console.log('[DB] DATABASE_URL not set. Running in static / demo mode.');
@@ -230,33 +387,47 @@ export async function initializeDatabase() {
       `);
     }
 
-    // 3. Seed HMO Claims if empty
+    // 3. Seed HMO Claims (48 claims scaling to ₦1,900,000)
     const claimCountRes = await pool.query('SELECT COUNT(*) FROM hmo_claims');
-    if (parseInt(claimCountRes.rows[0].count, 10) === 0) {
-      console.log('[DB] Seeding HMO claims...');
-      await pool.query(`
-        INSERT INTO hmo_claims (id, provider, amount, formatted_amount, status, status_label, is_disputed, denial_risk, age, patient_name, diagnosis, pre_auth_code) VALUES
-        ('CLM-4471', 'ABC Diagnostics', 12000, '₦12,000', 'submitted', 'Submitted', false, 'high', '2d', 'Kemi Adeleke', 'Routine lipid profile & HbA1c screening', NULL),
-        ('CLM-4472', 'ABC Diagnostics', 45000, '₦45,000', 'approved', 'Approved', false, 'low', '5d', 'Chinedu Eze', 'Echocardiography & Doppler imaging', 'PA-88910-E'),
-        ('CLM-4473', 'ABC Diagnostics', 85000, '₦85,000', 'submitted', 'Flagged for Review', true, 'missing-auth', '8d', 'Amina Bello', 'Appendectomy emergency intervention', NULL),
-        ('CLM-4474', 'ABC Diagnostics', 21500, '₦21,500', 'paid', 'Paid', false, 'low', '14d', 'Babatunde Fashola', 'Comprehensive metabolic panel', NULL)
-        ON CONFLICT (id) DO NOTHING;
-      `);
+    if (parseInt(claimCountRes.rows[0].count, 10) <= 4) {
+      console.log(`[DB] Seeding ${SCALED_SEED_DATA.hmoClaims.length} scaled HMO claims (target ₦1,900,000)...`);
+      for (const c of SCALED_SEED_DATA.hmoClaims) {
+        await pool.query(`
+          INSERT INTO hmo_claims (id, provider, amount, formatted_amount, status, status_label, is_disputed, denial_risk, age, patient_name, diagnosis, pre_auth_code)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          ON CONFLICT (id) DO UPDATE SET
+            provider = EXCLUDED.provider,
+            amount = EXCLUDED.amount,
+            formatted_amount = EXCLUDED.formatted_amount,
+            status = EXCLUDED.status,
+            status_label = EXCLUDED.status_label,
+            is_disputed = EXCLUDED.is_disputed,
+            denial_risk = EXCLUDED.denial_risk,
+            age = EXCLUDED.age,
+            patient_name = EXCLUDED.patient_name,
+            diagnosis = EXCLUDED.diagnosis,
+            pre_auth_code = EXCLUDED.pre_auth_code;
+        `, [c.id, c.provider, c.amount, c.formatted_amount, c.status, c.status_label, c.is_disputed, c.denial_risk, c.age, c.patient_name, c.diagnosis, c.pre_auth_code]);
+      }
     }
 
-    // 4. Seed Provider Transactions if empty
+    // 4. Seed Provider Transactions (52 transactions scaling to ₦640,000 + 4 failed)
     const txnCountRes = await pool.query('SELECT COUNT(*) FROM provider_transactions');
-    if (parseInt(txnCountRes.rows[0].count, 10) === 0) {
-      console.log('[DB] Seeding provider transactions...');
-      await pool.query(`
-        INSERT INTO provider_transactions (id, time_captured, patient_or_service, amount, formatted_amount, channel, status) VALUES
-        ('TXN-101', '09:14', 'J. Adeyemi — Consultation', 2000, '₦2,000', 'USSD', 'paid'),
-        ('TXN-102', '09:22', 'ABC Diagnostics — Lab claim', 12000, '₦12,000', 'HMO', 'pending'),
-        ('TXN-103', '09:40', 'F. Okon — Deposit', 50000, '₦50,000', 'Transfer', 'paid'),
-        ('TXN-104', '10:05', 'M. Bello — Pharmacy', 8500, '₦8,500', 'Card', 'failed'),
-        ('TXN-105', '10:21', 'T. Yusuf — Ultrasound', 8000, '₦8,000', 'Bank transfer', 'paid')
-        ON CONFLICT (id) DO NOTHING;
-      `);
+    if (parseInt(txnCountRes.rows[0].count, 10) <= 5) {
+      console.log(`[DB] Seeding ${SCALED_SEED_DATA.providerTransactions.length} scaled provider transactions (target ₦640,000)...`);
+      for (const t of SCALED_SEED_DATA.providerTransactions) {
+        await pool.query(`
+          INSERT INTO provider_transactions (id, time_captured, patient_or_service, amount, formatted_amount, channel, status)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          ON CONFLICT (id) DO UPDATE SET
+            time_captured = EXCLUDED.time_captured,
+            patient_or_service = EXCLUDED.patient_or_service,
+            amount = EXCLUDED.amount,
+            formatted_amount = EXCLUDED.formatted_amount,
+            channel = EXCLUDED.channel,
+            status = EXCLUDED.status;
+        `, [t.id, t.time_captured, t.patient_or_service, t.amount, t.formatted_amount, t.channel, t.status]);
+      }
     }
 
     // 5. Seed 17 Clinical Service Orders for Revenue Leakage Audit if empty
@@ -302,22 +473,29 @@ export async function initializeDatabase() {
       `);
     }
 
-    // 7. Seed Patients if empty
+    // 7. Seed Patients (backing all claims and transactions)
     const patientCountRes = await pool.query('SELECT COUNT(*) FROM patients');
-    if (parseInt(patientCountRes.rows[0].count, 10) === 0) {
-      console.log('[DB] Seeding 8 patient records...');
-      await pool.query(`
-        INSERT INTO patients (id, mrn, full_name, phone, email, gender, date_of_birth, primary_coverage, hmo_name, hmo_policy_number, hmo_enrollee_id, outstanding_copay, status) VALUES
-        ('PAT-1082', 'MRN-LSH-08241', 'J. Adeyemi', '+234 802 341 9901', 'j.adeyemi@lagoonhealth.ng', 'male', '1984-06-12', 'Self-Pay / Direct USSD', NULL, NULL, NULL, 0, 'active'),
-        ('PAT-1094', 'MRN-LSH-08294', 'J. Umar', '+234 813 902 4412', 'j.umar@lagoonhealth.ng', 'male', '1990-11-04', 'Reliance HMO (Silver Plan)', 'Reliance HMO', 'REL-992014-A', 'ENR-77210', 0, 'active'),
-        ('PAT-1102', 'MRN-LSH-08302', 'M. Bello', '+234 809 112 5530', 'm.bello@lagoonhealth.ng', 'female', '1979-03-21', 'Self-Pay / POS Card', NULL, NULL, NULL, 8500, 'active'),
-        ('PAT-1115', 'MRN-LSH-08315', 'T. Yusuf', '+234 805 771 8823', 't.yusuf@lagoonhealth.ng', 'female', '1993-08-19', 'AXA Mansard Health (Gold)', 'AXA Mansard', 'AXA-448201-B', 'ENR-88402', 0, 'active'),
-        ('PAT-1120', 'MRN-LSH-08320', 'Kemi Adeleke', '+234 803 445 1199', 'kemi.adeleke@lagoonhealth.ng', 'female', '1988-02-14', 'Reliance HMO (Executive)', 'Reliance HMO', 'REL-883192-E', 'ENR-90114', 0, 'active'),
-        ('PAT-1128', 'MRN-LSH-08328', 'Amina Bello', '+234 818 223 9944', 'amina.bello@lagoonhealth.ng', 'female', '1995-12-09', 'Hygeia HMO (Premium)', 'Hygeia HMO', 'HYG-551029-C', 'ENR-64210', 15000, 'active'),
-        ('PAT-1135', 'MRN-LSH-08335', 'Babatunde Fashola', '+234 802 889 0011', 'babatunde.fashola@lagoonhealth.ng', 'male', '1972-07-28', 'Leadway Health (Corporate)', 'Leadway Health', 'LDW-110294-D', 'ENR-53109', 0, 'active'),
-        ('PAT-1142', 'MRN-LSH-08342', 'Chinedu Eze', '+234 814 662 3388', 'chinedu.eze@lagoonhealth.ng', 'male', '1986-09-17', 'Reliance HMO (Silver Plan)', 'Reliance HMO', 'REL-441092-B', 'ENR-71904', 5000, 'active')
-        ON CONFLICT (id) DO NOTHING;
-      `);
+    if (parseInt(patientCountRes.rows[0].count, 10) <= 8) {
+      console.log(`[DB] Seeding ${SCALED_SEED_DATA.patients.length} scaled patient records...`);
+      for (const p of SCALED_SEED_DATA.patients) {
+        await pool.query(`
+          INSERT INTO patients (id, mrn, full_name, phone, email, gender, date_of_birth, primary_coverage, hmo_name, hmo_policy_number, hmo_enrollee_id, outstanding_copay, status)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          ON CONFLICT (id) DO UPDATE SET
+            mrn = EXCLUDED.mrn,
+            full_name = EXCLUDED.full_name,
+            phone = EXCLUDED.phone,
+            email = EXCLUDED.email,
+            gender = EXCLUDED.gender,
+            date_of_birth = EXCLUDED.date_of_birth,
+            primary_coverage = EXCLUDED.primary_coverage,
+            hmo_name = EXCLUDED.hmo_name,
+            hmo_policy_number = EXCLUDED.hmo_policy_number,
+            hmo_enrollee_id = EXCLUDED.hmo_enrollee_id,
+            outstanding_copay = EXCLUDED.outstanding_copay,
+            status = EXCLUDED.status;
+        `, [p.id, p.mrn, p.full_name, p.phone, p.email, p.gender, p.date_of_birth, p.primary_coverage, p.hmo_name, p.hmo_policy_number, p.hmo_enrollee_id, p.outstanding_copay, p.status]);
+      }
     }
 
     // 8. Seed Invoices if empty

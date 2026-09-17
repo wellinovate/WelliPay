@@ -5,7 +5,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { pool, checkDatabaseHealth, initializeDatabase, query } from './server/db.js';
+import { pool, checkDatabaseHealth, initializeDatabase, query, SCALED_SEED_DATA } from './server/db.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -239,7 +239,22 @@ app.get('/api/claims', requireAuth, async (req, res) => {
     return res.status(503).json({ error: 'Database service unavailable in production.' });
   }
 
-  res.json({ source: 'fallback', message: 'HMO claims ready.' });
+  const fallbackClaims = (SCALED_SEED_DATA?.hmoClaims || []).map(c => ({
+    id: c.id,
+    provider: c.provider,
+    amount: c.amount,
+    formattedAmount: c.formatted_amount,
+    status: c.status,
+    statusLabel: c.status_label,
+    isDisputed: c.is_disputed,
+    denialRisk: c.denial_risk,
+    age: c.age,
+    patientName: c.patient_name,
+    diagnosis: c.diagnosis,
+    preAuthCode: c.pre_auth_code
+  }));
+
+  res.json({ source: 'fallback', claims: fallbackClaims });
 });
 
 // 5. Approve HMO Claim
@@ -471,13 +486,15 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
         { name: 'Lipid Profile Panels (4 orders)', orderCount: 4, amount: 104000, formattedAmount: '₦104,000' }
       ]
     },
-    transactions: [
-      { id: 'TXN-101', time: '09:14', patientOrService: 'J. Adeyemi — Consultation', amount: 2000, formattedAmount: '₦2,000', channel: 'USSD', status: 'paid' },
-      { id: 'TXN-102', time: '09:22', patientOrService: 'ABC Diagnostics — Lab claim', amount: 12000, formattedAmount: '₦12,000', channel: 'HMO', status: 'pending' },
-      { id: 'TXN-103', time: '09:40', patientOrService: 'F. Okon — Deposit', amount: 50000, formattedAmount: '₦50,000', channel: 'Transfer', status: 'paid' },
-      { id: 'TXN-104', time: '10:05', patientOrService: 'M. Bello — Pharmacy', amount: 8500, formattedAmount: '₦8,500', channel: 'Card', status: 'failed' },
-      { id: 'TXN-105', time: '10:21', patientOrService: 'T. Yusuf — Ultrasound', amount: 8000, formattedAmount: '₦8,000', channel: 'Bank transfer', status: 'paid' }
-    ]
+    transactions: (SCALED_SEED_DATA?.providerTransactions || []).slice(0, 50).map(t => ({
+      id: t.id,
+      time: t.time_captured,
+      patientOrService: t.patient_or_service,
+      amount: t.amount,
+      formattedAmount: t.formatted_amount,
+      channel: t.channel,
+      status: t.status
+    }))
   });
 });
 
@@ -560,144 +577,26 @@ app.post('/api/dashboard/resolve-leakage', requireAuth, async (req, res) => {
 // Patients Directory Endpoints
 // ==========================================
 
-const FALLBACK_PATIENTS = [
-  {
-    id: 'PAT-1082',
-    mrn: 'MRN-LSH-08241',
-    fullName: 'J. Adeyemi',
-    phone: '+234 802 341 9901',
-    email: 'j.adeyemi@lagoonhealth.ng',
-    gender: 'male',
-    dateOfBirth: '1984-06-12',
-    primaryCoverage: 'Self-Pay / Direct USSD',
-    hmoName: null,
-    hmoPolicyNumber: null,
-    hmoEnrolleeId: null,
-    outstandingCopay: 0,
-    formattedOutstandingCopay: '₦0',
-    status: 'active',
-    createdAt: '2026-08-15'
-  },
-  {
-    id: 'PAT-1094',
-    mrn: 'MRN-LSH-08294',
-    fullName: 'J. Umar',
-    phone: '+234 813 902 4412',
-    email: 'j.umar@lagoonhealth.ng',
-    gender: 'male',
-    dateOfBirth: '1990-11-04',
-    primaryCoverage: 'Reliance HMO (Silver Plan)',
-    hmoName: 'Reliance HMO',
-    hmoPolicyNumber: 'REL-992014-A',
-    hmoEnrolleeId: 'ENR-77210',
-    outstandingCopay: 0,
-    formattedOutstandingCopay: '₦0',
-    status: 'active',
-    createdAt: '2026-08-19'
-  },
-  {
-    id: 'PAT-1102',
-    mrn: 'MRN-LSH-08302',
-    fullName: 'M. Bello',
-    phone: '+234 809 112 5530',
-    email: 'm.bello@lagoonhealth.ng',
-    gender: 'female',
-    dateOfBirth: '1979-03-21',
-    primaryCoverage: 'Self-Pay / POS Card',
-    hmoName: null,
-    hmoPolicyNumber: null,
-    hmoEnrolleeId: null,
-    outstandingCopay: 8500,
-    formattedOutstandingCopay: '₦8,500',
-    status: 'active',
-    createdAt: '2026-08-25'
-  },
-  {
-    id: 'PAT-1115',
-    mrn: 'MRN-LSH-08315',
-    fullName: 'T. Yusuf',
-    phone: '+234 805 771 8823',
-    email: 't.yusuf@lagoonhealth.ng',
-    gender: 'female',
-    dateOfBirth: '1993-08-19',
-    primaryCoverage: 'AXA Mansard Health (Gold)',
-    hmoName: 'AXA Mansard',
-    hmoPolicyNumber: 'AXA-448201-B',
-    hmoEnrolleeId: 'ENR-88402',
-    outstandingCopay: 0,
-    formattedOutstandingCopay: '₦0',
-    status: 'active',
-    createdAt: '2026-08-28'
-  },
-  {
-    id: 'PAT-1120',
-    mrn: 'MRN-LSH-08320',
-    fullName: 'Kemi Adeleke',
-    phone: '+234 803 445 1199',
-    email: 'kemi.adeleke@lagoonhealth.ng',
-    gender: 'female',
-    dateOfBirth: '1988-02-14',
-    primaryCoverage: 'Reliance HMO (Executive)',
-    hmoName: 'Reliance HMO',
-    hmoPolicyNumber: 'REL-883192-E',
-    hmoEnrolleeId: 'ENR-90114',
-    outstandingCopay: 0,
-    formattedOutstandingCopay: '₦0',
-    status: 'active',
-    createdAt: '2026-09-01'
-  },
-  {
-    id: 'PAT-1128',
-    mrn: 'MRN-LSH-08328',
-    fullName: 'Amina Bello',
-    phone: '+234 818 223 9944',
-    email: 'amina.bello@lagoonhealth.ng',
-    gender: 'female',
-    dateOfBirth: '1995-12-09',
-    primaryCoverage: 'Hygeia HMO (Premium)',
-    hmoName: 'Hygeia HMO',
-    hmoPolicyNumber: 'HYG-551029-C',
-    hmoEnrolleeId: 'ENR-64210',
-    outstandingCopay: 15000,
-    formattedOutstandingCopay: '₦15,000',
-    status: 'active',
-    createdAt: '2026-09-03'
-  },
-  {
-    id: 'PAT-1135',
-    mrn: 'MRN-LSH-08335',
-    fullName: 'Babatunde Fashola',
-    phone: '+234 802 889 0011',
-    email: 'babatunde.fashola@lagoonhealth.ng',
-    gender: 'male',
-    dateOfBirth: '1972-07-28',
-    primaryCoverage: 'Leadway Health (Corporate)',
-    hmoName: 'Leadway Health',
-    hmoPolicyNumber: 'LDW-110294-D',
-    hmoEnrolleeId: 'ENR-53109',
-    outstandingCopay: 0,
-    formattedOutstandingCopay: '₦0',
-    status: 'active',
-    createdAt: '2026-09-08'
-  },
-  {
-    id: 'PAT-1142',
-    mrn: 'MRN-LSH-08342',
-    fullName: 'Chinedu Eze',
-    phone: '+234 814 662 3388',
-    email: 'chinedu.eze@lagoonhealth.ng',
-    gender: 'male',
-    dateOfBirth: '1986-09-17',
-    primaryCoverage: 'Reliance HMO (Silver Plan)',
-    hmoName: 'Reliance HMO',
-    hmoPolicyNumber: 'REL-441092-B',
-    hmoEnrolleeId: 'ENR-71904',
-    outstandingCopay: 5000,
-    formattedOutstandingCopay: '₦5,000',
-    status: 'active',
-    createdAt: '2026-09-10'
-  }
-];
+const FALLBACK_PATIENTS = (SCALED_SEED_DATA?.patients && SCALED_SEED_DATA.patients.length > 0)
+  ? SCALED_SEED_DATA.patients.map(p => ({
+      id: p.id,
+      mrn: p.mrn,
+      fullName: p.full_name,
+      phone: p.phone,
+      email: p.email,
+      gender: p.gender,
+      dateOfBirth: p.date_of_birth,
+      primaryCoverage: p.primary_coverage,
+      hmoName: p.hmo_name,
+      hmoPolicyNumber: p.hmo_policy_number,
+      hmoEnrolleeId: p.hmo_enrollee_id,
+      outstandingCopay: p.outstanding_copay,
+      formattedOutstandingCopay: `₦${p.outstanding_copay.toLocaleString()}`,
+      status: p.status,
+      createdAt: '2026-08-15'
+    }))
+  : [];
+
 
 const FALLBACK_INVOICES = [
   {
