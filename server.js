@@ -118,8 +118,8 @@ app.get('/api/database/status', async (req, res) => {
 
 // 1. Get Reconciliation Queue
 app.get('/api/reconciliation', requireAuth, async (req, res) => {
-  try {
-    if (pool) {
+  if (pool) {
+    try {
       const result = await query(`
         SELECT 
           id, date_captured as date, amount, formatted_amount as "formattedAmount",
@@ -136,9 +136,14 @@ app.get('/api/reconciliation', requireAuth, async (req, res) => {
         ORDER BY id ASC
       `);
       return res.json({ source: 'postgresql', items: result.rows });
+    } catch (err) {
+      console.error('[API /api/reconciliation] DB error:', err.message);
+      return res.status(500).json({ error: 'Database query failed', message: err.message });
     }
-  } catch (err) {
-    console.error('[API /api/reconciliation] DB error, falling back to mock:', err.message);
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(503).json({ error: 'Database service unavailable in production.' });
   }
 
   res.json({ source: 'fallback', message: 'Database query executed with local state fallback.' });
@@ -212,8 +217,8 @@ app.post('/api/reconciliation/bulk-confirm', requireAuth, async (req, res) => {
 
 // 4. Get HMO Claims
 app.get('/api/claims', requireAuth, async (req, res) => {
-  try {
-    if (pool) {
+  if (pool) {
+    try {
       const result = await query(`
         SELECT 
           id, provider, amount, formatted_amount as "formattedAmount",
@@ -224,9 +229,14 @@ app.get('/api/claims', requireAuth, async (req, res) => {
         ORDER BY id ASC
       `);
       return res.json({ source: 'postgresql', claims: result.rows });
+    } catch (err) {
+      console.error('[API /api/claims] DB error:', err.message);
+      return res.status(500).json({ error: 'Database query failed', message: err.message });
     }
-  } catch (err) {
-    console.error('[API /api/claims] DB error:', err.message);
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(503).json({ error: 'Database service unavailable in production.' });
   }
 
   res.json({ source: 'fallback', message: 'HMO claims ready.' });
@@ -336,8 +346,8 @@ function formatNaira(amount) {
 
 // 6. Get Provider Dashboard KPIs, Leakage Audit & Transactions
 app.get('/api/dashboard', requireAuth, async (req, res) => {
-  try {
-    if (pool) {
+  if (pool) {
+    try {
       // Fetch recent transactions
       const txnsRes = await query(`
         SELECT id, time_captured as time, patient_or_service as "patientOrService",
@@ -424,9 +434,14 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
         },
         transactions: txnsRes.rows
       });
+    } catch (err) {
+      console.error('[API /api/dashboard] DB error:', err.message);
+      return res.status(500).json({ error: 'Database query failed', message: err.message });
     }
-  } catch (err) {
-    console.error('[API /api/dashboard] DB error, falling back to mock:', err.message);
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(503).json({ error: 'Database service unavailable in production.' });
   }
 
   // Fallback demo payload
@@ -747,8 +762,8 @@ const FALLBACK_INVOICES = [
 app.get('/api/patients', requireAuth, async (req, res) => {
   const { search, coverage, hasOutstanding } = req.query;
 
-  try {
-    if (pool) {
+  if (pool) {
+    try {
       let conditions = [];
       let params = [];
       let paramIdx = 1;
@@ -815,9 +830,14 @@ app.get('/api/patients', requireAuth, async (req, res) => {
         },
         patients
       });
+    } catch (err) {
+      console.error('[API /api/patients] DB error:', err.message);
+      return res.status(500).json({ error: 'Database query failed', message: err.message });
     }
-  } catch (err) {
-    console.error('[API /api/patients] DB error:', err.message);
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(503).json({ error: 'Database service unavailable in production.' });
   }
 
   // Fallback demo filtering
@@ -854,8 +874,8 @@ app.get('/api/patients', requireAuth, async (req, res) => {
 app.get('/api/patients/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
 
-  try {
-    if (pool) {
+  if (pool) {
+    try {
       const patRes = await query(`
         SELECT 
           id, mrn, full_name as "fullName", phone, email, gender,
@@ -902,9 +922,14 @@ app.get('/api/patients/:id', requireAuth, async (req, res) => {
         transactions: txnsRes.rows,
         claims: claimsRes.rows
       });
+    } catch (err) {
+      console.error('[API /api/patients/:id] DB error:', err.message);
+      return res.status(500).json({ error: 'Database query failed', message: err.message });
     }
-  } catch (err) {
-    console.error('[API /api/patients/:id] DB error:', err.message);
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(503).json({ error: 'Database service unavailable in production.' });
   }
 
   const patient = FALLBACK_PATIENTS.find(p => p.id === id || p.mrn === id) || FALLBACK_PATIENTS[0];
@@ -1040,8 +1065,8 @@ app.post('/api/patients/:id/collect-copay', requireAuth, async (req, res) => {
 app.get('/api/invoices', requireAuth, async (req, res) => {
   const { search, status } = req.query;
 
-  try {
-    if (pool) {
+  if (pool) {
+    try {
       let conditions = [];
       let params = [];
       let paramIdx = 1;
@@ -1104,9 +1129,14 @@ app.get('/api/invoices', requireAuth, async (req, res) => {
         },
         invoices
       });
+    } catch (err) {
+      console.error('[API /api/invoices] DB error:', err.message);
+      return res.status(500).json({ error: 'Database query failed', message: err.message });
     }
-  } catch (err) {
-    console.error('[API /api/invoices] DB error:', err.message);
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(503).json({ error: 'Database service unavailable in production.' });
   }
 
   // Fallback demo filtering
@@ -1144,8 +1174,8 @@ app.get('/api/invoices', requireAuth, async (req, res) => {
 app.get('/api/invoices/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
 
-  try {
-    if (pool) {
+  if (pool) {
+    try {
       const invRes = await query(`
         SELECT 
           id, invoice_number as "invoiceNumber", patient_id as "patientId",
@@ -1157,20 +1187,27 @@ app.get('/api/invoices/:id', requireAuth, async (req, res) => {
         WHERE id = $1 OR invoice_number = $1
       `, [id]);
 
-      if (invRes.rows.length > 0) {
-        const inv = invRes.rows[0];
-        return res.json({
-          source: 'postgresql',
-          invoice: {
-            ...inv,
-            totalAmount: parseFloat(inv.totalAmount || 0),
-            paidAmount: parseFloat(inv.paidAmount || 0)
-          }
-        });
+      if (invRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Invoice not found' });
       }
+
+      const inv = invRes.rows[0];
+      return res.json({
+        source: 'postgresql',
+        invoice: {
+          ...inv,
+          totalAmount: parseFloat(inv.totalAmount || 0),
+          paidAmount: parseFloat(inv.paidAmount || 0)
+        }
+      });
+    } catch (err) {
+      console.error('[API /api/invoices/:id] DB error:', err.message);
+      return res.status(500).json({ error: 'Database query failed', message: err.message });
     }
-  } catch (err) {
-    console.error('[API /api/invoices/:id] DB error:', err.message);
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(503).json({ error: 'Database service unavailable in production.' });
   }
 
   const found = FALLBACK_INVOICES.find(i => i.id === id || i.invoiceNumber === id);
