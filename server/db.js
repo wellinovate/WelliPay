@@ -422,6 +422,26 @@ export async function initializeDatabase() {
         due_date VARCHAR(50),
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+
+      CREATE TABLE IF NOT EXISTS reconciliation_entries (
+        id SERIAL PRIMARY KEY,
+        date TIMESTAMPTZ DEFAULT NOW(),
+        amount NUMERIC(15, 2) NOT NULL,
+        description TEXT,
+        channel VARCHAR(50) DEFAULT 'Paystack',
+        matched_invoice_id VARCHAR(50),
+        reconciliation_status VARCHAR(50) DEFAULT 'unmatched',
+        confidence_score NUMERIC(5, 2),
+        paystack_transaction_id BIGINT UNIQUE,
+        paystack_reference TEXT,
+        raw_customer_email TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      ALTER TABLE reconciliation_entries
+        ADD COLUMN IF NOT EXISTS paystack_transaction_id BIGINT UNIQUE,
+        ADD COLUMN IF NOT EXISTS paystack_reference TEXT,
+        ADD COLUMN IF NOT EXISTS raw_customer_email TEXT;
     `);
 
     // 2. Seed Organizations

@@ -44,3 +44,4 @@ Thumbs.db
 *-adminsdk-*.json
 *.pem
 *.key
+.env

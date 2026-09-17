@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -13,6 +14,148 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 5174;
+
+// ==========================================
+// Paystack Webhook Receiver
+// MUST be registered before app.use(express.json()) to capture the raw Buffer
+// for HMAC-SHA512 cryptographic signature verification.
+// ==========================================
+app.post('/api/webhooks/paystack', express.raw({ type: '*/*' }), async (req, res) => {
+  const signature = req.headers['x-paystack-signature'];
+  const secretKey = process.env.PAYSTACK_SECRET_KEY;
+
+  if (!secretKey) {
+    console.error('[webhook/paystack] PAYSTACK_SECRET_KEY is not configured in environment');
+    return res.status(500).send('Webhook signing key not configured');
+  }
+
+  if (!signature) {
+    console.error('[webhook/paystack] Missing x-paystack-signature header');
+    return res.status(401).send('Missing signature header');
+  }
+
+  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '');
+  const expectedSignature = crypto
+    .createHmac('sha512', secretKey)
+    .update(rawBody)
+    .digest('hex');
+
+  if (signature !== expectedSignature) {
+    console.error('[webhook/paystack] Invalid signature — rejecting');
+    return res.status(401).send('Invalid signature');
+  }
+
+  // Acknowledge receipt immediately as required by Paystack
+  res.sendStatus(200);
+
+  try {
+    const event = JSON.parse(rawBody.toString('utf8'));
+    await processPaystackEvent(event).catch(err => {
+      console.error('[webhook/paystack] Processing failed:', err.message);
+    });
+  } catch (parseErr) {
+    console.error('[webhook/paystack] JSON parse error:', parseErr.message);
+  }
+});
+
+// Diagnostic GET route for curl / status check
+app.get('/api/webhooks/paystack', (req, res) => {
+  res.status(200).json({
+    status: 'active',
+    endpoint: '/api/webhooks/paystack',
+    method: 'POST',
+    description: 'WelliPay Paystack Webhook Receiver is active and ready for charge.success events'
+  });
+});
+
+async function processPaystackEvent(event) {
+  if (event.event !== 'charge.success') return;
+
+  const { reference, amount, customer, id: paystackTransactionId } = event.data;
+  const amountNaira = amount / 100;
+
+  if (!pool) {
+    console.log(`[webhook/paystack] Processed event in static/demo mode (no DB): ${reference} - NGN ${amountNaira}`);
+    return;
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const existing = await client.query(
+      'SELECT id FROM reconciliation_entries WHERE paystack_transaction_id = $1',
+      [paystackTransactionId]
+    );
+    if (existing.rows.length > 0) {
+      await client.query('ROLLBACK');
+      console.log(`[webhook/paystack] Duplicate event for txn ${paystackTransactionId}, skipping`);
+      return;
+    }
+
+    let matchedInvoiceId = null, matchedStatus = 'unmatched', confidence = null;
+    const invoiceMatch = reference && reference.match(/^(INV-\d+)/);
+    if (invoiceMatch) {
+      const inv = await client.query(
+        'SELECT id, invoice_number FROM invoices WHERE invoice_number = $1',
+        [invoiceMatch[1]]
+      );
+      if (inv.rows.length > 0) {
+        matchedInvoiceId = inv.rows[0].id;
+        matchedStatus = 'confirmed';
+        confidence = 100;
+      }
+    }
+
+    await client.query(`
+      INSERT INTO reconciliation_entries
+        (date, amount, description, channel, matched_invoice_id, reconciliation_status,
+         confidence_score, paystack_transaction_id, paystack_reference, raw_customer_email)
+      VALUES (NOW(), $1, $2, 'Paystack', $3, $4, $5, $6, $7, $8)
+    `, [
+      amountNaira, reference, matchedInvoiceId, matchedStatus, confidence,
+      paystackTransactionId, reference, customer?.email || null,
+    ]);
+
+    // Also record into payments table for immediate visibility in UI reconciliation queue
+    const paymentId = `PAY-PSTK-${paystackTransactionId}`;
+    const todayStr = new Date().toISOString().split('T')[0];
+    await client.query(`
+      INSERT INTO payments (
+        id, organization_id, channel, amount, formatted_amount, raw_reference,
+        description, reconciliation_status, date_captured, ai_target_name,
+        ai_invoice_number, ai_confidence, ai_is_high_confidence, ai_explanation,
+        paystack_transaction_id, paystack_reference, raw_customer_email
+      ) VALUES (
+        $1, 'org-lagoon', 'Paystack', $2, $3, $4,
+        $5, $6, $7, $8,
+        $9, $10, $11, $12,
+        $13, $14, $15
+      ) ON CONFLICT (id) DO NOTHING
+    `, [
+      paymentId, amountNaira, `₦${amountNaira.toLocaleString()}`, reference,
+      `Paystack Online Payment (${reference})`, matchedStatus, todayStr, customer?.email || 'Direct Patient',
+      invoiceMatch ? invoiceMatch[1] : null, confidence, confidence === 100,
+      confidence === 100 ? 'Exact match by invoice reference' : 'Unmatched Paystack checkout payment',
+      paystackTransactionId, reference, customer?.email || null
+    ]);
+
+    if (matchedInvoiceId) {
+      await client.query(
+        `UPDATE invoices SET status = 'paid', status_label = 'Reconciled', paid_amount = $1 WHERE id = $2`,
+        [amountNaira, matchedInvoiceId]
+      );
+    }
+
+    await client.query('COMMIT');
+    console.log(`[webhook/paystack] Recorded txn ${paystackTransactionId}, matched=${matchedStatus}`);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
 
 app.use(express.json());
 
