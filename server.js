@@ -3,6 +3,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import PDFDocument from 'pdfkit';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { pool, checkDatabaseHealth, initializeDatabase, query, SCALED_SEED_DATA } from './server/db.js';
@@ -219,6 +220,61 @@ app.post('/api/reconciliation/bulk-confirm', requireAuth, async (req, res) => {
   res.json({ success: true, confirmedCount: ids.length, confirmedIds: ids, mode: 'demo' });
 });
 
+// 3b. Export Confirmed Reconciliation Batch as CSV
+app.get('/api/reconciliation/export', requireAuth, async (req, res) => {
+  if (pool) {
+    try {
+      const result = await query(`
+        SELECT 
+          date_captured as date,
+          amount,
+          description,
+          channel,
+          COALESCE(ai_target_name, 'Unassigned') as matched_patient,
+          COALESCE(ai_invoice_number, 'N/A') as matched_invoice,
+          COALESCE(ai_confidence, 0) as confidence_score,
+          reconciliation_status as status
+        FROM payments
+        WHERE reconciliation_status = 'confirmed'
+        ORDER BY id DESC
+      `);
+
+      const header = 'Date,Amount,Description,Channel,Matched Patient,Matched Invoice,Confidence,Status\n';
+      const rows = result.rows.map(r =>
+        `"${r.date}",${r.amount},"${(r.description || '').replace(/"/g, '""')}","${r.channel}","${(r.matched_patient || '').replace(/"/g, '""')}","${r.matched_invoice}",${r.confidence_score}%,${r.status}`
+      ).join('\n');
+
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="reconciliation-batch-${Date.now()}.csv"`);
+      return res.send(header + rows);
+    } catch (err) {
+      console.error('[API /api/reconciliation/export] DB error:', err.message);
+      return res.status(500).json({ error: 'Export failed', message: err.message });
+    }
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(503).json({ error: 'Database service unavailable in production.' });
+  }
+
+  // Fallback demo mode
+  const fallbackConfirmed = [
+    { date: 'Yesterday, 14:30', amount: 45000, description: 'Direct corporate retainer settlement', channel: 'Bank transfer', matched_patient: 'Hygeia HMO', matched_invoice: 'INV-92700', confidence_score: 98, status: 'confirmed' },
+    { date: 'Yesterday, 16:15', amount: 3200, description: 'Card payment at pharmacy counter', channel: 'POS card', matched_patient: 'Walk-in Patient', matched_invoice: 'INV-92715', confidence_score: 92, status: 'confirmed' },
+    { date: 'Sep 15, 11:20', amount: 18500, description: 'Post-op physiotherapy session fee', channel: 'Bank transfer', matched_patient: 'K. Adeleke', matched_invoice: 'INV-92680', confidence_score: 96, status: 'confirmed' },
+    { date: 'Sep 15, 15:00', amount: 80000, description: 'AXA Mansard HMO surgery copay', channel: 'Transfer', matched_patient: 'B. Fashola', matched_invoice: 'INV-92650', confidence_score: 99, status: 'confirmed' }
+  ];
+
+  const header = 'Date,Amount,Description,Channel,Matched Patient,Matched Invoice,Confidence,Status\n';
+  const rows = fallbackConfirmed.map(r =>
+    `"${r.date}",${r.amount},"${r.description.replace(/"/g, '""')}","${r.channel}","${r.matched_patient}","${r.matched_invoice}",${r.confidence_score}%,${r.status}`
+  ).join('\n');
+
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="reconciliation-batch-${Date.now()}.csv"`);
+  res.send(header + rows);
+});
+
 // 4. Get HMO Claims
 app.get('/api/claims', requireAuth, async (req, res) => {
   if (pool) {
@@ -345,6 +401,197 @@ app.post('/api/claims/:id/resolve', requireAuth, async (req, res) => {
   }
 
   res.json({ success: true, id, resolution, mode: 'demo' });
+});
+
+// 5b. Export Outstanding Claims Remittance Schedule as PDF
+app.get('/api/claims/remittance-export', requireAuth, async (req, res) => {
+  let claimsToExport = [];
+
+  if (pool) {
+    try {
+      const result = await query(`
+        SELECT 
+          id as claim_id,
+          provider,
+          patient_name,
+          amount::float as amount,
+          status,
+          status_label,
+          age,
+          diagnosis,
+          pre_auth_code
+        FROM hmo_claims
+        WHERE status IN ('submitted', 'approved')
+        ORDER BY id ASC
+      `);
+      claimsToExport = result.rows;
+    } catch (err) {
+      console.error('[API /api/claims/remittance-export] DB error:', err.message);
+      return res.status(500).json({ error: 'Export failed', message: err.message });
+    }
+  } else {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ error: 'Database service unavailable in production.' });
+    }
+    claimsToExport = (SCALED_SEED_DATA?.hmoClaims || [])
+      .filter(c => c.status === 'submitted' || c.status === 'approved')
+      .map(c => ({
+        claim_id: c.id,
+        provider: c.provider,
+        patient_name: c.patient_name,
+        amount: Number(c.amount),
+        status: c.status,
+        status_label: c.status_label,
+        age: c.age,
+        diagnosis: c.diagnosis,
+        pre_auth_code: c.pre_auth_code
+      }));
+  }
+
+  try {
+    const doc = new PDFDocument({
+      size: 'A4',
+      margin: 40,
+      bufferPages: true,
+      info: {
+        Title: 'HMO Remittance Schedule - Lagoon Specialist Hospital',
+        Author: 'WelliPay Healthcare Financial OS',
+        Subject: 'Claims Remittance Schedule & Outstanding Portfolio'
+      }
+    });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="remittance-schedule-${Date.now()}.pdf"`);
+    doc.pipe(res);
+
+    // Primary Header Title
+    doc.rect(40, 40, 515, 65).fill('#12244D');
+    
+    doc.fillColor('#FFFFFF')
+       .fontSize(16)
+       .font('Helvetica-Bold')
+       .text('LAGOON SPECIALIST HOSPITAL', 55, 52, { characterSpacing: 0.5 });
+
+    doc.fontSize(10)
+       .font('Helvetica')
+       .fillColor('#94A3B8')
+       .text('HMO REMITTANCE SCHEDULE & CLAIMS RECEIVABLES AUDIT', 55, 72);
+
+    doc.fontSize(8)
+       .fillColor('#CBD5E1')
+       .text(`Generated: ${new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} at ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}  |  Powered by WelliPay OS`, 55, 87);
+
+    // Calculate Summary Statistics
+    let totalOutstanding = 0;
+    let submittedCount = 0;
+    let approvedCount = 0;
+
+    claimsToExport.forEach(c => {
+      totalOutstanding += Number(c.amount) || 0;
+      if (c.status === 'approved') approvedCount++;
+      else submittedCount++;
+    });
+
+    // KPI Summary Strip
+    const startY = 120;
+    doc.rect(40, startY, 515, 45).fill('#F8FAFC');
+    doc.rect(40, startY, 515, 45).stroke('#E2E8F0');
+
+    // Box 1: Total Outstanding
+    doc.fillColor('#64748B').fontSize(8).font('Helvetica-Bold').text('TOTAL OUTSTANDING', 55, startY + 8);
+    doc.fillColor('#0B6B69').fontSize(13).font('Helvetica-Bold').text(`NGN ${totalOutstanding.toLocaleString()}`, 55, startY + 22);
+
+    // Box 2: Total Claims
+    doc.fillColor('#64748B').fontSize(8).font('Helvetica-Bold').text('OUTSTANDING CLAIMS', 220, startY + 8);
+    doc.fillColor('#12244D').fontSize(13).font('Helvetica-Bold').text(`${claimsToExport.length} Claims`, 220, startY + 22);
+
+    // Box 3: Status Breakdown
+    doc.fillColor('#64748B').fontSize(8).font('Helvetica-Bold').text('PORTFOLIO STATUS', 380, startY + 8);
+    doc.fillColor('#12244D').fontSize(11).font('Helvetica').text(`${approvedCount} Approved  ·  ${submittedCount} Submitted`, 380, startY + 24);
+
+    // Table Header function
+    let currentY = startY + 60;
+    const drawTableHeader = (y) => {
+      doc.rect(40, y, 515, 20).fill('#F1F5F9');
+      doc.fillColor('#334155').fontSize(8).font('Helvetica-Bold');
+      doc.text('CLAIM ID', 45, y + 6, { width: 65 });
+      doc.text('PAYER / HMO', 112, y + 6, { width: 105 });
+      doc.text('PATIENT NAME', 220, y + 6, { width: 105 });
+      doc.text('DIAGNOSIS / PRE-AUTH', 328, y + 6, { width: 95 });
+      doc.text('AGE', 426, y + 6, { width: 30 });
+      doc.text('STATUS', 458, y + 6, { width: 45 });
+      doc.text('AMOUNT (NGN)', 505, y + 6, { width: 48, align: 'right' });
+    };
+
+    drawTableHeader(currentY);
+    currentY += 22;
+
+    // Table Rows
+    doc.font('Helvetica').fontSize(7.5);
+
+    claimsToExport.forEach((row, idx) => {
+      if (currentY > 750) {
+        doc.addPage();
+        currentY = 50;
+        drawTableHeader(currentY);
+        currentY += 22;
+      }
+
+      if (idx % 2 === 0) {
+        doc.rect(40, currentY - 2, 515, 17).fill('#FAFAFA');
+      }
+
+      const statusColor = row.status === 'approved' ? '#166534' : '#475569';
+
+      doc.fillColor('#12244D').font('Helvetica-Bold').text(row.claim_id || 'N/A', 45, currentY, { width: 65 });
+      doc.fillColor('#334155').font('Helvetica').text((row.provider || '').slice(0, 22), 112, currentY, { width: 105 });
+      doc.fillColor('#334155').text((row.patient_name || 'Anonymous Patient').slice(0, 20), 220, currentY, { width: 105 });
+      
+      const diagText = row.diagnosis ? `${row.diagnosis.slice(0, 15)} (${row.pre_auth_code || 'N/A'})` : (row.pre_auth_code || 'Adjudication Pending');
+      doc.fillColor('#64748B').text(diagText.slice(0, 22), 328, currentY, { width: 95 });
+      
+      doc.fillColor('#64748B').text(row.age || '—', 426, currentY, { width: 30 });
+      doc.fillColor(statusColor).font('Helvetica-Bold').text(row.status === 'approved' ? 'Approved' : 'Submitted', 458, currentY, { width: 45 });
+      doc.fillColor('#12244D').font('Helvetica-Bold').text(Number(row.amount).toLocaleString(), 500, currentY, { width: 50, align: 'right' });
+
+      doc.strokeColor('#F1F5F9').lineWidth(0.5).moveTo(40, currentY + 15).lineTo(555, currentY + 15).stroke();
+
+      currentY += 17;
+    });
+
+    if (currentY > 730) {
+      doc.addPage();
+      currentY = 50;
+    }
+
+    currentY += 15;
+    doc.rect(40, currentY, 515, 30).fill('#0B6B69');
+    doc.fillColor('#FFFFFF').fontSize(9).font('Helvetica-Bold');
+    doc.text('TOTAL REMITTANCE RECEIVABLES (SUBMITTED + APPROVED):', 55, currentY + 10);
+    doc.fontSize(11).text(`NGN ${totalOutstanding.toLocaleString()}`, 390, currentY + 9, { width: 155, align: 'right' });
+
+    const range = doc.bufferedPageRange();
+    for (let i = range.start; i < range.start + range.count; i++) {
+      doc.switchToPage(i);
+      const prevMargin = doc.page.margins.bottom;
+      doc.page.margins.bottom = 0;
+      doc.fillColor('#94A3B8').fontSize(7.5).font('Helvetica');
+      doc.text(
+        `WelliPay Financial OS  ·  Lagoon Specialist Hospital Remittance Audit  ·  Page ${i + 1} of ${range.count}`,
+        40,
+        doc.page.height - 25,
+        { align: 'center', width: 515, lineBreak: false }
+      );
+      doc.page.margins.bottom = prevMargin;
+    }
+
+    doc.end();
+  } catch (pdfErr) {
+    console.error('[API /api/claims/remittance-export] PDF generation error:', pdfErr);
+    if (!res.headersSent) {
+      res.status(500).json({ error: 'Failed to generate PDF remittance schedule' });
+    }
+  }
 });
 
 // Currency formatter helper (e.g. 57000 -> ₦57K, 1900000 -> ₦1.9M)

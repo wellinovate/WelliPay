@@ -15,8 +15,11 @@ import {
   Building,
   CreditCard,
   PhoneCall,
-  CheckCircle
+  CheckCircle,
+  Download,
+  Loader2
 } from 'lucide-react';
+import { auth } from '../../firebase';
 import { ReconciliationItem } from '../../types';
 
 export const ReconciliationQueue: React.FC = () => {
@@ -37,10 +40,41 @@ export const ReconciliationQueue: React.FC = () => {
     suggestedCount,
     confirmedCount,
     selectedCount,
+    addNotification,
   } = useWelliPay();
 
   // Selected item for AI match deep inspection modal
   const [inspectingItem, setInspectingItem] = useState<ReconciliationItem | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportReconciliation = async () => {
+    setExporting(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/reconciliation/export', { headers });
+      if (!res.ok) {
+        throw new Error('Failed to export reconciliation batch');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `reconciliation-batch-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addNotification('Confirmed reconciliation batch exported as CSV.', 'success');
+    } catch (err: any) {
+      console.error('Reconciliation export error:', err);
+      addNotification(err.message || 'Export failed', 'error');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Filter items based on active status, channel, and search query
   const displayedItems = useMemo(() => {
@@ -103,11 +137,24 @@ export const ReconciliationQueue: React.FC = () => {
             Match incoming multi-channel payments to patients, invoices, and providers. AI calculates a confidence score based on fuzzy name and bill matching.
           </p>
         </div>
-        <div className="font-sans text-xs text-[#475569] bg-white px-3.5 py-2 rounded-lg border border-[#e2e8f0] shadow-xs flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-          <span className="font-medium">{confirmedCount} confirmed this week</span>
-          <span className="opacity-40">·</span>
-          <span className="font-bold text-[#0B6B69]">{unmatchedCount} unmatched</span>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="font-sans text-xs text-[#475569] bg-white px-3.5 py-2 rounded-lg border border-[#e2e8f0] shadow-xs flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span className="font-medium">{confirmedCount} confirmed this week</span>
+            <span className="opacity-40">·</span>
+            <span className="font-bold text-[#0B6B69]">{unmatchedCount} unmatched</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleExportReconciliation}
+            disabled={exporting}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-white hover:bg-slate-50 text-[#12244D] border border-[#cbd5e1] transition-all shadow-xs cursor-pointer disabled:opacity-60"
+            title="Export confirmed reconciliation entries as CSV"
+          >
+            {exporting ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[#0B6B69]" /> : <Download className="w-3.5 h-3.5 text-[#0B6B69]" />}
+            {exporting ? 'Exporting...' : 'Export Reconciliation Batch'}
+          </button>
         </div>
       </div>
 

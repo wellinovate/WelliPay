@@ -10,17 +10,51 @@ import {
   Info, 
   FileSpreadsheet, 
   ExternalLink,
-  Search
+  Search,
+  FileText,
+  Download,
+  Loader2
 } from 'lucide-react';
+import { auth } from '../../firebase';
 import { HMOClaim } from '../../types';
 
 export const HMODashboard: React.FC = () => {
-  const { hmoClaims, approveClaim, rejectClaim, resolveClaimDispute } = useWelliPay();
+  const { hmoClaims, approveClaim, rejectClaim, resolveClaimDispute, addNotification } = useWelliPay();
 
   const [selectedClaim, setSelectedClaim] = useState<HMOClaim | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('All');
   const [denialRiskFilter, setDenialRiskFilter] = useState<string>('All');
   const [claimSearch, setClaimSearch] = useState<string>('');
+  const [exportingPdf, setExportingPdf] = useState(false);
+
+  const handleExportRemittance = async () => {
+    setExportingPdf(true);
+    try {
+      const token = await auth.currentUser?.getIdToken();
+      const headers: Record<string, string> = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/claims/remittance-export', { headers });
+      if (!res.ok) {
+        throw new Error('Failed to generate remittance schedule');
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `remittance-schedule-${new Date().toISOString().slice(0, 10)}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      addNotification('Remittance schedule PDF generated and downloaded.', 'success');
+    } catch (err: any) {
+      console.error('Remittance export error:', err);
+      addNotification(err.message || 'Failed to export remittance schedule', 'error');
+    } finally {
+      setExportingPdf(false);
+    }
+  };
 
   const filteredClaims = useMemo(() => {
     return hmoClaims.filter((claim) => {
@@ -111,8 +145,21 @@ export const HMODashboard: React.FC = () => {
             Claim portfolio financials by status, payer adjudication pipeline, and real-time dispute resolution.
           </p>
         </div>
-        <div className="font-sans text-xs text-[#475569] bg-white px-3.5 py-2 rounded-lg border border-[#e2e8f0] shadow-xs">
-          <span className="font-bold text-[#12244D]">{formatClaimMetric(totalClaimed)} claimed (30d)</span> · {disputedClaims.length} disputed
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="font-sans text-xs text-[#475569] bg-white px-3.5 py-2 rounded-lg border border-[#e2e8f0] shadow-xs">
+            <span className="font-bold text-[#12244D]">{formatClaimMetric(totalClaimed)} claimed (30d)</span> · {disputedClaims.length} disputed
+          </div>
+
+          <button
+            type="button"
+            onClick={handleExportRemittance}
+            disabled={exportingPdf}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-white hover:bg-slate-50 text-[#12244D] border border-[#cbd5e1] transition-all shadow-xs cursor-pointer disabled:opacity-60"
+            title="Download outstanding claims remittance schedule as PDF"
+          >
+            {exportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[#0B6B69]" /> : <FileText className="w-3.5 h-3.5 text-[#0B6B69]" />}
+            {exportingPdf ? 'Generating PDF...' : 'Export Remittance Schedule'}
+          </button>
         </div>
       </div>
 
