@@ -61,7 +61,7 @@ export const HMODashboard: React.FC = () => {
 
   const totalOutstanding = useMemo(() => {
     return hmoClaims
-      .filter(c => c.status === 'submitted' || c.isDisputed)
+      .filter(c => c.status === 'submitted' || c.status === 'approved')
       .reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
   }, [hmoClaims]);
 
