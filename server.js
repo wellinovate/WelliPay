@@ -522,14 +522,14 @@ app.get('/api/claims/remittance-export', requireAuth, async (req, res) => {
     let currentY = startY + 60;
     const drawTableHeader = (y) => {
       doc.rect(40, y, 515, 20).fill('#F1F5F9');
-      doc.fillColor('#334155').fontSize(8).font('Helvetica-Bold');
-      doc.text('CLAIM ID', 45, y + 6, { width: 65 });
-      doc.text('PAYER / HMO', 112, y + 6, { width: 105 });
-      doc.text('PATIENT NAME', 220, y + 6, { width: 105 });
-      doc.text('DIAGNOSIS / PRE-AUTH', 328, y + 6, { width: 95 });
-      doc.text('AGE', 426, y + 6, { width: 30 });
-      doc.text('STATUS', 458, y + 6, { width: 45 });
-      doc.text('AMOUNT (NGN)', 505, y + 6, { width: 48, align: 'right' });
+      doc.fillColor('#334155').fontSize(7.5).font('Helvetica-Bold');
+      doc.text('CLAIM ID', 45, y + 6, { width: 55 });
+      doc.text('PAYER / HMO', 105, y + 6, { width: 95 });
+      doc.text('PATIENT NAME', 205, y + 6, { width: 95 });
+      doc.text('DIAGNOSIS / AUTH', 305, y + 6, { width: 110 });
+      doc.text('AGE', 420, y + 6, { width: 25 });
+      doc.text('STATUS', 450, y + 6, { width: 42 });
+      doc.text('AMOUNT (NGN)', 495, y + 6, { width: 55, align: 'right' });
     };
 
     drawTableHeader(currentY);
@@ -552,16 +552,21 @@ app.get('/api/claims/remittance-export', requireAuth, async (req, res) => {
 
       const statusColor = row.status === 'approved' ? '#166534' : '#475569';
 
-      doc.fillColor('#12244D').font('Helvetica-Bold').text(row.claim_id || 'N/A', 45, currentY, { width: 65 });
-      doc.fillColor('#334155').font('Helvetica').text((row.provider || '').slice(0, 22), 112, currentY, { width: 105 });
-      doc.fillColor('#334155').text((row.patient_name || 'Anonymous Patient').slice(0, 20), 220, currentY, { width: 105 });
+      doc.fillColor('#12244D').font('Helvetica-Bold').text(row.claim_id || 'N/A', 45, currentY, { width: 55, lineBreak: false });
       
-      const diagText = row.diagnosis ? `${row.diagnosis.slice(0, 15)} (${row.pre_auth_code || 'N/A'})` : (row.pre_auth_code || 'Adjudication Pending');
-      doc.fillColor('#64748B').text(diagText.slice(0, 22), 328, currentY, { width: 95 });
+      const providerText = (row.provider || '').length > 18 ? (row.provider || '').slice(0, 17) + '…' : (row.provider || '');
+      doc.fillColor('#334155').font('Helvetica').text(providerText, 105, currentY, { width: 95, lineBreak: false });
       
-      doc.fillColor('#64748B').text(row.age || '—', 426, currentY, { width: 30 });
-      doc.fillColor(statusColor).font('Helvetica-Bold').text(row.status === 'approved' ? 'Approved' : 'Submitted', 458, currentY, { width: 45 });
-      doc.fillColor('#12244D').font('Helvetica-Bold').text(Number(row.amount).toLocaleString(), 500, currentY, { width: 50, align: 'right' });
+      const patientText = (row.patient_name || 'Anonymous Patient').length > 18 ? (row.patient_name || 'Anonymous Patient').slice(0, 17) + '…' : (row.patient_name || 'Anonymous Patient');
+      doc.fillColor('#334155').text(patientText, 205, currentY, { width: 95, lineBreak: false });
+      
+      const rawDiag = row.diagnosis ? `${row.diagnosis.slice(0, 14)} (${row.pre_auth_code || 'N/A'})` : (row.pre_auth_code || 'Pending');
+      const diagText = rawDiag.length > 22 ? rawDiag.slice(0, 21) + '…' : rawDiag;
+      doc.fillColor('#64748B').text(diagText, 305, currentY, { width: 110, lineBreak: false });
+      
+      doc.fillColor('#64748B').text(row.age || '—', 420, currentY, { width: 25, lineBreak: false });
+      doc.fillColor(statusColor).font('Helvetica-Bold').text(row.status === 'approved' ? 'Approved' : 'Submitted', 450, currentY, { width: 42, lineBreak: false });
+      doc.fillColor('#12244D').font('Helvetica-Bold').text(Number(row.amount).toLocaleString(), 495, currentY, { width: 55, align: 'right', lineBreak: false });
 
       doc.strokeColor('#F1F5F9').lineWidth(0.5).moveTo(40, currentY + 15).lineTo(555, currentY + 15).stroke();
 
@@ -700,7 +705,7 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
                amount::float as amount, formatted_amount as "formattedAmount", channel, status
         FROM provider_transactions
         ORDER BY time_captured DESC, id DESC
-        LIMIT 50
+        LIMIT 100
       `);
 
       // 1. Total collections today across ALL payment channels in provider_transactions (Card, POS, USSD, Transfers, HMO remittances, Corporate retainers)
@@ -817,7 +822,7 @@ app.get('/api/dashboard', requireAuth, async (req, res) => {
       activeChannels: 6
     },
     leakage: FALLBACK_LEAKAGE,
-    transactions: (SCALED_SEED_DATA?.providerTransactions || []).slice(0, 50).map(t => ({
+    transactions: (SCALED_SEED_DATA?.providerTransactions || []).map(t => ({
       id: t.id,
       time: t.time_captured,
       patientOrService: t.patient_or_service,
