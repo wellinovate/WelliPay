@@ -5,6 +5,7 @@ import { AppLayout } from './components/layout/AppLayout';
 import { ReconciliationQueue } from './features/reconciliation/ReconciliationQueue';
 import { ProviderDashboard } from './features/provider/ProviderDashboard';
 import { HMODashboard } from './features/hmo/HMODashboard';
+import { PatientsDirectory } from './features/patients/PatientsDirectory';
 import { PlaceholderView } from './features/common/PlaceholderView';
 import { Login } from './components/Login';
 
@@ -16,7 +17,8 @@ const AppContent: React.FC = () => {
       {activeTab === 'reconciliation' && <ReconciliationQueue />}
       {activeTab === 'dashboard' && <ProviderDashboard />}
       {activeTab === 'claims' && <HMODashboard />}
-      {(activeTab === 'invoices' || activeTab === 'patients' || activeTab === 'settings') && (
+      {activeTab === 'patients' && <PatientsDirectory />}
+      {(activeTab === 'invoices' || activeTab === 'settings') && (
         <PlaceholderView tab={activeTab} />
       )}
     </AppLayout>

@@ -187,12 +187,12 @@ export async function initializeDatabase() {
       // Seed Initial Payments
       await pool.query(`
         INSERT INTO payments (id, organization_id, channel, amount, formatted_amount, raw_reference, description, reconciliation_status, date_captured, ai_target_name, ai_invoice_number, ai_confidence, ai_is_high_confidence, ai_explanation) VALUES
-        ('REC-001', 'org-lagoon', 'Bank transfer', 25000, '₦25,000', '"JOHN U."', 'Bank transfer', 'unmatched', 'Sep 12', 'J. Umar', 'INV-92831', 94, true, 'Name match 98% with patient registry + exact amount match on pending cardiology bill.'),
-        ('REC-002', 'org-lagoon', 'POS card', 8500, '₦8,500', 'txn 44231', 'POS card', 'unmatched', 'Sep 12', 'M. Bello', 'INV-93010', 88, true, 'Terminal ID 02 matched Pharmacy counter at 10:05 + outpatient prescription total.'),
-        ('REC-003', 'org-lagoon', 'Bank transfer', 12000, '₦12,000', '"ABC DIAG"', 'Bank transfer', 'unmatched', 'Sep 13', 'ABC Diagnostics', 'INV-93044', 97, true, 'Vendor corporate code matched partner referral reconciliation ledger.'),
-        ('REC-004', 'org-lagoon', 'USSD', 3200, '₦3,200', 'ref *737*...', 'USSD payment', 'unmatched', 'Sep 13', 'Unassigned patient', NULL, 34, false, 'Session phone number unlisted in hospital EMR. Requires cashier manual lookup.'),
-        ('REC-005', 'org-lagoon', 'Bank transfer', 15000, '₦15,000', '"EMMANUEL O."', 'Bank transfer', 'unmatched', 'Sep 13', 'E. Okafor', 'INV-93050', 91, true, 'Reference string and deposit slip time matched triage intake.'),
-        ('REC-006', 'org-lagoon', 'USSD', 4500, '₦4,500', 'ref *894*...', 'USSD payment', 'unmatched', 'Sep 14', 'S. Ibrahim', 'INV-93062', 86, true, 'Phone number matched patient mobile for antenatal clinic visit.'),
+        ('REC-001', 'org-lagoon', 'Bank transfer', 25000, '₦25,000', 'REF/2026/09/001', 'Payment from J. Umar', 'unmatched', 'Today, 09:15', 'J. Umar', 'INV-92831', 94, true, 'Exact amount match on outstanding invoice INV-92831; sender name matched patient registry.'),
+        ('REC-002', 'org-lagoon', 'POS card', 8500, '₦8,500', 'POS/STANBIC/4491', 'POS Terminal #4 — Receipt 8821', 'unmatched', 'Today, 09:42', 'M. Bello', 'INV-93010', 88, true, 'Amount matched pharmacy dispense total; terminal timestamp correlated with invoice generation.'),
+        ('REC-003', 'org-lagoon', 'USSD', 12000, '₦12,000', '*737*...REF891', 'Quickteller USSD Collection', 'unmatched', 'Today, 10:05', 'ABC Diagnostics', 'INV-93044', 97, true, 'Payment reference matched electronic lab request identifier.'),
+        ('REC-004', 'org-lagoon', 'Bank transfer', 11500, '₦11,500', 'GTB/NIP/99210041', 'Inpatient admission deposit', 'unmatched', 'Today, 10:18', 'T. Adeyemi', 'INV-93105', 35, false, 'No invoice found for ₦11,500. Partial payment on INV-93105 (₦23,000)? Requires manual review.'),
+        ('REC-005', 'org-lagoon', 'Bank transfer', 45000, '₦45,000', 'FBN/NIP/2209114', 'Direct corporate retainer settlement', 'confirmed', 'Yesterday', 'Hygeia HMO', 'INV-92700', 98, true, 'Remittance matched contracted quarterly corporate retainer schedule.'),
+        ('REC-006', 'org-lagoon', 'POS card', 3200, '₦3,200', 'POS/ZENITH/1102', 'Card payment at pharmacy counter', 'confirmed', 'Yesterday', 'Walk-in Patient', 'INV-92715', 92, true, 'Confirmed by cashier Olumide at counter.'),
         ('REC-007', 'org-lagoon', 'Bank transfer', 65000, '₦65,000', '"RELIANCE COPAY"', 'HMO remittance', 'unmatched', 'Sep 14', 'Reliance HMO', 'BATCH-892', 95, true, 'Monthly remittance schedule matched electronic claims batch.')
         ON CONFLICT (id) DO NOTHING;
       `);
@@ -205,8 +205,8 @@ export async function initializeDatabase() {
       await pool.query(`
         INSERT INTO hmo_claims (id, provider, amount, formatted_amount, status, status_label, is_disputed, denial_risk, age, patient_name, diagnosis, pre_auth_code) VALUES
         ('CLM-4471', 'ABC Diagnostics', 12000, '₦12,000', 'submitted', 'Submitted', false, 'high', '2d', 'Kemi Adeleke', 'Routine lipid profile & HbA1c screening', NULL),
-        ('CLM-4472', 'Lagoon Hospital', 45000, '₦45,000', 'approved', 'Approved', false, 'low', '5d', 'Emeka Okonkwo', 'Emergency appendectomy pre-auth', 'PA-LAG-88219'),
-        ('CLM-4473', 'Sunrise Clinic', 8200, '₦8,200', 'rejected', 'Rejected — disputed', true, 'missing-auth', '9d', 'Halima Bello', 'Pelvic ultrasound without pre-authorization code', NULL),
+        ('CLM-4472', 'ABC Diagnostics', 45000, '₦45,000', 'approved', 'Approved', false, 'low', '5d', 'Chinedu Eze', 'Echocardiography & Doppler imaging', 'PA-88910-E'),
+        ('CLM-4473', 'ABC Diagnostics', 85000, '₦85,000', 'submitted', 'Flagged for Review', true, 'missing-auth', '8d', 'Amina Bello', 'Appendectomy emergency intervention', NULL),
         ('CLM-4474', 'ABC Diagnostics', 21500, '₦21,500', 'paid', 'Paid', false, 'low', '14d', 'Babatunde Fashola', 'Comprehensive metabolic panel', NULL)
         ON CONFLICT (id) DO NOTHING;
       `);
@@ -266,6 +266,24 @@ export async function initializeDatabase() {
         ('RET-001', 'Dangote Industries Executive Retainer', 120000, 'active', 'Tier 1 Executive Staff Full Medical Coverage'),
         ('RET-002', 'MTN Nigeria Corporate Health Account', 100000, 'active', 'Enterprise Triage & Outpatient Health Retainer'),
         ('RET-003', 'Standard Chartered Corporate Retainer', 80000, 'active', 'Executive Health Check & Annual Pathology Retainer')
+        ON CONFLICT (id) DO NOTHING;
+      `);
+    }
+
+    // 7. Seed Patients if empty
+    const patientCountRes = await pool.query('SELECT COUNT(*) FROM patients');
+    if (parseInt(patientCountRes.rows[0].count, 10) === 0) {
+      console.log('[DB] Seeding 8 patient records...');
+      await pool.query(`
+        INSERT INTO patients (id, mrn, full_name, phone, email, gender, date_of_birth, primary_coverage, hmo_name, hmo_policy_number, hmo_enrollee_id, outstanding_copay, status) VALUES
+        ('PAT-1082', 'MRN-LSH-08241', 'J. Adeyemi', '+234 802 341 9901', 'j.adeyemi@lagoonhealth.ng', 'male', '1984-06-12', 'Self-Pay / Direct USSD', NULL, NULL, NULL, 0, 'active'),
+        ('PAT-1094', 'MRN-LSH-08294', 'J. Umar', '+234 813 902 4412', 'j.umar@lagoonhealth.ng', 'male', '1990-11-04', 'Reliance HMO (Silver Plan)', 'Reliance HMO', 'REL-992014-A', 'ENR-77210', 0, 'active'),
+        ('PAT-1102', 'MRN-LSH-08302', 'M. Bello', '+234 809 112 5530', 'm.bello@lagoonhealth.ng', 'female', '1979-03-21', 'Self-Pay / POS Card', NULL, NULL, NULL, 8500, 'active'),
+        ('PAT-1115', 'MRN-LSH-08315', 'T. Yusuf', '+234 805 771 8823', 't.yusuf@lagoonhealth.ng', 'female', '1993-08-19', 'AXA Mansard Health (Gold)', 'AXA Mansard', 'AXA-448201-B', 'ENR-88402', 0, 'active'),
+        ('PAT-1120', 'MRN-LSH-08320', 'Kemi Adeleke', '+234 803 445 1199', 'kemi.adeleke@lagoonhealth.ng', 'female', '1988-02-14', 'Reliance HMO (Executive)', 'Reliance HMO', 'REL-883192-E', 'ENR-90114', 0, 'active'),
+        ('PAT-1128', 'MRN-LSH-08328', 'Amina Bello', '+234 818 223 9944', 'amina.bello@lagoonhealth.ng', 'female', '1995-12-09', 'Hygeia HMO (Premium)', 'Hygeia HMO', 'HYG-551029-C', 'ENR-64210', 15000, 'active'),
+        ('PAT-1135', 'MRN-LSH-08335', 'Babatunde Fashola', '+234 802 889 0011', 'babatunde.fashola@lagoonhealth.ng', 'male', '1972-07-28', 'Leadway Health (Corporate)', 'Leadway Health', 'LDW-110294-D', 'ENR-53109', 0, 'active'),
+        ('PAT-1142', 'MRN-LSH-08342', 'Chinedu Eze', '+234 814 662 3388', 'chinedu.eze@lagoonhealth.ng', 'male', '1986-09-17', 'Reliance HMO (Silver Plan)', 'Reliance HMO', 'REL-441092-B', 'ENR-71904', 5000, 'active')
         ON CONFLICT (id) DO NOTHING;
       `);
     }

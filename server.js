@@ -542,6 +542,439 @@ app.post('/api/dashboard/resolve-leakage', requireAuth, async (req, res) => {
 });
 
 // ==========================================
+// Patients Directory Endpoints
+// ==========================================
+
+const FALLBACK_PATIENTS = [
+  {
+    id: 'PAT-1082',
+    mrn: 'MRN-LSH-08241',
+    fullName: 'J. Adeyemi',
+    phone: '+234 802 341 9901',
+    email: 'j.adeyemi@lagoonhealth.ng',
+    gender: 'male',
+    dateOfBirth: '1984-06-12',
+    primaryCoverage: 'Self-Pay / Direct USSD',
+    hmoName: null,
+    hmoPolicyNumber: null,
+    hmoEnrolleeId: null,
+    outstandingCopay: 0,
+    formattedOutstandingCopay: '₦0',
+    status: 'active',
+    createdAt: '2026-08-15'
+  },
+  {
+    id: 'PAT-1094',
+    mrn: 'MRN-LSH-08294',
+    fullName: 'J. Umar',
+    phone: '+234 813 902 4412',
+    email: 'j.umar@lagoonhealth.ng',
+    gender: 'male',
+    dateOfBirth: '1990-11-04',
+    primaryCoverage: 'Reliance HMO (Silver Plan)',
+    hmoName: 'Reliance HMO',
+    hmoPolicyNumber: 'REL-992014-A',
+    hmoEnrolleeId: 'ENR-77210',
+    outstandingCopay: 0,
+    formattedOutstandingCopay: '₦0',
+    status: 'active',
+    createdAt: '2026-08-19'
+  },
+  {
+    id: 'PAT-1102',
+    mrn: 'MRN-LSH-08302',
+    fullName: 'M. Bello',
+    phone: '+234 809 112 5530',
+    email: 'm.bello@lagoonhealth.ng',
+    gender: 'female',
+    dateOfBirth: '1979-03-21',
+    primaryCoverage: 'Self-Pay / POS Card',
+    hmoName: null,
+    hmoPolicyNumber: null,
+    hmoEnrolleeId: null,
+    outstandingCopay: 8500,
+    formattedOutstandingCopay: '₦8,500',
+    status: 'active',
+    createdAt: '2026-08-25'
+  },
+  {
+    id: 'PAT-1115',
+    mrn: 'MRN-LSH-08315',
+    fullName: 'T. Yusuf',
+    phone: '+234 805 771 8823',
+    email: 't.yusuf@lagoonhealth.ng',
+    gender: 'female',
+    dateOfBirth: '1993-08-19',
+    primaryCoverage: 'AXA Mansard Health (Gold)',
+    hmoName: 'AXA Mansard',
+    hmoPolicyNumber: 'AXA-448201-B',
+    hmoEnrolleeId: 'ENR-88402',
+    outstandingCopay: 0,
+    formattedOutstandingCopay: '₦0',
+    status: 'active',
+    createdAt: '2026-08-28'
+  },
+  {
+    id: 'PAT-1120',
+    mrn: 'MRN-LSH-08320',
+    fullName: 'Kemi Adeleke',
+    phone: '+234 803 445 1199',
+    email: 'kemi.adeleke@lagoonhealth.ng',
+    gender: 'female',
+    dateOfBirth: '1988-02-14',
+    primaryCoverage: 'Reliance HMO (Executive)',
+    hmoName: 'Reliance HMO',
+    hmoPolicyNumber: 'REL-883192-E',
+    hmoEnrolleeId: 'ENR-90114',
+    outstandingCopay: 0,
+    formattedOutstandingCopay: '₦0',
+    status: 'active',
+    createdAt: '2026-09-01'
+  },
+  {
+    id: 'PAT-1128',
+    mrn: 'MRN-LSH-08328',
+    fullName: 'Amina Bello',
+    phone: '+234 818 223 9944',
+    email: 'amina.bello@lagoonhealth.ng',
+    gender: 'female',
+    dateOfBirth: '1995-12-09',
+    primaryCoverage: 'Hygeia HMO (Premium)',
+    hmoName: 'Hygeia HMO',
+    hmoPolicyNumber: 'HYG-551029-C',
+    hmoEnrolleeId: 'ENR-64210',
+    outstandingCopay: 15000,
+    formattedOutstandingCopay: '₦15,000',
+    status: 'active',
+    createdAt: '2026-09-03'
+  },
+  {
+    id: 'PAT-1135',
+    mrn: 'MRN-LSH-08335',
+    fullName: 'Babatunde Fashola',
+    phone: '+234 802 889 0011',
+    email: 'babatunde.fashola@lagoonhealth.ng',
+    gender: 'male',
+    dateOfBirth: '1972-07-28',
+    primaryCoverage: 'Leadway Health (Corporate)',
+    hmoName: 'Leadway Health',
+    hmoPolicyNumber: 'LDW-110294-D',
+    hmoEnrolleeId: 'ENR-53109',
+    outstandingCopay: 0,
+    formattedOutstandingCopay: '₦0',
+    status: 'active',
+    createdAt: '2026-09-08'
+  },
+  {
+    id: 'PAT-1142',
+    mrn: 'MRN-LSH-08342',
+    fullName: 'Chinedu Eze',
+    phone: '+234 814 662 3388',
+    email: 'chinedu.eze@lagoonhealth.ng',
+    gender: 'male',
+    dateOfBirth: '1986-09-17',
+    primaryCoverage: 'Reliance HMO (Silver Plan)',
+    hmoName: 'Reliance HMO',
+    hmoPolicyNumber: 'REL-441092-B',
+    hmoEnrolleeId: 'ENR-71904',
+    outstandingCopay: 5000,
+    formattedOutstandingCopay: '₦5,000',
+    status: 'active',
+    createdAt: '2026-09-10'
+  }
+];
+
+// 9. Get Patients Directory
+app.get('/api/patients', requireAuth, async (req, res) => {
+  const { search, coverage, hasOutstanding } = req.query;
+
+  try {
+    if (pool) {
+      let conditions = [];
+      let params = [];
+      let paramIdx = 1;
+
+      if (search && search.trim()) {
+        conditions.push(`(full_name ILIKE $${paramIdx} OR mrn ILIKE $${paramIdx} OR phone ILIKE $${paramIdx} OR hmo_policy_number ILIKE $${paramIdx})`);
+        params.push(`%${search.trim()}%`);
+        paramIdx++;
+      }
+
+      if (coverage === 'hmo') {
+        conditions.push(`hmo_name IS NOT NULL`);
+      } else if (coverage === 'self-pay') {
+        conditions.push(`hmo_name IS NULL`);
+      }
+
+      if (hasOutstanding === 'true') {
+        conditions.push(`outstanding_copay > 0`);
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+      const listRes = await query(`
+        SELECT 
+          id, mrn, full_name as "fullName", phone, email, gender,
+          date_of_birth as "dateOfBirth", primary_coverage as "primaryCoverage",
+          hmo_name as "hmoName", hmo_policy_number as "hmoPolicyNumber",
+          hmo_enrollee_id as "hmoEnrolleeId", outstanding_copay as "outstandingCopay",
+          status, created_at as "createdAt"
+        FROM patients
+        ${whereClause}
+        ORDER BY id ASC
+      `, params);
+
+      // Metrics calculation
+      const metricsRes = await query(`
+        SELECT 
+          COUNT(*) as total,
+          COUNT(*) FILTER (WHERE hmo_name IS NOT NULL) as insured,
+          COUNT(*) FILTER (WHERE hmo_name IS NULL) as self_pay,
+          COALESCE(SUM(outstanding_copay), 0) as total_copay
+        FROM patients
+      `);
+
+      const total = parseInt(metricsRes.rows[0]?.total || 0, 10);
+      const insured = parseInt(metricsRes.rows[0]?.insured || 0, 10);
+      const selfPay = parseInt(metricsRes.rows[0]?.self_pay || 0, 10);
+      const totalCopay = parseFloat(metricsRes.rows[0]?.total_copay || 0);
+
+      const patients = listRes.rows.map(p => ({
+        ...p,
+        outstandingCopay: parseFloat(p.outstandingCopay || 0),
+        formattedOutstandingCopay: `₦${parseFloat(p.outstandingCopay || 0).toLocaleString()}`
+      }));
+
+      return res.json({
+        source: 'postgresql',
+        metrics: {
+          totalPatients: total,
+          insuredCount: insured,
+          selfPayCount: selfPay,
+          totalOutstandingCopays: totalCopay,
+          formattedTotalOutstandingCopays: `₦${totalCopay.toLocaleString()}`
+        },
+        patients
+      });
+    }
+  } catch (err) {
+    console.error('[API /api/patients] DB error:', err.message);
+  }
+
+  // Fallback demo filtering
+  let filtered = [...FALLBACK_PATIENTS];
+  if (search && search.trim()) {
+    const q = search.toLowerCase().trim();
+    filtered = filtered.filter(p => 
+      p.fullName.toLowerCase().includes(q) || 
+      p.mrn.toLowerCase().includes(q) || 
+      p.phone.includes(q) || 
+      (p.hmoPolicyNumber && p.hmoPolicyNumber.toLowerCase().includes(q))
+    );
+  }
+  if (coverage === 'hmo') filtered = filtered.filter(p => !!p.hmoName);
+  if (coverage === 'self-pay') filtered = filtered.filter(p => !p.hmoName);
+  if (hasOutstanding === 'true') filtered = filtered.filter(p => p.outstandingCopay > 0);
+
+  const totalCopay = FALLBACK_PATIENTS.reduce((sum, p) => sum + p.outstandingCopay, 0);
+
+  res.json({
+    source: 'fallback',
+    metrics: {
+      totalPatients: FALLBACK_PATIENTS.length,
+      insuredCount: FALLBACK_PATIENTS.filter(p => !!p.hmoName).length,
+      selfPayCount: FALLBACK_PATIENTS.filter(p => !p.hmoName).length,
+      totalOutstandingCopays: totalCopay,
+      formattedTotalOutstandingCopays: `₦${totalCopay.toLocaleString()}`
+    },
+    patients: filtered
+  });
+});
+
+// 10. Get Patient Dossier & Linked Records
+app.get('/api/patients/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (pool) {
+      const patRes = await query(`
+        SELECT 
+          id, mrn, full_name as "fullName", phone, email, gender,
+          date_of_birth as "dateOfBirth", primary_coverage as "primaryCoverage",
+          hmo_name as "hmoName", hmo_policy_number as "hmoPolicyNumber",
+          hmo_enrollee_id as "hmoEnrolleeId", outstanding_copay as "outstandingCopay",
+          status, created_at as "createdAt"
+        FROM patients
+        WHERE id = $1 OR mrn = $1
+      `, [id]);
+
+      if (patRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Patient not found' });
+      }
+
+      const patient = {
+        ...patRes.rows[0],
+        outstandingCopay: parseFloat(patRes.rows[0].outstandingCopay || 0),
+        formattedOutstandingCopay: `₦${parseFloat(patRes.rows[0].outstandingCopay || 0).toLocaleString()}`
+      };
+
+      // Search linked transactions
+      const txnsRes = await query(`
+        SELECT id, time_captured as time, patient_or_service as "patientOrService",
+               amount, formatted_amount as "formattedAmount", channel, status
+        FROM provider_transactions
+        WHERE patient_or_service ILIKE $1
+        ORDER BY id DESC
+      `, [`%${patient.fullName}%`]);
+
+      // Search linked claims
+      const claimsRes = await query(`
+        SELECT id, provider, amount, formatted_amount as "formattedAmount",
+               status, status_label as "statusLabel", is_disputed as "isDisputed",
+               denial_risk as "denialRisk", age, diagnosis, pre_auth_code as "preAuthCode"
+        FROM hmo_claims
+        WHERE patient_name ILIKE $1
+        ORDER BY id DESC
+      `, [`%${patient.fullName}%`]);
+
+      return res.json({
+        source: 'postgresql',
+        patient,
+        transactions: txnsRes.rows,
+        claims: claimsRes.rows
+      });
+    }
+  } catch (err) {
+    console.error('[API /api/patients/:id] DB error:', err.message);
+  }
+
+  const patient = FALLBACK_PATIENTS.find(p => p.id === id || p.mrn === id) || FALLBACK_PATIENTS[0];
+  res.json({
+    source: 'fallback',
+    patient,
+    transactions: [
+      { id: 'TXN-104', time: '10:05', patientOrService: `${patient.fullName} — Outpatient Visit`, amount: patient.outstandingCopay || 8500, formattedAmount: `₦${(patient.outstandingCopay || 8500).toLocaleString()}`, channel: 'POS card', status: patient.outstandingCopay > 0 ? 'failed' : 'paid' }
+    ],
+    claims: patient.hmoName ? [
+      { id: 'CLM-4471', provider: 'ABC Diagnostics', amount: 12000, formattedAmount: '₦12,000', status: 'submitted', statusLabel: 'Submitted', isDisputed: false, denialRisk: 'high', age: '2d', diagnosis: 'Routine screening', preAuthCode: null }
+    ] : []
+  });
+});
+
+// 11. Register New Patient
+app.post('/api/patients', requireAuth, async (req, res) => {
+  const { fullName, phone, email, gender, dateOfBirth, primaryCoverage, hmoName, hmoPolicyNumber, hmoEnrolleeId, outstandingCopay } = req.body;
+  
+  if (!fullName || !primaryCoverage) {
+    return res.status(400).json({ error: 'Full name and primary coverage are required' });
+  }
+
+  const id = `PAT-${Date.now().toString().slice(-4)}`;
+  const mrn = `MRN-LSH-${Math.floor(10000 + Math.random() * 90000)}`;
+  const copay = parseFloat(outstandingCopay) || 0;
+
+  try {
+    if (pool) {
+      const insertRes = await query(`
+        INSERT INTO patients (id, mrn, full_name, phone, email, gender, date_of_birth, primary_coverage, hmo_name, hmo_policy_number, hmo_enrollee_id, outstanding_copay, status)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'active')
+        RETURNING id, mrn, full_name as "fullName", phone, email, gender, date_of_birth as "dateOfBirth",
+                  primary_coverage as "primaryCoverage", hmo_name as "hmoName",
+                  hmo_policy_number as "hmoPolicyNumber", hmo_enrollee_id as "hmoEnrolleeId",
+                  outstanding_copay as "outstandingCopay", status, created_at as "createdAt"
+      `, [id, mrn, fullName, phone || null, email || null, gender || 'female', dateOfBirth || null, primaryCoverage, hmoName || null, hmoPolicyNumber || null, hmoEnrolleeId || null, copay]);
+
+      const created = {
+        ...insertRes.rows[0],
+        outstandingCopay: parseFloat(insertRes.rows[0].outstandingCopay || 0),
+        formattedOutstandingCopay: `₦${parseFloat(insertRes.rows[0].outstandingCopay || 0).toLocaleString()}`
+      };
+
+      return res.json({ success: true, patient: created });
+    }
+  } catch (err) {
+    console.error('[API /api/patients POST] DB error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+
+  const demoPatient = {
+    id,
+    mrn,
+    fullName,
+    phone: phone || '+234 800 000 0000',
+    email: email || '',
+    gender: gender || 'female',
+    dateOfBirth: dateOfBirth || '1992-01-01',
+    primaryCoverage,
+    hmoName: hmoName || null,
+    hmoPolicyNumber: hmoPolicyNumber || null,
+    hmoEnrolleeId: hmoEnrolleeId || null,
+    outstandingCopay: copay,
+    formattedOutstandingCopay: `₦${copay.toLocaleString()}`,
+    status: 'active',
+    createdAt: new Date().toISOString()
+  };
+  res.json({ success: true, patient: demoPatient, mode: 'demo' });
+});
+
+// 12. Collect Patient Copay Settlement
+app.post('/api/patients/:id/collect-copay', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { amount, channel } = req.body;
+  const payAmount = parseFloat(amount) || 0;
+  const payChannel = channel || 'POS card';
+
+  if (payAmount <= 0) {
+    return res.status(400).json({ error: 'Payment amount must be greater than 0' });
+  }
+
+  try {
+    if (pool) {
+      // Find patient
+      const patRes = await query('SELECT * FROM patients WHERE id = $1', [id]);
+      if (patRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Patient not found' });
+      }
+      const pat = patRes.rows[0];
+      const currentCopay = parseFloat(pat.outstanding_copay || 0);
+      const newCopay = Math.max(0, currentCopay - payAmount);
+
+      // Update copay balance
+      await query('UPDATE patients SET outstanding_copay = $1 WHERE id = $2', [newCopay, id]);
+
+      // Record transaction in provider_transactions
+      const txnId = `TXN-COP-${Date.now().toString().slice(-4)}`;
+      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      await query(`
+        INSERT INTO provider_transactions (id, time_captured, patient_or_service, amount, formatted_amount, channel, status)
+        VALUES ($1, $2, $3, $4, $5, $6, 'paid')
+      `, [txnId, now, `${pat.full_name} — Copay Collection`, payAmount, `₦${payAmount.toLocaleString()}`, payChannel]);
+
+      return res.json({
+        success: true,
+        patientId: id,
+        previousCopay: currentCopay,
+        newCopay,
+        formattedNewCopay: `₦${newCopay.toLocaleString()}`,
+        transactionId: txnId
+      });
+    }
+  } catch (err) {
+    console.error('[API /api/patients/:id/collect-copay] DB error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+
+  res.json({
+    success: true,
+    patientId: id,
+    previousCopay: payAmount,
+    newCopay: 0,
+    formattedNewCopay: '₦0',
+    mode: 'demo'
+  });
+});
+
+// ==========================================
 // Static Assets & Client-Side SPA Routing
 // ==========================================
 

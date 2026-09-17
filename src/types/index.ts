@@ -99,3 +99,42 @@ export interface DashboardResponse {
   leakage: RevenueLeakageSummary;
   transactions: ProviderTransaction[];
 }
+
+export interface Patient {
+  id: string;
+  mrn: string;
+  fullName: string;
+  phone: string;
+  email?: string;
+  gender: 'male' | 'female' | 'other';
+  dateOfBirth?: string;
+  primaryCoverage: string;
+  hmoName?: string | null;
+  hmoPolicyNumber?: string | null;
+  hmoEnrolleeId?: string | null;
+  outstandingCopay: number;
+  formattedOutstandingCopay: string;
+  status: 'active' | 'flagged' | 'archived';
+  createdAt: string;
+}
+
+export interface PatientDirectoryMetrics {
+  totalPatients: number;
+  insuredCount: number;
+  selfPayCount: number;
+  totalOutstandingCopays: number;
+  formattedTotalOutstandingCopays: string;
+}
+
+export interface PatientDirectoryResponse {
+  source: 'postgresql' | 'fallback';
+  metrics: PatientDirectoryMetrics;
+  patients: Patient[];
+}
+
+export interface PatientDossierResponse {
+  source: 'postgresql' | 'fallback';
+  patient: Patient;
+  transactions: ProviderTransaction[];
+  claims: HMOClaim[];
+}
