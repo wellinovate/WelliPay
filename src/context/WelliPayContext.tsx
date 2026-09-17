@@ -52,7 +52,8 @@ interface WelliPayContextType {
   dashboardMetrics: DashboardMetrics;
   leakageSummary: RevenueLeakageSummary;
   unbilledExposureResolved: boolean;
-  resolveUnbilledExposure: () => void;
+  resolveUnbilledExposure: () => Promise<{ success: boolean; count?: number; error?: string }>;
+  refreshDashboard: () => Promise<void>;
   addProviderTransaction: (t: ProviderTransaction) => void;
 
   // HMO Claims Data & Operations
@@ -303,18 +304,58 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
-  // Provider Actions
-  const resolveUnbilledExposure = () => {
-    setUnbilledExposureResolved(true);
-    setLeakageSummary(prev => ({ ...prev, isResolved: true, unbilledCount: 0 }));
-    addNotification('Automated charge-capture generated invoices for 17 unbilled lab procedures (₦340,000 exposure mitigated).', 'success');
+  const refreshDashboard = async () => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/dashboard', { headers });
+      if (res.ok) {
+        const dashData = await res.json();
+        if (dashData) {
+          if (dashData.transactions && dashData.transactions.length > 0) {
+            setProviderTransactions(dashData.transactions);
+          }
+          if (dashData.metrics) {
+            setDashboardMetrics(dashData.metrics);
+          }
+          if (dashData.leakage) {
+            setLeakageSummary(dashData.leakage);
+            setUnbilledExposureResolved(dashData.leakage.isResolved || dashData.leakage.unbilledCount === 0);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Error refreshing dashboard:', e);
+    }
+  };
 
-    getAuthHeaders().then(headers => {
-      fetch('/api/dashboard/resolve-leakage', {
+  const resolveUnbilledExposure = async (): Promise<{ success: boolean; count?: number; error?: string }> => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/leakage/bill', {
         method: 'POST',
         headers
-      }).catch(() => {});
-    });
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to bill exposure');
+      }
+      setUnbilledExposureResolved(true);
+      setLeakageSummary(prev => ({
+        ...prev,
+        isResolved: true,
+        unbilledCount: 0,
+        totalExposure: 0,
+        formattedTotalExposure: '₦0',
+        breakdown: []
+      }));
+      addNotification(`${data.count || 3} invoice(s) generated from unbilled lab services.`, 'success');
+      await refreshDashboard();
+      return { success: true, count: data.count || 3 };
+    } catch (err: any) {
+      console.error('Error billing exposure:', err);
+      addNotification(err.message || 'Failed to generate invoices from leakage', 'error');
+      return { success: false, error: err.message };
+    }
   };
 
   const addProviderTransaction = (t: ProviderTransaction) => {
@@ -348,18 +389,6 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   // HMO Actions
-  const refreshDashboard = () => {
-    getAuthHeaders().then(headers => {
-      fetch('/api/dashboard', { headers })
-        .then(r => r.json())
-        .then(dashData => {
-          if (dashData?.metrics) setDashboardMetrics(dashData.metrics);
-          if (dashData?.leakage) setLeakageSummary(dashData.leakage);
-        })
-        .catch(() => {});
-    });
-  };
-
   const approveClaim = (id: string) => {
     setHmoClaims(prev => prev.map(c => 
       c.id === id ? { ...c, status: 'approved', statusLabel: 'Approved', denialRisk: 'low' } : c
@@ -453,6 +482,7 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         leakageSummary,
         unbilledExposureResolved,
         resolveUnbilledExposure,
+        refreshDashboard,
         addProviderTransaction,
         hmoClaims,
         approveClaim,

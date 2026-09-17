@@ -11,7 +11,8 @@ import {
   FileText,
   Plus,
   Zap,
-  DollarSign
+  DollarSign,
+  Loader2
 } from 'lucide-react';
 import { ProviderTransaction } from '../../types';
 
@@ -28,6 +29,19 @@ export const ProviderDashboard: React.FC = () => {
 
   const [isLeakageModalOpen, setIsLeakageModalOpen] = useState(false);
   const [isNewTxnModalOpen, setIsNewTxnModalOpen] = useState(false);
+  const [billing, setBilling] = useState(false);
+
+  const handleBillExposure = async () => {
+    setBilling(true);
+    try {
+      const result = await resolveUnbilledExposure();
+      if (result.success) {
+        setIsLeakageModalOpen(false);
+      }
+    } finally {
+      setBilling(false);
+    }
+  };
 
   const activeChannelsCount = useMemo(() => {
     const channels = new Set(
@@ -152,7 +166,7 @@ export const ProviderDashboard: React.FC = () => {
       </div>
 
       {/* Revenue Leakage Alert Banner */}
-      {!unbilledExposureResolved ? (
+      {!unbilledExposureResolved && leakageSummary.unbilledCount > 0 ? (
         <div className="bg-[#fff1f4] border border-[#ff90b1] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm font-sans shadow-xs">
           <div className="flex items-start gap-3">
             <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold uppercase bg-[#d6006c] text-white tracking-wider">
@@ -160,25 +174,49 @@ export const ProviderDashboard: React.FC = () => {
             </span>
             <div className="text-[#a5372c] leading-relaxed">
               <span className="font-bold">{leakageSummary.unbilledCount} laboratory services</span> completed with no corresponding invoice — estimated exposure <span className="font-bold">{leakageSummary.formattedTotalExposure}</span>.
+              <button
+                type="button"
+                onClick={() => setIsLeakageModalOpen(true)}
+                className="ml-2 text-xs underline font-semibold text-[#d6006c] hover:text-[#aa0b56] cursor-pointer inline-block"
+              >
+                View Breakdown
+              </button>
             </div>
           </div>
 
-          <button
-            onClick={() => setIsLeakageModalOpen(true)}
-            className="whitespace-nowrap px-4 py-2 text-xs font-bold rounded-lg bg-[#d6006c] hover:bg-[#aa0b56] text-white transition-colors self-start sm:self-auto shadow-xs cursor-pointer"
-          >
-            Review & Bill Exposure
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={handleBillExposure}
+              disabled={billing}
+              className="inline-flex items-center gap-2 whitespace-nowrap px-4 py-2 text-xs font-bold rounded-lg bg-[#d6006c] hover:bg-[#aa0b56] text-white transition-colors shadow-xs cursor-pointer disabled:opacity-60"
+            >
+              {billing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {billing ? 'Billing Exposure...' : 'Review & Bill Exposure'}
+            </button>
+          </div>
         </div>
       ) : (
-        <div className="bg-[#eafaf0] border border-[#2a9d5c]/30 rounded-xl p-4 flex items-center justify-between text-xs font-sans text-[#1e7e47] shadow-xs">
+        <div className="bg-[#eafaf0] border border-[#2a9d5c]/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-sans text-[#1e7e47] shadow-xs">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-[#2a9d5c]" />
+            <CheckCircle2 className="w-4 h-4 text-[#2a9d5c] shrink-0" />
             <span className="font-medium">All 17 laboratory procedures invoiced and attributed to patient folders. ₦340,000 recovered.</span>
           </div>
-          <span className="text-[11px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
-            Resolved
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
+              Resolved
+            </span>
+            <button
+              type="button"
+              onClick={handleBillExposure}
+              disabled={billing}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-100/90 hover:bg-emerald-200/80 text-emerald-900 border border-emerald-300/60 transition-colors cursor-pointer disabled:opacity-60"
+              title="Click to verify 409 response when no unbilled exposure remains"
+            >
+              {billing && <Loader2 className="w-3 h-3 animate-spin" />}
+              Review & Bill Exposure
+            </button>
+          </div>
         </div>
       )}
 
@@ -260,19 +298,19 @@ export const ProviderDashboard: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsLeakageModalOpen(false)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#64748b] hover:bg-black/5"
+              disabled={billing}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#64748b] hover:bg-black/5 disabled:opacity-50"
             >
               Dismiss
             </button>
             <button
               type="button"
-              onClick={() => {
-                resolveUnbilledExposure();
-                setIsLeakageModalOpen(false);
-              }}
-              className="px-4 py-2 rounded-lg text-xs font-bold bg-[#d6006c] hover:bg-[#aa0b56] text-white transition-colors shadow-xs cursor-pointer"
+              onClick={handleBillExposure}
+              disabled={billing || leakageSummary.unbilledCount === 0}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold bg-[#d6006c] hover:bg-[#aa0b56] text-white transition-colors shadow-xs cursor-pointer disabled:opacity-50"
             >
-              Generate {leakageSummary.unbilledCount} Invoices & Bill ({leakageSummary.formattedTotalExposure})
+              {billing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {billing ? 'Generating Invoices...' : `Generate ${leakageSummary.breakdown.length || 3} Invoices & Bill (${leakageSummary.formattedTotalExposure})`}
             </button>
           </div>
         </div>
