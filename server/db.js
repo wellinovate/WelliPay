@@ -167,6 +167,38 @@ export async function initializeDatabase() {
         status VARCHAR(50) DEFAULT 'active',
         coverage_details VARCHAR(255)
       );
+
+      CREATE TABLE IF NOT EXISTS patients (
+        id VARCHAR(50) PRIMARY KEY,
+        mrn VARCHAR(50) UNIQUE NOT NULL,
+        full_name VARCHAR(255) NOT NULL,
+        phone VARCHAR(50),
+        email VARCHAR(255),
+        gender VARCHAR(20),
+        date_of_birth VARCHAR(50),
+        primary_coverage VARCHAR(100),
+        hmo_name VARCHAR(100),
+        hmo_policy_number VARCHAR(100),
+        hmo_enrollee_id VARCHAR(100),
+        outstanding_copay NUMERIC(15, 2) DEFAULT 0.00,
+        status VARCHAR(50) DEFAULT 'active',
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS invoices (
+        id VARCHAR(50) PRIMARY KEY,
+        invoice_number VARCHAR(50) UNIQUE NOT NULL,
+        patient_id VARCHAR(50),
+        patient_name VARCHAR(255) NOT NULL,
+        service_description TEXT NOT NULL,
+        total_amount NUMERIC(15, 2) NOT NULL,
+        formatted_amount VARCHAR(50) NOT NULL,
+        paid_amount NUMERIC(15, 2) DEFAULT 0.00,
+        status VARCHAR(50) DEFAULT 'pending',
+        status_label VARCHAR(100) DEFAULT 'Pending Match',
+        due_date VARCHAR(50),
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
     `);
 
     // 2. Check if payments table has seed data
@@ -284,6 +316,20 @@ export async function initializeDatabase() {
         ('PAT-1128', 'MRN-LSH-08328', 'Amina Bello', '+234 818 223 9944', 'amina.bello@lagoonhealth.ng', 'female', '1995-12-09', 'Hygeia HMO (Premium)', 'Hygeia HMO', 'HYG-551029-C', 'ENR-64210', 15000, 'active'),
         ('PAT-1135', 'MRN-LSH-08335', 'Babatunde Fashola', '+234 802 889 0011', 'babatunde.fashola@lagoonhealth.ng', 'male', '1972-07-28', 'Leadway Health (Corporate)', 'Leadway Health', 'LDW-110294-D', 'ENR-53109', 0, 'active'),
         ('PAT-1142', 'MRN-LSH-08342', 'Chinedu Eze', '+234 814 662 3388', 'chinedu.eze@lagoonhealth.ng', 'male', '1986-09-17', 'Reliance HMO (Silver Plan)', 'Reliance HMO', 'REL-441092-B', 'ENR-71904', 5000, 'active')
+        ON CONFLICT (id) DO NOTHING;
+      `);
+    }
+
+    // 8. Seed Invoices if empty
+    const invoiceCountRes = await pool.query('SELECT COUNT(*) FROM invoices');
+    if (parseInt(invoiceCountRes.rows[0].count, 10) === 0) {
+      console.log('[DB] Seeding 4 foundational invoices...');
+      await pool.query(`
+        INSERT INTO invoices (id, invoice_number, patient_id, patient_name, service_description, total_amount, formatted_amount, paid_amount, status, status_label, due_date) VALUES
+        ('INV-92831', 'INV-92831', 'PAT-1094', 'J. Umar', 'Cardiology Consultation & ECG', 25000, '₦25,000', 25000, 'paid', 'Reconciled', 'Today'),
+        ('INV-93010', 'INV-93010', 'PAT-1102', 'M. Bello', 'Pharmacy Prescription Checkout', 8500, '₦8,500', 8500, 'paid', 'Reconciled', 'Today'),
+        ('INV-93044', 'INV-93044', 'PAT-1120', 'ABC Diagnostics', 'Referred Pathology Panel Batch', 12000, '₦12,000', 12000, 'paid', 'Reconciled', 'Today'),
+        ('INV-93105', 'INV-93105', 'PAT-1082', 'T. Adeyemi', 'Pediatric Inpatient Observation', 11500, '₦11,500', 0, 'pending', 'Pending Match', 'Tomorrow')
         ON CONFLICT (id) DO NOTHING;
       `);
     }

@@ -684,6 +684,65 @@ const FALLBACK_PATIENTS = [
   }
 ];
 
+const FALLBACK_INVOICES = [
+  {
+    id: 'INV-92831',
+    invoiceNumber: 'INV-92831',
+    patientId: 'PAT-1094',
+    patientName: 'J. Umar',
+    serviceDescription: 'Cardiology Consultation & ECG',
+    totalAmount: 25000,
+    formattedAmount: '₦25,000',
+    paidAmount: 25000,
+    status: 'paid',
+    statusLabel: 'Reconciled',
+    dueDate: 'Today',
+    createdAt: '2026-09-17T09:00:00.000Z'
+  },
+  {
+    id: 'INV-93010',
+    invoiceNumber: 'INV-93010',
+    patientId: 'PAT-1102',
+    patientName: 'M. Bello',
+    serviceDescription: 'Pharmacy Prescription Checkout',
+    totalAmount: 8500,
+    formattedAmount: '₦8,500',
+    paidAmount: 8500,
+    status: 'paid',
+    statusLabel: 'Reconciled',
+    dueDate: 'Today',
+    createdAt: '2026-09-17T09:30:00.000Z'
+  },
+  {
+    id: 'INV-93044',
+    invoiceNumber: 'INV-93044',
+    patientId: 'PAT-1120',
+    patientName: 'ABC Diagnostics',
+    serviceDescription: 'Referred Pathology Panel Batch',
+    totalAmount: 12000,
+    formattedAmount: '₦12,000',
+    paidAmount: 12000,
+    status: 'paid',
+    statusLabel: 'Reconciled',
+    dueDate: 'Today',
+    createdAt: '2026-09-17T10:00:00.000Z'
+  },
+  {
+    id: 'INV-93105',
+    invoiceNumber: 'INV-93105',
+    patientId: 'PAT-1082',
+    patientName: 'T. Adeyemi',
+    serviceDescription: 'Pediatric Inpatient Observation',
+    totalAmount: 11500,
+    formattedAmount: '₦11,500',
+    paidAmount: 0,
+    status: 'pending',
+    statusLabel: 'Pending Match',
+    dueDate: 'Tomorrow',
+    createdAt: '2026-09-17T10:15:00.000Z'
+  }
+];
+
 // 9. Get Patients Directory
 app.get('/api/patients', requireAuth, async (req, res) => {
   const { search, coverage, hasOutstanding } = req.query;
@@ -971,6 +1030,157 @@ app.post('/api/patients/:id/collect-copay', requireAuth, async (req, res) => {
     newCopay: 0,
     formattedNewCopay: '₦0',
     mode: 'demo'
+  });
+});
+
+// ==========================================
+// 10. Invoices Endpoints
+// ==========================================
+
+app.get('/api/invoices', requireAuth, async (req, res) => {
+  const { search, status } = req.query;
+
+  try {
+    if (pool) {
+      let conditions = [];
+      let params = [];
+      let paramIdx = 1;
+
+      if (search && search.trim()) {
+        conditions.push(`(invoice_number ILIKE $${paramIdx} OR patient_name ILIKE $${paramIdx} OR service_description ILIKE $${paramIdx})`);
+        params.push(`%${search.trim()}%`);
+        paramIdx++;
+      }
+
+      if (status && status !== 'all') {
+        conditions.push(`status = $${paramIdx}`);
+        params.push(status);
+        paramIdx++;
+      }
+
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+      const listRes = await query(`
+        SELECT 
+          id, invoice_number as "invoiceNumber", patient_id as "patientId",
+          patient_name as "patientName", service_description as "serviceDescription",
+          total_amount as "totalAmount", formatted_amount as "formattedAmount",
+          paid_amount as "paidAmount", status, status_label as "statusLabel",
+          due_date as "dueDate", created_at as "createdAt"
+        FROM invoices
+        ${whereClause}
+        ORDER BY invoice_number ASC
+      `, params);
+
+      // Metrics calculation across all invoices
+      const metricsRes = await query(`
+        SELECT 
+          COUNT(*) as total,
+          COALESCE(SUM(total_amount), 0) as total_amount,
+          COUNT(*) FILTER (WHERE status = 'paid') as reconciled_count,
+          COUNT(*) FILTER (WHERE status = 'pending') as pending_count
+        FROM invoices
+      `);
+
+      const totalInvoices = parseInt(metricsRes.rows[0]?.total || 0, 10);
+      const totalAmount = parseFloat(metricsRes.rows[0]?.total_amount || 0);
+      const reconciledCount = parseInt(metricsRes.rows[0]?.reconciled_count || 0, 10);
+      const pendingCount = parseInt(metricsRes.rows[0]?.pending_count || 0, 10);
+
+      const invoices = listRes.rows.map(inv => ({
+        ...inv,
+        totalAmount: parseFloat(inv.totalAmount || 0),
+        paidAmount: parseFloat(inv.paidAmount || 0)
+      }));
+
+      return res.json({
+        source: 'postgresql',
+        metrics: {
+          totalInvoices,
+          totalAmount,
+          formattedTotalAmount: `₦${totalAmount.toLocaleString()}`,
+          reconciledCount,
+          pendingCount
+        },
+        invoices
+      });
+    }
+  } catch (err) {
+    console.error('[API /api/invoices] DB error:', err.message);
+  }
+
+  // Fallback demo filtering
+  let filtered = [...FALLBACK_INVOICES];
+  if (search && search.trim()) {
+    const q = search.toLowerCase().trim();
+    filtered = filtered.filter(inv =>
+      inv.invoiceNumber.toLowerCase().includes(q) ||
+      inv.patientName.toLowerCase().includes(q) ||
+      inv.serviceDescription.toLowerCase().includes(q)
+    );
+  }
+
+  if (status && status !== 'all') {
+    filtered = filtered.filter(inv => inv.status === status);
+  }
+
+  const totalAmount = FALLBACK_INVOICES.reduce((acc, curr) => acc + curr.totalAmount, 0);
+  const reconciledCount = FALLBACK_INVOICES.filter(i => i.status === 'paid').length;
+  const pendingCount = FALLBACK_INVOICES.filter(i => i.status === 'pending').length;
+
+  res.json({
+    source: 'fallback',
+    metrics: {
+      totalInvoices: FALLBACK_INVOICES.length,
+      totalAmount,
+      formattedTotalAmount: `₦${totalAmount.toLocaleString()}`,
+      reconciledCount,
+      pendingCount
+    },
+    invoices: filtered
+  });
+});
+
+app.get('/api/invoices/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    if (pool) {
+      const invRes = await query(`
+        SELECT 
+          id, invoice_number as "invoiceNumber", patient_id as "patientId",
+          patient_name as "patientName", service_description as "serviceDescription",
+          total_amount as "totalAmount", formatted_amount as "formattedAmount",
+          paid_amount as "paidAmount", status, status_label as "statusLabel",
+          due_date as "dueDate", created_at as "createdAt"
+        FROM invoices
+        WHERE id = $1 OR invoice_number = $1
+      `, [id]);
+
+      if (invRes.rows.length > 0) {
+        const inv = invRes.rows[0];
+        return res.json({
+          source: 'postgresql',
+          invoice: {
+            ...inv,
+            totalAmount: parseFloat(inv.totalAmount || 0),
+            paidAmount: parseFloat(inv.paidAmount || 0)
+          }
+        });
+      }
+    }
+  } catch (err) {
+    console.error('[API /api/invoices/:id] DB error:', err.message);
+  }
+
+  const found = FALLBACK_INVOICES.find(i => i.id === id || i.invoiceNumber === id);
+  if (!found) {
+    return res.status(404).json({ error: 'Invoice not found' });
+  }
+
+  res.json({
+    source: 'fallback',
+    invoice: found
   });
 });
 

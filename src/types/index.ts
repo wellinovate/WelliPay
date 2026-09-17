@@ -138,3 +138,32 @@ export interface PatientDossierResponse {
   transactions: ProviderTransaction[];
   claims: HMOClaim[];
 }
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  patientId?: string;
+  patientName: string;
+  serviceDescription: string;
+  totalAmount: number;
+  formattedAmount: string;
+  paidAmount: number;
+  status: 'paid' | 'pending' | 'partially_paid' | 'cancelled';
+  statusLabel: string;
+  dueDate?: string;
+  createdAt: string;
+}
+
+export interface InvoiceMetrics {
+  totalInvoices: number;
+  totalAmount: number;
+  formattedTotalAmount: string;
+  reconciledCount: number;
+  pendingCount: number;
+}
+
+export interface InvoicesResponse {
+  source: 'postgresql' | 'fallback';
+  metrics: InvoiceMetrics;
+  invoices: Invoice[];
+}
