@@ -68,14 +68,62 @@ app.get('/api/webhooks/paystack', (req, res) => {
   });
 });
 
+const DEMO_PROCESSED_PAYSTACK_TXNS = new Set();
+
 async function processPaystackEvent(event) {
   if (event.event !== 'charge.success') return;
 
   const { reference, amount, customer, id: paystackTransactionId } = event.data;
   const amountNaira = amount / 100;
 
+  let matchedInvoiceId = null, matchedStatus = 'unmatched', confidence = null;
+  const invoiceMatch = reference && reference.match(/^(INV-\d+)/);
+
   if (!pool) {
-    console.log(`[webhook/paystack] Processed event in static/demo mode (no DB): ${reference} - NGN ${amountNaira}`);
+    if (DEMO_PROCESSED_PAYSTACK_TXNS.has(paystackTransactionId)) {
+      console.log(`[webhook/paystack] Duplicate event for txn ${paystackTransactionId}, skipping`);
+      return;
+    }
+    DEMO_PROCESSED_PAYSTACK_TXNS.add(paystackTransactionId);
+
+    if (invoiceMatch) {
+      const inv = FALLBACK_INVOICES.find(i => i.invoiceNumber === invoiceMatch[1]);
+      if (inv) {
+        matchedInvoiceId = inv.id;
+        matchedStatus = 'confirmed';
+        confidence = 100;
+        inv.status = 'paid';
+        inv.statusLabel = 'Reconciled';
+        inv.paidAmount = amountNaira;
+      }
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const paymentId = `PAY-PSTK-${paystackTransactionId}`;
+
+    if (SCALED_SEED_DATA?.reconciliationItems) {
+      SCALED_SEED_DATA.reconciliationItems.unshift({
+        id: paymentId,
+        date: todayStr,
+        amount: amountNaira,
+        formattedAmount: `₦${amountNaira.toLocaleString()}`,
+        channel: 'Paystack',
+        description: `Paystack Online Payment (${reference})`,
+        rawDetails: reference,
+        status: matchedStatus,
+        confirmedAt: matchedStatus === 'confirmed' ? nowTime : null,
+        aiMatch: {
+          confidence: confidence || 0,
+          isHighConfidence: confidence === 100,
+          targetName: customer?.email || 'Direct Patient',
+          invoiceNumber: invoiceMatch ? invoiceMatch[1] : 'N/A',
+          explanation: confidence === 100 ? 'Exact match by invoice reference' : 'Unmatched online payment'
+        }
+      });
+    }
+
+    console.log(`[webhook/paystack] Recorded txn ${paystackTransactionId}, matched=${matchedStatus} (demo mode)`);
     return;
   }
 
