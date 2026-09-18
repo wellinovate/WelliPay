@@ -524,6 +524,7 @@ export async function initializeDatabase() {
       CREATE TABLE IF NOT EXISTS clinical_service_orders (
         id VARCHAR(50) PRIMARY KEY,
         patient_name VARCHAR(255) NOT NULL,
+        patient_mrn VARCHAR(100),
         service_type VARCHAR(100) NOT NULL,
         category VARCHAR(50) DEFAULT 'Laboratory',
         amount NUMERIC(15, 2) NOT NULL,
@@ -531,6 +532,8 @@ export async function initializeDatabase() {
         performed_at TIMESTAMPTZ DEFAULT NOW(),
         invoice_id VARCHAR(50)
       );
+
+      ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS patient_mrn VARCHAR(100);
 
       CREATE TABLE IF NOT EXISTS corporate_retainers (
         id VARCHAR(50) PRIMARY KEY,
@@ -562,15 +565,24 @@ export async function initializeDatabase() {
         invoice_number VARCHAR(50) UNIQUE NOT NULL,
         patient_id VARCHAR(50),
         patient_name VARCHAR(255) NOT NULL,
+        patient_mrn VARCHAR(100),
         service_description TEXT NOT NULL,
         total_amount NUMERIC(15, 2) NOT NULL,
         formatted_amount VARCHAR(50) NOT NULL,
         paid_amount NUMERIC(15, 2) DEFAULT 0.00,
         status VARCHAR(50) DEFAULT 'pending',
-        status_label VARCHAR(100) DEFAULT 'Pending Match',
+        status_label VARCHAR(100) DEFAULT 'Pending Payment',
         due_date VARCHAR(50),
+        paid_date VARCHAR(50),
+        is_inpatient BOOLEAN DEFAULT FALSE,
+        discharge_status VARCHAR(50),
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS patient_mrn VARCHAR(100);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS paid_date VARCHAR(50);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS is_inpatient BOOLEAN DEFAULT FALSE;
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discharge_status VARCHAR(50);
 
       CREATE TABLE IF NOT EXISTS reconciliation_entries (
         id SERIAL PRIMARY KEY,
@@ -692,27 +704,27 @@ export async function initializeDatabase() {
     if (parseInt(labCountRes.rows[0].count, 10) === 0) {
       console.log('[DB] Seeding 17 unbilled clinical service orders...');
       await pool.query(`
-        INSERT INTO clinical_service_orders (id, patient_name, service_type, category, amount, status) VALUES
+        INSERT INTO clinical_service_orders (id, patient_name, patient_mrn, service_type, category, amount, status) VALUES
         -- 8 Full Blood Count orders (₦96,000 total, ₦12,000 each)
-        ('LAB-FBC-01', 'Patient FBC-01', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
-        ('LAB-FBC-02', 'Patient FBC-02', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
-        ('LAB-FBC-03', 'Patient FBC-03', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
-        ('LAB-FBC-04', 'Patient FBC-04', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
-        ('LAB-FBC-05', 'Patient FBC-05', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
-        ('LAB-FBC-06', 'Patient FBC-06', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
-        ('LAB-FBC-07', 'Patient FBC-07', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
-        ('LAB-FBC-08', 'Patient FBC-08', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-01', 'Chinedu Eze', 'MRN-LSH-10008', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-02', 'Halima Bello', 'MRN-LSH-10003', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-03', 'Adebayo Adeleke', 'MRN-LSH-10012', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-04', 'Kemi Adeleke', 'MRN-LSH-10001', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-05', 'Babatunde Fashola', 'MRN-LSH-10007', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-06', 'Ngozi Okonjo', 'MRN-LSH-10014', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-07', 'Emeka Okonkwo', 'MRN-LSH-10002', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
+        ('LAB-FBC-08', 'Fatima Abubakar', 'MRN-LSH-10016', 'Full Blood Count', 'Hematology', 12000, 'unbilled'),
         -- 5 Electrolytes, Urea & Creatinine orders (₦140,000 total, ₦28,000 each)
-        ('LAB-EUC-01', 'Patient EUC-01', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
-        ('LAB-EUC-02', 'Patient EUC-02', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
-        ('LAB-EUC-03', 'Patient EUC-03', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
-        ('LAB-EUC-04', 'Patient EUC-04', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
-        ('LAB-EUC-05', 'Patient EUC-05', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
+        ('LAB-EUC-01', 'Grace Okafor', 'MRN-LSH-10015', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
+        ('LAB-EUC-02', 'Oluwaseun Bakare', 'MRN-LSH-10017', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
+        ('LAB-EUC-03', 'T. Adeyemi', 'MRN-LSH-10004', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
+        ('LAB-EUC-04', 'M. Bello', 'MRN-LSH-10005', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
+        ('LAB-EUC-05', 'J. Umar', 'MRN-LSH-10006', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
         -- 4 Lipid Profile Panels (₦104,000 total, ₦26,000 each)
-        ('LAB-LIP-01', 'Patient LIP-01', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
-        ('LAB-LIP-02', 'Patient LIP-02', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
-        ('LAB-LIP-03', 'Patient LIP-03', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
-        ('LAB-LIP-04', 'Patient LIP-04', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled')
+        ('LAB-LIP-01', 'Ibrahim Danjuma', 'MRN-LSH-10018', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
+        ('LAB-LIP-02', 'Zainab Abiola', 'MRN-LSH-10019', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
+        ('LAB-LIP-03', 'Samuel Ogundipe', 'MRN-LSH-10020', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
+        ('LAB-LIP-04', 'Folake Adeleke', 'MRN-LSH-10021', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled')
         ON CONFLICT (id) DO NOTHING;
       `);
     }
@@ -757,12 +769,28 @@ export async function initializeDatabase() {
     if (parseInt(invoiceCountRes.rows[0].count, 10) === 0) {
       console.log('[DB] Seeding 4 foundational invoices...');
       await pool.query(`
-        INSERT INTO invoices (id, invoice_number, patient_id, patient_name, service_description, total_amount, formatted_amount, paid_amount, status, status_label, due_date) VALUES
-        ('INV-92831', 'INV-92831', 'PAT-1094', 'J. Umar', 'Cardiology Consultation & ECG', 25000, '₦25,000', 25000, 'paid', 'Reconciled', 'Today'),
-        ('INV-93010', 'INV-93010', 'PAT-1102', 'M. Bello', 'Pharmacy Prescription Checkout', 8500, '₦8,500', 8500, 'paid', 'Reconciled', 'Today'),
-        ('INV-93044', 'INV-93044', 'PAT-1120', 'ABC Diagnostics', 'Referred Pathology Panel Batch', 12000, '₦12,000', 12000, 'paid', 'Reconciled', 'Today'),
-        ('INV-93105', 'INV-93105', 'PAT-1082', 'T. Adeyemi', 'Pediatric Inpatient Observation', 11500, '₦11,500', 0, 'pending', 'Pending Match', 'Tomorrow')
-        ON CONFLICT (id) DO NOTHING;
+        INSERT INTO invoices (
+          id, invoice_number, patient_id, patient_name, patient_mrn, service_description,
+          total_amount, formatted_amount, paid_amount, status, status_label,
+          due_date, paid_date, is_inpatient, discharge_status
+        ) VALUES
+        ('INV-93105', 'INV-93105', 'PAT-1082', 'T. Adeyemi', 'MRN-LSH-10004', 'Pediatric Inpatient Observation', 11500, '₦11,500', 0, 'pending', 'Pending Payment', '2026-09-19', NULL, true, 'awaiting_settlement'),
+        ('INV-92831', 'INV-92831', 'PAT-1094', 'J. Umar', 'MRN-LSH-10006', 'Cardiology Consultation & ECG', 25000, '₦25,000', 25000, 'paid', 'Reconciled', '2026-09-17', '2026-09-17', false, NULL),
+        ('INV-93010', 'INV-93010', 'PAT-1102', 'M. Bello', 'MRN-LSH-10005', 'Pharmacy Prescription Checkout', 8500, '₦8,500', 8500, 'paid', 'Reconciled', '2026-09-17', '2026-09-17', false, NULL),
+        ('INV-93044', 'INV-93044', 'PAT-1120', 'ABC Diagnostics', 'EXT-ACC-1120', 'Referred Pathology Panel Batch', 12000, '₦12,000', 12000, 'paid', 'Reconciled', '2026-09-17', '2026-09-17', false, NULL)
+        ON CONFLICT (id) DO UPDATE SET
+          patient_name = EXCLUDED.patient_name,
+          patient_mrn = EXCLUDED.patient_mrn,
+          service_description = EXCLUDED.service_description,
+          total_amount = EXCLUDED.total_amount,
+          formatted_amount = EXCLUDED.formatted_amount,
+          paid_amount = EXCLUDED.paid_amount,
+          status = EXCLUDED.status,
+          status_label = EXCLUDED.status_label,
+          due_date = EXCLUDED.due_date,
+          paid_date = EXCLUDED.paid_date,
+          is_inpatient = EXCLUDED.is_inpatient,
+          discharge_status = EXCLUDED.discharge_status;
       `);
     }
 

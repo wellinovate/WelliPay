@@ -1004,60 +1004,75 @@ let FALLBACK_LEAKAGE = {
 
 const FALLBACK_INVOICES = [
   {
+    id: 'INV-93105',
+    invoiceNumber: 'INV-93105',
+    patientId: 'PAT-1082',
+    patientName: 'T. Adeyemi',
+    patientMrn: 'MRN-LSH-10004',
+    serviceDescription: 'Pediatric Inpatient Observation',
+    totalAmount: 11500,
+    formattedAmount: '₦11,500',
+    paidAmount: 0,
+    status: 'pending',
+    statusLabel: 'Pending Payment',
+    dueDate: '2026-09-19',
+    createdAt: '2026-09-17T10:15:00.000Z',
+    isInpatient: true,
+    dischargeStatus: 'awaiting_settlement'
+  },
+  {
     id: 'INV-92831',
     invoiceNumber: 'INV-92831',
     patientId: 'PAT-1094',
     patientName: 'J. Umar',
+    patientMrn: 'MRN-LSH-10006',
     serviceDescription: 'Cardiology Consultation & ECG',
     totalAmount: 25000,
     formattedAmount: '₦25,000',
     paidAmount: 25000,
     status: 'paid',
     statusLabel: 'Reconciled',
-    dueDate: 'Today',
-    createdAt: '2026-09-17T09:00:00.000Z'
+    dueDate: '2026-09-17',
+    paidDate: '2026-09-17',
+    createdAt: '2026-09-17T09:00:00.000Z',
+    isInpatient: false,
+    dischargeStatus: null
   },
   {
     id: 'INV-93010',
     invoiceNumber: 'INV-93010',
     patientId: 'PAT-1102',
     patientName: 'M. Bello',
+    patientMrn: 'MRN-LSH-10005',
     serviceDescription: 'Pharmacy Prescription Checkout',
     totalAmount: 8500,
     formattedAmount: '₦8,500',
     paidAmount: 8500,
     status: 'paid',
     statusLabel: 'Reconciled',
-    dueDate: 'Today',
-    createdAt: '2026-09-17T09:30:00.000Z'
+    dueDate: '2026-09-17',
+    paidDate: '2026-09-17',
+    createdAt: '2026-09-17T09:30:00.000Z',
+    isInpatient: false,
+    dischargeStatus: null
   },
   {
     id: 'INV-93044',
     invoiceNumber: 'INV-93044',
     patientId: 'PAT-1120',
     patientName: 'ABC Diagnostics',
+    patientMrn: 'EXT-ACC-1120',
     serviceDescription: 'Referred Pathology Panel Batch',
     totalAmount: 12000,
     formattedAmount: '₦12,000',
     paidAmount: 12000,
     status: 'paid',
     statusLabel: 'Reconciled',
-    dueDate: 'Today',
-    createdAt: '2026-09-17T10:00:00.000Z'
-  },
-  {
-    id: 'INV-93105',
-    invoiceNumber: 'INV-93105',
-    patientId: 'PAT-1082',
-    patientName: 'T. Adeyemi',
-    serviceDescription: 'Pediatric Inpatient Observation',
-    totalAmount: 11500,
-    formattedAmount: '₦11,500',
-    paidAmount: 0,
-    status: 'pending',
-    statusLabel: 'Pending Match',
-    dueDate: 'Tomorrow',
-    createdAt: '2026-09-17T10:15:00.000Z'
+    dueDate: '2026-09-17',
+    paidDate: '2026-09-17',
+    createdAt: '2026-09-17T10:00:00.000Z',
+    isInpatient: false,
+    dischargeStatus: null
   }
 ];
 
@@ -1310,46 +1325,78 @@ app.post('/api/leakage/bill', requireAuth, async (req, res) => {
 
   const fallbackGenerated = [
     {
-      id: `INV-${Math.floor(93200 + Math.random() * 200)}`,
-      invoiceNumber: `INV-${Math.floor(93200 + Math.random() * 200)}`,
+      id: 'INV-93202',
+      invoiceNumber: 'INV-93202',
       patientId: null,
-      patientName: 'Multiple Patients',
+      patientName: 'Multiple Patients (5 Orders)',
+      patientMrn: 'BATCH-EUC-05',
       serviceDescription: 'Electrolytes, Urea & Creatinine (5 orders)',
       totalAmount: 140000,
       formattedAmount: '₦140,000',
       paidAmount: 0,
       status: 'pending',
-      statusLabel: 'Pending Match',
-      dueDate: '7 days',
-      createdAt: new Date().toISOString().split('T')[0]
+      statusLabel: 'Pending Payment',
+      dueDate: '2026-09-25',
+      createdAt: new Date().toISOString().split('T')[0],
+      isInpatient: false,
+      dischargeStatus: null,
+      orders: [
+        { id: 'LAB-EUC-01', patientName: 'Grace Okafor', patientMrn: 'MRN-LSH-10015', serviceType: 'Electrolytes, Urea & Creatinine', amount: 28000, formattedAmount: '₦28,000', status: 'invoiced' },
+        { id: 'LAB-EUC-02', patientName: 'Oluwaseun Bakare', patientMrn: 'MRN-LSH-10017', serviceType: 'Electrolytes, Urea & Creatinine', amount: 28000, formattedAmount: '₦28,000', status: 'invoiced' },
+        { id: 'LAB-EUC-03', patientName: 'T. Adeyemi', patientMrn: 'MRN-LSH-10004', serviceType: 'Electrolytes, Urea & Creatinine', amount: 28000, formattedAmount: '₦28,000', status: 'invoiced' },
+        { id: 'LAB-EUC-04', patientName: 'M. Bello', patientMrn: 'MRN-LSH-10005', serviceType: 'Electrolytes, Urea & Creatinine', amount: 28000, formattedAmount: '₦28,000', status: 'invoiced' },
+        { id: 'LAB-EUC-05', patientName: 'J. Umar', patientMrn: 'MRN-LSH-10006', serviceType: 'Electrolytes, Urea & Creatinine', amount: 28000, formattedAmount: '₦28,000', status: 'invoiced' },
+      ]
     },
     {
-      id: `INV-${Math.floor(93400 + Math.random() * 200)}`,
-      invoiceNumber: `INV-${Math.floor(93400 + Math.random() * 200)}`,
+      id: 'INV-93201',
+      invoiceNumber: 'INV-93201',
       patientId: null,
-      patientName: 'Multiple Patients',
+      patientName: 'Multiple Patients (4 Orders)',
+      patientMrn: 'BATCH-LIP-04',
       serviceDescription: 'Lipid Profile Panels (4 orders)',
       totalAmount: 104000,
       formattedAmount: '₦104,000',
       paidAmount: 0,
       status: 'pending',
-      statusLabel: 'Pending Match',
-      dueDate: '7 days',
-      createdAt: new Date().toISOString().split('T')[0]
+      statusLabel: 'Pending Payment',
+      dueDate: '2026-09-25',
+      createdAt: new Date().toISOString().split('T')[0],
+      isInpatient: false,
+      dischargeStatus: null,
+      orders: [
+        { id: 'LAB-LIP-01', patientName: 'Ibrahim Danjuma', patientMrn: 'MRN-LSH-10018', serviceType: 'Lipid Profile Panels', amount: 26000, formattedAmount: '₦26,000', status: 'invoiced' },
+        { id: 'LAB-LIP-02', patientName: 'Zainab Abiola', patientMrn: 'MRN-LSH-10019', serviceType: 'Lipid Profile Panels', amount: 26000, formattedAmount: '₦26,000', status: 'invoiced' },
+        { id: 'LAB-LIP-03', patientName: 'Samuel Ogundipe', patientMrn: 'MRN-LSH-10020', serviceType: 'Lipid Profile Panels', amount: 26000, formattedAmount: '₦26,000', status: 'invoiced' },
+        { id: 'LAB-LIP-04', patientName: 'Folake Adeleke', patientMrn: 'MRN-LSH-10021', serviceType: 'Lipid Profile Panels', amount: 26000, formattedAmount: '₦26,000', status: 'invoiced' },
+      ]
     },
     {
-      id: `INV-${Math.floor(93600 + Math.random() * 200)}`,
-      invoiceNumber: `INV-${Math.floor(93600 + Math.random() * 200)}`,
+      id: 'INV-93203',
+      invoiceNumber: 'INV-93203',
       patientId: null,
-      patientName: 'Multiple Patients',
+      patientName: 'Multiple Patients (8 Orders)',
+      patientMrn: 'BATCH-FBC-08',
       serviceDescription: 'Full Blood Count (8 orders)',
       totalAmount: 96000,
       formattedAmount: '₦96,000',
       paidAmount: 0,
       status: 'pending',
-      statusLabel: 'Pending Match',
-      dueDate: '7 days',
-      createdAt: new Date().toISOString().split('T')[0]
+      statusLabel: 'Pending Payment',
+      dueDate: '2026-09-25',
+      createdAt: new Date().toISOString().split('T')[0],
+      isInpatient: false,
+      dischargeStatus: null,
+      orders: [
+        { id: 'LAB-FBC-01', patientName: 'Chinedu Eze', patientMrn: 'MRN-LSH-10008', serviceType: 'Full Blood Count', amount: 12000, formattedAmount: '₦12,000', status: 'invoiced' },
+        { id: 'LAB-FBC-02', patientName: 'Halima Bello', patientMrn: 'MRN-LSH-10003', serviceType: 'Full Blood Count', amount: 12000, formattedAmount: '₦12,000', status: 'invoiced' },
+        { id: 'LAB-FBC-03', patientName: 'Adebayo Adeleke', patientMrn: 'MRN-LSH-10012', serviceType: 'Full Blood Count', amount: 12000, formattedAmount: '₦12,000', status: 'invoiced' },
+        { id: 'LAB-FBC-04', patientName: 'Kemi Adeleke', patientMrn: 'MRN-LSH-10001', serviceType: 'Full Blood Count', amount: 12000, formattedAmount: '₦12,000', status: 'invoiced' },
+        { id: 'LAB-FBC-05', patientName: 'Babatunde Fashola', patientMrn: 'MRN-LSH-10007', serviceType: 'Full Blood Count', amount: 12000, formattedAmount: '₦12,000', status: 'invoiced' },
+        { id: 'LAB-FBC-06', patientName: 'Ngozi Okonjo', patientMrn: 'MRN-LSH-10014', serviceType: 'Full Blood Count', amount: 12000, formattedAmount: '₦12,000', status: 'invoiced' },
+        { id: 'LAB-FBC-07', patientName: 'Emeka Okonkwo', patientMrn: 'MRN-LSH-10002', serviceType: 'Full Blood Count', amount: 12000, formattedAmount: '₦12,000', status: 'invoiced' },
+        { id: 'LAB-FBC-08', patientName: 'Fatima Abubakar', patientMrn: 'MRN-LSH-10016', serviceType: 'Full Blood Count', amount: 12000, formattedAmount: '₦12,000', status: 'invoiced' },
+      ]
     }
   ];
 
@@ -1727,27 +1774,47 @@ app.get('/api/invoices', requireAuth, async (req, res) => {
         paramIdx++;
       }
 
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
       const listRes = await query(`
         SELECT 
           id, invoice_number as "invoiceNumber", patient_id as "patientId",
-          patient_name as "patientName", service_description as "serviceDescription",
+          patient_name as "patientName", patient_mrn as "patientMrn",
+          service_description as "serviceDescription",
           total_amount as "totalAmount", formatted_amount as "formattedAmount",
           paid_amount as "paidAmount", status, status_label as "statusLabel",
-          due_date as "dueDate", created_at as "createdAt"
+          due_date as "dueDate", paid_date as "paidDate",
+          is_inpatient as "isInpatient", discharge_status as "dischargeStatus",
+          created_at as "createdAt"
         FROM invoices
         ${whereClause}
         ORDER BY created_at DESC, invoice_number DESC
       `, params);
+
+      // Fetch linked clinical service orders if any
+      let ordersByInvoice = {};
+      try {
+        const ordersRes = await query(`
+          SELECT id, patient_name as "patientName", patient_mrn as "patientMrn",
+                 service_type as "serviceType", category, amount::float as amount,
+                 ('₦' || TO_CHAR(amount, 'FM999,999,999')) as "formattedAmount",
+                 status, invoice_id as "invoiceId"
+          FROM clinical_service_orders
+          WHERE invoice_id IS NOT NULL
+        `);
+        for (const ord of (ordersRes.rows || [])) {
+          if (!ordersByInvoice[ord.invoiceId]) ordersByInvoice[ord.invoiceId] = [];
+          ordersByInvoice[ord.invoiceId].push(ord);
+        }
+      } catch (e) {
+        // Table or columns may be empty or unmigrated
+      }
 
       // Metrics calculation across all invoices
       const metricsRes = await query(`
         SELECT 
           COUNT(*) as total,
           COALESCE(SUM(total_amount), 0) as total_amount,
-          COUNT(*) FILTER (WHERE status = 'paid') as reconciled_count,
-          COUNT(*) FILTER (WHERE status = 'pending') as pending_count
+          COUNT(*) FILTER (WHERE status = 'paid' OR status = 'reconciled') as reconciled_count,
+          COUNT(*) FILTER (WHERE status = 'pending' OR status = 'overdue') as pending_count
         FROM invoices
       `);
 
@@ -1760,12 +1827,17 @@ app.get('/api/invoices', requireAuth, async (req, res) => {
         ...inv,
         invoice_number: inv.invoiceNumber,
         patient_name: inv.patientName,
+        patient_mrn: inv.patientMrn,
         service_description: inv.serviceDescription,
         total_amount: parseFloat(inv.totalAmount || 0),
         formatted_amount: inv.formattedAmount,
         paid_amount: parseFloat(inv.paidAmount || 0),
         status_label: inv.statusLabel,
         due_date: inv.dueDate,
+        paid_date: inv.paidDate,
+        is_inpatient: Boolean(inv.isInpatient),
+        discharge_status: inv.dischargeStatus,
+        orders: ordersByInvoice[inv.id] || ordersByInvoice[inv.invoiceNumber] || [],
         created_at: inv.createdAt,
         totalAmount: parseFloat(inv.totalAmount || 0),
         paidAmount: parseFloat(inv.paidAmount || 0)
@@ -1799,28 +1871,38 @@ app.get('/api/invoices', requireAuth, async (req, res) => {
     filtered = filtered.filter(inv =>
       inv.invoiceNumber.toLowerCase().includes(q) ||
       inv.patientName.toLowerCase().includes(q) ||
+      (inv.patientMrn || '').toLowerCase().includes(q) ||
       inv.serviceDescription.toLowerCase().includes(q)
     );
   }
 
   if (status && status !== 'all') {
-    filtered = filtered.filter(inv => inv.status === status);
+    if (status === 'paid' || status === 'reconciled') {
+      filtered = filtered.filter(inv => inv.status === 'paid' || inv.status === 'reconciled');
+    } else {
+      filtered = filtered.filter(inv => inv.status === status);
+    }
   }
 
   const totalAmount = FALLBACK_INVOICES.reduce((acc, curr) => acc + curr.totalAmount, 0);
-  const reconciledCount = FALLBACK_INVOICES.filter(i => i.status === 'paid').length;
-  const pendingCount = FALLBACK_INVOICES.filter(i => i.status === 'pending').length;
+  const reconciledCount = FALLBACK_INVOICES.filter(i => i.status === 'paid' || i.status === 'reconciled').length;
+  const pendingCount = FALLBACK_INVOICES.filter(i => i.status === 'pending' || i.status === 'overdue').length;
 
   const formattedFallback = filtered.map(inv => ({
     ...inv,
     invoice_number: inv.invoiceNumber,
     patient_name: inv.patientName,
+    patient_mrn: inv.patientMrn,
     service_description: inv.serviceDescription,
     total_amount: inv.totalAmount,
     formatted_amount: inv.formattedAmount,
     paid_amount: inv.paidAmount,
     status_label: inv.statusLabel,
     due_date: inv.dueDate,
+    paid_date: inv.paidDate,
+    is_inpatient: Boolean(inv.isInpatient),
+    discharge_status: inv.dischargeStatus,
+    orders: inv.orders || [],
     created_at: inv.createdAt
   }));
 

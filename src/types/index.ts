@@ -146,19 +146,50 @@ export interface PatientDossierResponse {
   claims: HMOClaim[];
 }
 
-export interface Invoice {
+export interface InvoiceOrder {
   id: string;
-  invoiceNumber: string;
-  patientId?: string;
   patientName: string;
-  serviceDescription: string;
-  totalAmount: number;
+  patientMrn?: string;
+  serviceType: string;
+  category?: string;
+  amount: number;
   formattedAmount: string;
-  paidAmount: number;
-  status: 'paid' | 'pending' | 'partially_paid' | 'cancelled';
-  statusLabel: string;
+  status: 'unbilled' | 'invoiced' | 'paid';
+  performedAt?: string;
+}
+
+export interface Invoice {
+  id?: string;
+  invoice_number: string;
+  invoiceNumber?: string;
+  patient_id?: string;
+  patientId?: string;
+  patient_name: string;
+  patientName?: string;
+  patient_mrn?: string;
+  patientMrn?: string;
+  service_description: string;
+  serviceDescription?: string;
+  total_amount: number;
+  totalAmount?: number;
+  formatted_amount: string;
+  formattedAmount?: string;
+  paid_amount: number;
+  paidAmount?: number;
+  status: string;
+  status_label: string;
+  statusLabel?: string;
+  due_date: string;
   dueDate?: string;
-  createdAt: string;
+  paid_date?: string;
+  paidDate?: string;
+  created_at: string;
+  createdAt?: string;
+  is_inpatient?: boolean;
+  isInpatient?: boolean;
+  discharge_status?: 'awaiting_settlement' | 'cleared' | null;
+  dischargeStatus?: 'awaiting_settlement' | 'cleared' | null;
+  orders?: InvoiceOrder[];
 }
 
 export interface InvoiceMetrics {

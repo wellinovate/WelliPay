@@ -206,7 +206,7 @@ export const ProviderDashboard: React.FC = () => {
         <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-lg px-3.5 py-2 flex items-center justify-between text-xs font-sans text-emerald-800 shadow-xs">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>Revenue leakage resolved: 17 laboratory procedures invoiced (₦340,000 recovered to billing ledger).</span>
+            <span>Revenue leakage resolved: 17 laboratory procedures invoiced across 3 departmental batches and attributed to patient folders (₦340,000 billed).</span>
           </div>
           <button
             type="button"

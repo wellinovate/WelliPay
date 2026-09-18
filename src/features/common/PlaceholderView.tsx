@@ -223,7 +223,7 @@ const InvoicesView: React.FC = () => {
                     {inv.serviceDescription}
                   </td>
                   <td className="font-heading font-semibold text-brand-navy">
-                    {inv.formattedAmount || `₦${inv.totalAmount.toLocaleString()}`}
+                    {inv.formattedAmount || `₦${(inv.totalAmount ?? 0).toLocaleString()}`}
                   </td>
                   <td className="text-slate-500 text-xs">
                     {inv.dueDate || 'Today'}
