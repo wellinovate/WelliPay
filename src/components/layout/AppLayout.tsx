@@ -104,7 +104,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`h-full px-3.5 font-semibold text-xs transition-colors duration-150 flex items-center gap-1.5 border-b-2 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-[#12244D] focus-visible:ring-offset-2 ${
+                    className={`h-full px-3.5 font-semibold text-xs transition-colors duration-150 flex items-center gap-1.5 border-b-2 cursor-pointer outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#12244D] focus-visible:ring-offset-2 ${
                       isActive
                         ? 'text-[#12244D] border-[#12244D]'
                         : 'text-[#64748b] border-transparent hover:text-[#12244D] hover:border-slate-300'

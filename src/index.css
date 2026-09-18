@@ -82,3 +82,11 @@ h1, h2, h3, h4, .font-heading {
   background-color: rgba(11, 107, 105, 0.03);
 }
 
+/* Restrict button outlines exclusively to keyboard navigation (:focus-visible) */
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+[role="button"]:focus:not(:focus-visible) {
+  outline: none !important;
+  box-shadow: none !important;
+}
+

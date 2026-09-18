@@ -8,6 +8,7 @@ import { ProviderDashboard } from './features/provider/ProviderDashboard';
 import { HMODashboard } from './features/hmo/HMODashboard';
 import { PatientsDirectory } from './features/patients/PatientsDirectory';
 import InvoicesHub from './features/invoices/InvoicesHub';
+import { SettingsView } from './features/settings/SettingsView';
 import { PlaceholderView } from './features/common/PlaceholderView';
 import { Login } from './components/Login';
 import PublicInvoicePay from './pages/PublicInvoicePay';
@@ -22,7 +23,7 @@ const AppContent: React.FC = () => {
       {activeTab === 'claims' && <HMODashboard />}
       {activeTab === 'patients' && <PatientsDirectory />}
       {activeTab === 'invoices' && <InvoicesHub />}
-      {activeTab === 'settings' && <PlaceholderView tab={activeTab} />}
+      {activeTab === 'settings' && <SettingsView />}
     </AppLayout>
   );
 };

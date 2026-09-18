@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { NavTab, Invoice, InvoicesResponse, InvoiceMetrics } from '../../types';
 import { FileText, Users, Settings as SettingsIcon, Check, ShieldCheck, Database, Search, RefreshCw, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
 import { StatusChip } from '../../components/ui/StatusChip';
+import { SettingsView } from '../settings/SettingsView';
 
 interface PlaceholderViewProps {
   tab: NavTab;
@@ -247,6 +248,10 @@ const InvoicesView: React.FC = () => {
 export const PlaceholderView: React.FC<PlaceholderViewProps> = ({ tab }) => {
   if (tab === 'invoices') {
     return <InvoicesView />;
+  }
+
+  if (tab === 'settings') {
+    return <SettingsView />;
   }
 
   if (tab === 'patients') {

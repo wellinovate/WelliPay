@@ -231,3 +231,78 @@ export interface InvoicesResponse {
   metrics: InvoiceMetrics;
   invoices: Invoice[];
 }
+
+export interface FacilitySettings {
+  id: string;
+  name: string;
+  tier: string;
+  location: string;
+}
+
+export interface MatchingSettings {
+  threshold: number; // e.g. 85
+  autoConfirm: boolean; // default false
+  autoConfirmThreshold: number; // e.g. 98
+  fuzzyNameMatching: boolean; // default true
+  lastChangedBy: string;
+  lastChangedAt: string;
+}
+
+export interface PaymentChannelConfig {
+  id: string;
+  name: string;
+  channel: string;
+  protocol: string;
+  status: 'active' | 'degraded' | 'inactive';
+  latencyMs: number;
+  dailyVolume: string;
+  txnCount: number;
+}
+
+export interface SyncStatusConfig {
+  ehr: {
+    name: string;
+    status: 'active' | 'syncing' | 'error';
+    protocol: string;
+    lastSyncSecondsAgo: number;
+    inboundPending: number;
+    ordersSyncedToday: number;
+  };
+  posFleet: {
+    name: string;
+    status: 'active' | 'degraded';
+    terminalsOnline: number;
+    terminalsTotal: number;
+    lastHeartbeatSecondsAgo: number;
+    pollIntervalSeconds: number;
+  };
+  clearinghouse: {
+    name: string;
+    status: 'active' | 'idle';
+    lastBatch: string;
+    claimsInFlight: number;
+  };
+}
+
+export interface LedgerIntegrityStatus {
+  totalDebits: number;
+  formattedTotalDebits: string;
+  totalCredits: number;
+  formattedTotalCredits: string;
+  variance: number;
+  formattedVariance: string;
+  isBalanced: boolean;
+  verifiedAt: string;
+  lastReconciliationRun: string;
+  engine: string;
+  isolationLevel: string;
+  rowLevelLocking: boolean;
+}
+
+export interface SystemSettingsResponse {
+  facility: FacilitySettings;
+  matching: MatchingSettings;
+  channels: PaymentChannelConfig[];
+  sync: SyncStatusConfig;
+  integrity: LedgerIntegrityStatus;
+}
