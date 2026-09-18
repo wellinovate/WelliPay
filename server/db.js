@@ -668,90 +668,91 @@ export async function initializeDatabase() {
       ON CONFLICT (id) DO NOTHING;
     `);
 
-    // Ensure clean state for scaled seed tables
-    await pool.query(`
-      DELETE FROM provider_transactions;
-      DELETE FROM hmo_claims;
-      DELETE FROM patients;
-      DELETE FROM payments;
-    `);
-
-    // Seed Payments (all 45 items: 12 unmatched + 33 confirmed)
-    console.log(`[DB] Seeding ${SCALED_SEED_DATA.reconciliationItems.length} reconciliation payments (${CONFIRMED_RECONCILIATION_ITEMS.length} confirmed)...`);
-    for (const p of SCALED_SEED_DATA.reconciliationItems) {
-      await pool.query(`
-        INSERT INTO payments (id, organization_id, channel, amount, formatted_amount, raw_reference, description, reconciliation_status, date_captured, ai_target_name, ai_invoice_number, ai_confidence, ai_is_high_confidence, ai_explanation, confirmed_at)
-        VALUES ($1, 'org-lagoon', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-        ON CONFLICT (id) DO UPDATE SET
-          channel = EXCLUDED.channel,
-          amount = EXCLUDED.amount,
-          formatted_amount = EXCLUDED.formatted_amount,
-          raw_reference = EXCLUDED.raw_reference,
-          description = EXCLUDED.description,
-          reconciliation_status = EXCLUDED.reconciliation_status,
-          date_captured = EXCLUDED.date_captured,
-          ai_target_name = EXCLUDED.ai_target_name,
-          ai_invoice_number = EXCLUDED.ai_invoice_number,
-          ai_confidence = EXCLUDED.ai_confidence,
-          ai_is_high_confidence = EXCLUDED.ai_is_high_confidence,
-          ai_explanation = EXCLUDED.ai_explanation,
-          confirmed_at = EXCLUDED.confirmed_at;
-      `, [
-        p.id, p.channel, p.amount, p.formattedAmount, p.rawDetails, p.description,
-        p.status, p.date, p.aiMatch?.targetName || null, p.aiMatch?.invoiceNumber || null,
-        p.aiMatch?.confidence || 0, p.aiMatch?.isHighConfidence ?? false,
-        p.aiMatch?.explanation || null, p.confirmedAt || null
-      ]);
+    // Seed Payments (all 45 items: 12 unmatched + 33 confirmed) if empty
+    const paymentCountRes = await pool.query('SELECT COUNT(*) FROM payments');
+    if (parseInt(paymentCountRes.rows[0].count, 10) === 0) {
+      console.log(`[DB] Seeding ${SCALED_SEED_DATA.reconciliationItems.length} reconciliation payments (${CONFIRMED_RECONCILIATION_ITEMS.length} confirmed)...`);
+      for (const p of SCALED_SEED_DATA.reconciliationItems) {
+        await pool.query(`
+          INSERT INTO payments (id, organization_id, channel, amount, formatted_amount, raw_reference, description, reconciliation_status, date_captured, ai_target_name, ai_invoice_number, ai_confidence, ai_is_high_confidence, ai_explanation, confirmed_at)
+          VALUES ($1, 'org-lagoon', $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+          ON CONFLICT (id) DO UPDATE SET
+            channel = EXCLUDED.channel,
+            amount = EXCLUDED.amount,
+            formatted_amount = EXCLUDED.formatted_amount,
+            raw_reference = EXCLUDED.raw_reference,
+            description = EXCLUDED.description,
+            reconciliation_status = EXCLUDED.reconciliation_status,
+            date_captured = EXCLUDED.date_captured,
+            ai_target_name = EXCLUDED.ai_target_name,
+            ai_invoice_number = EXCLUDED.ai_invoice_number,
+            ai_confidence = EXCLUDED.ai_confidence,
+            ai_is_high_confidence = EXCLUDED.ai_is_high_confidence,
+            ai_explanation = EXCLUDED.ai_explanation,
+            confirmed_at = EXCLUDED.confirmed_at;
+        `, [
+          p.id, p.channel, p.amount, p.formattedAmount, p.rawDetails, p.description,
+          p.status, p.date, p.aiMatch?.targetName || null, p.aiMatch?.invoiceNumber || null,
+          p.aiMatch?.confidence || 0, p.aiMatch?.isHighConfidence ?? false,
+          p.aiMatch?.explanation || null, p.confirmedAt || null
+        ]);
+      }
     }
 
-    // 3. Seed HMO Claims (48 claims scaling to ₦1,900,000 + 12 settled remittances)
-    console.log(`[DB] Seeding ${SCALED_SEED_DATA.hmoClaims.length} scaled HMO claims (target ₦1,900,000)...`);
-    for (const c of SCALED_SEED_DATA.hmoClaims) {
-      await pool.query(`
-        INSERT INTO hmo_claims (
-          id, provider, amount, formatted_amount, status, status_label, is_disputed,
-          denial_risk, age, patient_name, patient_mrn, payer, diagnosis, pre_auth_code,
-          denial_reason, plan_rule, sla_days
-        )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-        ON CONFLICT (id) DO UPDATE SET
-          provider = EXCLUDED.provider,
-          amount = EXCLUDED.amount,
-          formatted_amount = EXCLUDED.formatted_amount,
-          status = EXCLUDED.status,
-          status_label = EXCLUDED.status_label,
-          is_disputed = EXCLUDED.is_disputed,
-          denial_risk = EXCLUDED.denial_risk,
-          age = EXCLUDED.age,
-          patient_name = EXCLUDED.patient_name,
-          patient_mrn = EXCLUDED.patient_mrn,
-          payer = EXCLUDED.payer,
-          diagnosis = EXCLUDED.diagnosis,
-          pre_auth_code = EXCLUDED.pre_auth_code,
-          denial_reason = EXCLUDED.denial_reason,
-          plan_rule = EXCLUDED.plan_rule,
-          sla_days = EXCLUDED.sla_days;
-      `, [
-        c.id, c.provider, c.amount, c.formatted_amount, c.status, c.status_label,
-        c.is_disputed, c.denial_risk, c.age, c.patient_name, c.patient_mrn, c.payer,
-        c.diagnosis, c.pre_auth_code, c.denial_reason, c.plan_rule, c.sla_days || 14
-      ]);
+    // 3. Seed HMO Claims (48 claims scaling to ₦1,900,000 + 12 settled remittances) if empty
+    const claimsCountRes = await pool.query('SELECT COUNT(*) FROM hmo_claims');
+    if (parseInt(claimsCountRes.rows[0].count, 10) === 0) {
+      console.log(`[DB] Seeding ${SCALED_SEED_DATA.hmoClaims.length} scaled HMO claims (target ₦1,900,000)...`);
+      for (const c of SCALED_SEED_DATA.hmoClaims) {
+        await pool.query(`
+          INSERT INTO hmo_claims (
+            id, provider, amount, formatted_amount, status, status_label, is_disputed,
+            denial_risk, age, patient_name, patient_mrn, payer, diagnosis, pre_auth_code,
+            denial_reason, plan_rule, sla_days
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+          ON CONFLICT (id) DO UPDATE SET
+            provider = EXCLUDED.provider,
+            amount = EXCLUDED.amount,
+            formatted_amount = EXCLUDED.formatted_amount,
+            status = EXCLUDED.status,
+            status_label = EXCLUDED.status_label,
+            is_disputed = EXCLUDED.is_disputed,
+            denial_risk = EXCLUDED.denial_risk,
+            age = EXCLUDED.age,
+            patient_name = EXCLUDED.patient_name,
+            patient_mrn = EXCLUDED.patient_mrn,
+            payer = EXCLUDED.payer,
+            diagnosis = EXCLUDED.diagnosis,
+            pre_auth_code = EXCLUDED.pre_auth_code,
+            denial_reason = EXCLUDED.denial_reason,
+            plan_rule = EXCLUDED.plan_rule,
+            sla_days = EXCLUDED.sla_days;
+        `, [
+          c.id, c.provider, c.amount, c.formatted_amount, c.status, c.status_label,
+          c.is_disputed, c.denial_risk, c.age, c.patient_name, c.patient_mrn, c.payer,
+          c.diagnosis, c.pre_auth_code, c.denial_reason, c.plan_rule, c.sla_days || 14
+        ]);
+      }
     }
 
-    // 4. Seed Provider Transactions (52 patient direct + 2 HMO remittances + 1 corporate retainer + 4 failed)
-    console.log(`[DB] Seeding ${SCALED_SEED_DATA.providerTransactions.length} scaled provider transactions (target ₦640,000 direct, ₦2.84M total)...`);
-    for (const t of SCALED_SEED_DATA.providerTransactions) {
-      await pool.query(`
-        INSERT INTO provider_transactions (id, time_captured, patient_or_service, amount, formatted_amount, channel, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
-        ON CONFLICT (id) DO UPDATE SET
-          time_captured = EXCLUDED.time_captured,
-          patient_or_service = EXCLUDED.patient_or_service,
-          amount = EXCLUDED.amount,
-          formatted_amount = EXCLUDED.formatted_amount,
-          channel = EXCLUDED.channel,
-          status = EXCLUDED.status;
-      `, [t.id, t.time_captured, t.patient_or_service, t.amount, t.formatted_amount, t.channel, t.status]);
+    // 4. Seed Provider Transactions (52 patient direct + 2 HMO remittances + 1 corporate retainer + 4 failed) if empty
+    const txCountRes = await pool.query('SELECT COUNT(*) FROM provider_transactions');
+    if (parseInt(txCountRes.rows[0].count, 10) === 0) {
+      console.log(`[DB] Seeding ${SCALED_SEED_DATA.providerTransactions.length} scaled provider transactions (target ₦640,000 direct, ₦2.84M total)...`);
+      for (const t of SCALED_SEED_DATA.providerTransactions) {
+        await pool.query(`
+          INSERT INTO provider_transactions (id, time_captured, patient_or_service, amount, formatted_amount, channel, status)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          ON CONFLICT (id) DO UPDATE SET
+            time_captured = EXCLUDED.time_captured,
+            patient_or_service = EXCLUDED.patient_or_service,
+            amount = EXCLUDED.amount,
+            formatted_amount = EXCLUDED.formatted_amount,
+            channel = EXCLUDED.channel,
+            status = EXCLUDED.status;
+        `, [t.id, t.time_captured, t.patient_or_service, t.amount, t.formatted_amount, t.channel, t.status]);
+      }
     }
 
     // 5. Seed 17 Clinical Service Orders for Revenue Leakage Audit if empty
@@ -797,26 +798,29 @@ export async function initializeDatabase() {
       `);
     }
 
-    // 7. Seed Patients (backing all claims and transactions)
-    console.log(`[DB] Seeding ${SCALED_SEED_DATA.patients.length} scaled patient records...`);
-    for (const p of SCALED_SEED_DATA.patients) {
-      await pool.query(`
-        INSERT INTO patients (id, mrn, full_name, phone, email, gender, date_of_birth, primary_coverage, hmo_name, hmo_policy_number, hmo_enrollee_id, outstanding_copay, status)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-        ON CONFLICT (id) DO UPDATE SET
-          mrn = EXCLUDED.mrn,
-          full_name = EXCLUDED.full_name,
-          phone = EXCLUDED.phone,
-          email = EXCLUDED.email,
-          gender = EXCLUDED.gender,
-          date_of_birth = EXCLUDED.date_of_birth,
-          primary_coverage = EXCLUDED.primary_coverage,
-          hmo_name = EXCLUDED.hmo_name,
-          hmo_policy_number = EXCLUDED.hmo_policy_number,
-          hmo_enrollee_id = EXCLUDED.hmo_enrollee_id,
-          outstanding_copay = EXCLUDED.outstanding_copay,
-          status = EXCLUDED.status;
-      `, [p.id, p.mrn, p.full_name, p.phone, p.email, p.gender, p.date_of_birth, p.primary_coverage, p.hmo_name, p.hmo_policy_number, p.hmo_enrollee_id, p.outstanding_copay, p.status]);
+    // 7. Seed Patients (backing all claims and transactions) if empty
+    const patientCountRes = await pool.query('SELECT COUNT(*) FROM patients');
+    if (parseInt(patientCountRes.rows[0].count, 10) === 0) {
+      console.log(`[DB] Seeding ${SCALED_SEED_DATA.patients.length} scaled patient records...`);
+      for (const p of SCALED_SEED_DATA.patients) {
+        await pool.query(`
+          INSERT INTO patients (id, mrn, full_name, phone, email, gender, date_of_birth, primary_coverage, hmo_name, hmo_policy_number, hmo_enrollee_id, outstanding_copay, status)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          ON CONFLICT (id) DO UPDATE SET
+            mrn = EXCLUDED.mrn,
+            full_name = EXCLUDED.full_name,
+            phone = EXCLUDED.phone,
+            email = EXCLUDED.email,
+            gender = EXCLUDED.gender,
+            date_of_birth = EXCLUDED.date_of_birth,
+            primary_coverage = EXCLUDED.primary_coverage,
+            hmo_name = EXCLUDED.hmo_name,
+            hmo_policy_number = EXCLUDED.hmo_policy_number,
+            hmo_enrollee_id = EXCLUDED.hmo_enrollee_id,
+            outstanding_copay = EXCLUDED.outstanding_copay,
+            status = EXCLUDED.status;
+        `, [p.id, p.mrn, p.full_name, p.phone, p.email, p.gender, p.date_of_birth, p.primary_coverage, p.hmo_name, p.hmo_policy_number, p.hmo_enrollee_id, p.outstanding_copay, p.status]);
+      }
     }
 
     // 8. Seed Invoices if empty
