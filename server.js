@@ -1718,6 +1718,15 @@ app.get('/api/invoices', requireAuth, async (req, res) => {
 
       const invoices = listRes.rows.map(inv => ({
         ...inv,
+        invoice_number: inv.invoiceNumber,
+        patient_name: inv.patientName,
+        service_description: inv.serviceDescription,
+        total_amount: parseFloat(inv.totalAmount || 0),
+        formatted_amount: inv.formattedAmount,
+        paid_amount: parseFloat(inv.paidAmount || 0),
+        status_label: inv.statusLabel,
+        due_date: inv.dueDate,
+        created_at: inv.createdAt,
         totalAmount: parseFloat(inv.totalAmount || 0),
         paidAmount: parseFloat(inv.paidAmount || 0)
       }));
@@ -1762,6 +1771,19 @@ app.get('/api/invoices', requireAuth, async (req, res) => {
   const reconciledCount = FALLBACK_INVOICES.filter(i => i.status === 'paid').length;
   const pendingCount = FALLBACK_INVOICES.filter(i => i.status === 'pending').length;
 
+  const formattedFallback = filtered.map(inv => ({
+    ...inv,
+    invoice_number: inv.invoiceNumber,
+    patient_name: inv.patientName,
+    service_description: inv.serviceDescription,
+    total_amount: inv.totalAmount,
+    formatted_amount: inv.formattedAmount,
+    paid_amount: inv.paidAmount,
+    status_label: inv.statusLabel,
+    due_date: inv.dueDate,
+    created_at: inv.createdAt
+  }));
+
   res.json({
     source: 'fallback',
     metrics: {
@@ -1771,7 +1793,7 @@ app.get('/api/invoices', requireAuth, async (req, res) => {
       reconciledCount,
       pendingCount
     },
-    invoices: filtered
+    invoices: formattedFallback
   });
 });
 
@@ -1823,6 +1845,85 @@ app.get('/api/invoices/:id', requireAuth, async (req, res) => {
     source: 'fallback',
     invoice: found
   });
+});
+
+app.post('/api/invoices', requireAuth, async (req, res) => {
+  const { patient_name, service_description, total_amount, due_date } = req.body;
+  if (!patient_name || !service_description || !total_amount) {
+    return res.status(400).json({ error: 'patient_name, service_description, and total_amount are required.' });
+  }
+
+  const invoiceNumber = `INV-${Math.floor(90000 + Math.random() * 9999)}`;
+  const formattedAmount = `₦${Number(total_amount).toLocaleString()}`;
+
+  if (pool) {
+    try {
+      const result = await pool.query(`
+        INSERT INTO invoices
+          (id, invoice_number, patient_id, patient_name, service_description,
+           total_amount, formatted_amount, paid_amount, status, status_label, due_date, created_at)
+        VALUES ($1, $1, NULL, $2, $3, $4, $5, 0, 'pending', 'Pending Match', $6, NOW())
+        RETURNING *
+      `, [
+        invoiceNumber, patient_name, service_description, total_amount,
+        formattedAmount, due_date || null,
+      ]);
+
+      const row = result.rows[0];
+      return res.json({
+        invoice: {
+          ...row,
+          invoice_number: row.invoice_number,
+          invoiceNumber: row.invoice_number,
+          patient_name: row.patient_name,
+          patientName: row.patient_name,
+          service_description: row.service_description,
+          serviceDescription: row.service_description,
+          total_amount: parseFloat(row.total_amount),
+          totalAmount: parseFloat(row.total_amount),
+          formatted_amount: row.formatted_amount,
+          formattedAmount: row.formatted_amount,
+          due_date: row.due_date,
+          dueDate: row.due_date,
+          status: row.status,
+          status_label: row.status_label,
+          statusLabel: row.status_label
+        }
+      });
+    } catch (err) {
+      console.error('[API POST /api/invoices] error:', err.message);
+      return res.status(500).json({ error: 'Failed to create invoice.' });
+    }
+  }
+
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(503).json({ error: 'Database service unavailable in production.' });
+  }
+
+  const newInv = {
+    id: invoiceNumber,
+    invoiceNumber,
+    invoice_number: invoiceNumber,
+    patientName: patient_name,
+    patient_name: patient_name,
+    serviceDescription: service_description,
+    service_description: service_description,
+    totalAmount: Number(total_amount),
+    total_amount: Number(total_amount),
+    formattedAmount,
+    formatted_amount: formattedAmount,
+    paidAmount: 0,
+    paid_amount: 0,
+    status: 'pending',
+    statusLabel: 'Pending Match',
+    status_label: 'Pending Match',
+    dueDate: due_date || 'In 7 days',
+    due_date: due_date || 'In 7 days',
+    createdAt: new Date().toISOString(),
+    created_at: new Date().toISOString()
+  };
+  FALLBACK_INVOICES.unshift(newInv);
+  res.json({ invoice: newInv });
 });
 
 // ==========================================

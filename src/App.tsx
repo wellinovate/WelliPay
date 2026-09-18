@@ -7,6 +7,7 @@ import { ReconciliationQueue } from './features/reconciliation/ReconciliationQue
 import { ProviderDashboard } from './features/provider/ProviderDashboard';
 import { HMODashboard } from './features/hmo/HMODashboard';
 import { PatientsDirectory } from './features/patients/PatientsDirectory';
+import InvoicesHub from './features/invoices/InvoicesHub';
 import { PlaceholderView } from './features/common/PlaceholderView';
 import { Login } from './components/Login';
 import PublicInvoicePay from './pages/PublicInvoicePay';
@@ -20,9 +21,8 @@ const AppContent: React.FC = () => {
       {activeTab === 'dashboard' && <ProviderDashboard />}
       {activeTab === 'claims' && <HMODashboard />}
       {activeTab === 'patients' && <PatientsDirectory />}
-      {(activeTab === 'invoices' || activeTab === 'settings') && (
-        <PlaceholderView tab={activeTab} />
-      )}
+      {activeTab === 'invoices' && <InvoicesHub />}
+      {activeTab === 'settings' && <PlaceholderView tab={activeTab} />}
     </AppLayout>
   );
 };
