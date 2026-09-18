@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import axios from 'axios';
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs';
@@ -325,6 +326,121 @@ app.get('/api/health', async (req, res) => {
 app.get('/api/database/status', async (req, res) => {
   const dbHealth = await checkDatabaseHealth();
   res.json(dbHealth);
+});
+
+// ==========================================
+// Public Patient Payment Endpoints (No requireAuth)
+// Allows patients to retrieve their invoice and initialize Paystack checkout
+// ==========================================
+
+app.get('/api/public/invoice/:invoiceNumber', async (req, res) => {
+  const { invoiceNumber } = req.params;
+
+  if (pool) {
+    try {
+      const result = await pool.query(
+        `SELECT invoice_number, patient_name, service_description, total_amount,
+                formatted_amount, paid_amount, status, status_label, due_date
+         FROM invoices WHERE invoice_number = $1`,
+        [invoiceNumber]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Invoice not found.' });
+      }
+      return res.json({ invoice: result.rows[0] });
+    } catch (err) {
+      console.error('[API /api/public/invoice] error:', err.message);
+      return res.status(500).json({ error: 'Failed to load invoice.' });
+    }
+  }
+
+  // Fallback demo support for local development without PostgreSQL
+  const found = FALLBACK_INVOICES.find(i => i.invoiceNumber.toUpperCase() === invoiceNumber.toUpperCase());
+  if (!found) {
+    return res.status(404).json({ error: 'Invoice not found.' });
+  }
+
+  res.json({
+    invoice: {
+      invoice_number: found.invoiceNumber,
+      patient_name: found.patientName,
+      service_description: found.serviceDescription,
+      total_amount: found.totalAmount,
+      formatted_amount: found.formattedAmount,
+      paid_amount: found.paidAmount,
+      status: found.status,
+      status_label: found.statusLabel,
+      due_date: found.dueDate
+    }
+  });
+});
+
+app.post('/api/public/invoice/:invoiceNumber/pay', async (req, res) => {
+  const { invoiceNumber } = req.params;
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email is required to initialize payment.' });
+  }
+
+  let invoice = null;
+
+  if (pool) {
+    try {
+      const invoiceRes = await pool.query(
+        `SELECT invoice_number, total_amount, status FROM invoices WHERE invoice_number = $1`,
+        [invoiceNumber]
+      );
+      if (invoiceRes.rows.length === 0) {
+        return res.status(404).json({ error: 'Invoice not found.' });
+      }
+      invoice = invoiceRes.rows[0];
+    } catch (err) {
+      console.error('[API /api/public/invoice/pay] DB error:', err.message);
+      return res.status(500).json({ error: 'Failed to load invoice from database.' });
+    }
+  } else {
+    // Fallback demo mode
+    const found = FALLBACK_INVOICES.find(i => i.invoiceNumber.toUpperCase() === invoiceNumber.toUpperCase());
+    if (!found) {
+      return res.status(404).json({ error: 'Invoice not found.' });
+    }
+    invoice = {
+      invoice_number: found.invoiceNumber,
+      total_amount: found.totalAmount,
+      status: found.status
+    };
+  }
+
+  if (invoice.status === 'paid') {
+    return res.status(409).json({ error: 'Invoice already paid.' });
+  }
+
+  try {
+    const reference = `${invoice.invoice_number}-${Date.now()}`;
+    const baseUrl = process.env.APP_BASE_URL || `http://localhost:${PORT}`;
+
+    const paystackRes = await axios.post('https://api.paystack.co/transaction/initialize', {
+      email,
+      amount: Math.round(Number(invoice.total_amount) * 100), // kobo
+      reference,
+      callback_url: `${baseUrl}/pay/${invoice.invoice_number}?status=callback`,
+    }, {
+      headers: { Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}` },
+    });
+
+    res.json({
+      authorization_url: paystackRes.data.data.authorization_url,
+      access_code: paystackRes.data.data.access_code,
+      reference: paystackRes.data.data.reference,
+    });
+  } catch (err) {
+    console.error('[API /api/public/invoice/pay] Paystack initialize error:', err.response?.data || err.message);
+    res.status(500).json({ 
+      error: 'Failed to initialize payment.',
+      details: err.response?.data?.message || err.message
+    });
+  }
 });
 
 // ==========================================

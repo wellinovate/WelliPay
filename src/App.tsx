@@ -1,4 +1,5 @@
 import React from 'react';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { WelliPayProvider, useWelliPay } from './context/WelliPayContext';
 import { useAuth } from './context/AuthContext';
 import { AppLayout } from './components/layout/AppLayout';
@@ -8,6 +9,7 @@ import { HMODashboard } from './features/hmo/HMODashboard';
 import { PatientsDirectory } from './features/patients/PatientsDirectory';
 import { PlaceholderView } from './features/common/PlaceholderView';
 import { Login } from './components/Login';
+import PublicInvoicePay from './pages/PublicInvoicePay';
 
 const AppContent: React.FC = () => {
   const { activeTab } = useWelliPay();
@@ -25,7 +27,7 @@ const AppContent: React.FC = () => {
   );
 };
 
-export function App() {
+const AuthenticatedApp: React.FC = () => {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -56,6 +58,17 @@ export function App() {
     <WelliPayProvider>
       <AppContent />
     </WelliPayProvider>
+  );
+};
+
+export function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/pay/:invoiceNumber" element={<PublicInvoicePay />} />
+        <Route path="/*" element={<AuthenticatedApp />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 
