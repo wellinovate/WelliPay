@@ -619,7 +619,9 @@ app.get('/api/claims', requireAuth, async (req, res) => {
           id, provider, amount::float as amount, formatted_amount as "formattedAmount",
           status, status_label as "statusLabel", is_disputed as "isDisputed",
           denial_risk as "denialRisk", age, patient_name as "patientName",
-          diagnosis, pre_auth_code as "preAuthCode"
+          patient_mrn as "patientMrn", payer, diagnosis, pre_auth_code as "preAuthCode",
+          denial_reason as "denialReason", plan_rule as "planRule",
+          COALESCE(sla_days, 14) as "slaDays"
         FROM hmo_claims
         ORDER BY id ASC
       `);
@@ -637,14 +639,19 @@ app.get('/api/claims', requireAuth, async (req, res) => {
   const fallbackClaims = (SCALED_SEED_DATA?.hmoClaims || []).map(c => ({
     id: c.id,
     provider: c.provider,
+    payer: c.payer,
     amount: c.amount,
     formattedAmount: c.formatted_amount,
     status: c.status,
     statusLabel: c.status_label,
     isDisputed: c.is_disputed,
     denialRisk: c.denial_risk,
+    denialReason: c.denial_reason,
+    planRule: c.plan_rule,
+    slaDays: c.sla_days || 14,
     age: c.age,
     patientName: c.patient_name,
+    patientMrn: c.patient_mrn,
     diagnosis: c.diagnosis,
     preAuthCode: c.pre_auth_code
   }));
@@ -736,6 +743,39 @@ app.post('/api/claims/:id/resolve', requireAuth, async (req, res) => {
   }
 
   res.json({ success: true, id, resolution, mode: 'demo' });
+});
+
+// 7b. Submit Clinical Appeal / Pre-Auth Documentation for Disputed Claim
+app.post('/api/claims/:id/appeal', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { preAuthCode, appealNotes } = req.body;
+
+  try {
+    if (pool) {
+      const updateRes = await query(`
+        UPDATE hmo_claims
+        SET is_disputed = false,
+            status = 'approved',
+            status_label = 'Approved (Appeal Upheld)',
+            denial_risk = 'low',
+            pre_auth_code = COALESCE($1, pre_auth_code),
+            denial_reason = 'Pre-auth documentation submitted on appeal'
+        WHERE id = $2
+        RETURNING id, provider, amount, formatted_amount as "formattedAmount", status, status_label as "statusLabel", pre_auth_code as "preAuthCode"
+      `, [preAuthCode || null, id]);
+
+      if (updateRes.rows.length === 0) {
+        return res.status(404).json({ error: `Claim ${id} not found` });
+      }
+
+      return res.json({ success: true, claim: updateRes.rows[0], status: 'approved' });
+    }
+  } catch (err) {
+    console.error('[API /api/claims/:id/appeal] DB error:', err.message);
+    return res.status(500).json({ error: err.message });
+  }
+
+  res.json({ success: true, id, status: 'approved', mode: 'demo' });
 });
 
 // 5b. Export Outstanding Claims Remittance Schedule as PDF

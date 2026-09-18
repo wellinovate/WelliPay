@@ -50,16 +50,21 @@ export interface ProviderTransaction {
 export interface HMOClaim {
   id: string;
   provider: string;
+  payer?: string;
   amount: number;
   formattedAmount: string;
   status: 'submitted' | 'approved' | 'paid' | 'rejected';
   statusLabel?: string;
   isDisputed: boolean;
   denialRisk: 'high' | 'low' | 'missing-auth';
+  denialReason?: string;
   age: string;
+  slaDays?: number;
   preAuthCode?: string;
   patientName?: string;
+  patientMrn?: string;
   diagnosis?: string;
+  planRule?: string;
 }
 
 export type PersonaType = 'provider' | 'hmo';

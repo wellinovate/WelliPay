@@ -301,7 +301,8 @@ export function generateScaledSeedData() {
   const HMO_RECEIVABLES_TARGET = 1900000;
   const OUTSTANDING_CLAIM_COUNT = 48;
   const claimAmounts = distributeAmount(HMO_RECEIVABLES_TARGET, OUTSTANDING_CLAIM_COUNT, 8000, 90000);
-  const PROVIDERS = ['ABC Diagnostics', 'Lagoon Hospital', 'St. Mary Clinic', 'Wellness Point Lab', 'Trust Care Hospital'];
+  const PROVIDER_NAME = 'Lagoon Specialist Hospital';
+  const PAYERS = ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Leadway Health'];
   const DIAGNOSES = [
     'Routine lipid profile & HbA1c screening',
     'Echocardiography & Doppler imaging',
@@ -324,18 +325,50 @@ export function generateScaledSeedData() {
     const status = isApproved ? 'approved' : 'submitted'; // Counted in hmoReceivables (status IN ('submitted', 'approved'))
     const statusLabel = isDisputed ? 'Flagged for Review' : (isApproved ? 'Approved' : 'Submitted');
 
+    const payer = i === 2 ? 'Reliance HMO' : (i === 15 ? 'AXA Mansard' : (i === 29 ? 'Hygeia HMO' : PAYERS[i % PAYERS.length]));
+    const diagnosis = i === 2 ? 'Appendectomy emergency intervention' : pick(DIAGNOSES);
+    const patientName = pick(NIGERIAN_NAMES);
+    const patientMrn = `MRN-LSH-${10400 + i}`;
+
+    let denialReason = 'Under routine clinical review';
+    let planRule = `${payer} Standard Benefit Plan · Routine outpatient tariff`;
+
+    if (isDisputed) {
+      if (i === 2) {
+        denialReason = 'Missing pre-authorization code';
+        planRule = 'Reliance HMO Silver Plan · Pre-authorization mandatory for all inpatient/surgical care regardless of amount, and all procedures exceeding ₦100,000 (POL-SILVER-V3)';
+      } else if (i === 15) {
+        denialReason = 'Diagnostic code review required';
+        planRule = 'AXA Mansard Gold · Pre-auth required for specialist imaging > ₦25,000 (POL-AXA-08)';
+      } else {
+        denialReason = 'Tariff verification pending with payer';
+        planRule = 'Hygeia Corporate Standard · Diagnostic coding validation mandatory (POL-HYG-12)';
+      }
+    } else if (isApproved) {
+      denialReason = 'Pre-auth verified & approved by payer';
+      planRule = `${payer} Comprehensive Plan · Tariff pre-cleared`;
+    } else if (denialRisk === 'high') {
+      denialReason = 'Tariff verification pending with payer';
+      planRule = `${payer} Standard Plan · Tariff validation in progress`;
+    }
+
     return {
       id: `CLM-${4470 + i}`,
-      provider: pick(PROVIDERS),
+      provider: PROVIDER_NAME,
+      payer,
       amount,
       formatted_amount: `₦${amount.toLocaleString()}`,
       status,
       status_label: statusLabel,
       is_disputed: isDisputed,
       denial_risk: denialRisk,
+      denial_reason: denialReason,
+      plan_rule: planRule,
+      sla_days: 14,
       age: `${ageDays}d`,
-      patient_name: pick(NIGERIAN_NAMES),
-      diagnosis: pick(DIAGNOSES),
+      patient_name: patientName,
+      patient_mrn: patientMrn,
+      diagnosis,
       pre_auth_code: isDisputed ? null : (isApproved ? `PA-${randInt(10000, 99999)}-E` : (Math.random() < 0.3 ? `PA-${randInt(10000, 99999)}-E` : null)),
     };
   });
@@ -345,17 +378,23 @@ export function generateScaledSeedData() {
   const settledClaims = settledClaimAmounts.map((amount, i) => {
     const submittedAt = randomPastDate(28);
     const ageDays = Math.max(7, Math.floor((Date.now() - submittedAt.getTime()) / 86400000));
+    const payer = PAYERS[i % PAYERS.length];
     return {
       id: `CLM-${4520 + i}`,
-      provider: pick(PROVIDERS),
+      provider: PROVIDER_NAME,
+      payer,
       amount,
       formatted_amount: `₦${amount.toLocaleString()}`,
       status: 'paid',
       status_label: 'Paid Remittance',
       is_disputed: false,
       denial_risk: 'low',
+      denial_reason: 'Settled against remittance advice',
+      plan_rule: `${payer} Remittance Schedule Settled`,
+      sla_days: 14,
       age: `${ageDays}d`,
       patient_name: pick(NIGERIAN_NAMES),
+      patient_mrn: `MRN-LSH-${10500 + i}`,
       diagnosis: pick(DIAGNOSES),
       pre_auth_code: `PA-${randInt(10000, 99999)}-E`,
     };
@@ -455,10 +494,21 @@ export async function initializeDatabase() {
         denial_risk VARCHAR(50) DEFAULT 'low',
         age VARCHAR(50) NOT NULL,
         patient_name VARCHAR(255),
+        patient_mrn VARCHAR(100),
+        payer VARCHAR(100),
         diagnosis TEXT,
         pre_auth_code VARCHAR(100),
+        denial_reason TEXT,
+        plan_rule TEXT,
+        sla_days INT DEFAULT 14,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+
+      ALTER TABLE hmo_claims ADD COLUMN IF NOT EXISTS payer VARCHAR(100);
+      ALTER TABLE hmo_claims ADD COLUMN IF NOT EXISTS patient_mrn VARCHAR(100);
+      ALTER TABLE hmo_claims ADD COLUMN IF NOT EXISTS denial_reason TEXT;
+      ALTER TABLE hmo_claims ADD COLUMN IF NOT EXISTS plan_rule TEXT;
+      ALTER TABLE hmo_claims ADD COLUMN IF NOT EXISTS sla_days INT DEFAULT 14;
 
         CREATE TABLE IF NOT EXISTS provider_transactions (
         id VARCHAR(50) PRIMARY KEY,
@@ -591,8 +641,12 @@ export async function initializeDatabase() {
     console.log(`[DB] Seeding ${SCALED_SEED_DATA.hmoClaims.length} scaled HMO claims (target ₦1,900,000)...`);
     for (const c of SCALED_SEED_DATA.hmoClaims) {
       await pool.query(`
-        INSERT INTO hmo_claims (id, provider, amount, formatted_amount, status, status_label, is_disputed, denial_risk, age, patient_name, diagnosis, pre_auth_code)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        INSERT INTO hmo_claims (
+          id, provider, amount, formatted_amount, status, status_label, is_disputed,
+          denial_risk, age, patient_name, patient_mrn, payer, diagnosis, pre_auth_code,
+          denial_reason, plan_rule, sla_days
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
         ON CONFLICT (id) DO UPDATE SET
           provider = EXCLUDED.provider,
           amount = EXCLUDED.amount,
@@ -603,9 +657,18 @@ export async function initializeDatabase() {
           denial_risk = EXCLUDED.denial_risk,
           age = EXCLUDED.age,
           patient_name = EXCLUDED.patient_name,
+          patient_mrn = EXCLUDED.patient_mrn,
+          payer = EXCLUDED.payer,
           diagnosis = EXCLUDED.diagnosis,
-          pre_auth_code = EXCLUDED.pre_auth_code;
-      `, [c.id, c.provider, c.amount, c.formatted_amount, c.status, c.status_label, c.is_disputed, c.denial_risk, c.age, c.patient_name, c.diagnosis, c.pre_auth_code]);
+          pre_auth_code = EXCLUDED.pre_auth_code,
+          denial_reason = EXCLUDED.denial_reason,
+          plan_rule = EXCLUDED.plan_rule,
+          sla_days = EXCLUDED.sla_days;
+      `, [
+        c.id, c.provider, c.amount, c.formatted_amount, c.status, c.status_label,
+        c.is_disputed, c.denial_risk, c.age, c.patient_name, c.patient_mrn, c.payer,
+        c.diagnosis, c.pre_auth_code, c.denial_reason, c.plan_rule, c.sla_days || 14
+      ]);
     }
 
     // 4. Seed Provider Transactions (52 patient direct + 2 HMO remittances + 1 corporate retainer + 4 failed)

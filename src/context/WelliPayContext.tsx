@@ -63,6 +63,7 @@ interface WelliPayContextType {
   approveClaim: (id: string) => void;
   rejectClaim: (id: string, reason?: string) => void;
   resolveClaimDispute: (id: string, resolution: 'approve' | 'reject') => void;
+  appealClaim: (id: string, preAuthCode?: string, notes?: string) => void;
 
   // Notifications
   notifications: NotificationToast[];
@@ -463,6 +464,34 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
+  const appealClaim = (id: string, preAuthCode?: string, notes?: string) => {
+    setHmoClaims(prev => prev.map(c => {
+      if (c.id === id) {
+        return {
+          ...c,
+          isDisputed: false,
+          status: 'approved',
+          statusLabel: 'Approved (Appeal Upheld)',
+          denialRisk: 'low',
+          denialReason: 'Pre-auth documentation submitted on appeal',
+          preAuthCode: preAuthCode || c.preAuthCode
+        };
+      }
+      return c;
+    }));
+    addNotification(`Clinical appeal submitted for claim ${id}. Pre-auth documentation attached.`, 'success');
+
+    getAuthHeaders().then(headers => {
+      fetch(`/api/claims/${id}/appeal`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ preAuthCode, appealNotes: notes })
+      })
+      .then(() => refreshDashboard())
+      .catch(() => {});
+    });
+  };
+
   // Computed counts
   const unmatchedCount = reconciliationItems.filter(i => i.status === 'unmatched').length;
   const suggestedCount = reconciliationItems.filter(i => i.status === 'unmatched' && i.aiMatch.isHighConfidence).length;
@@ -504,6 +533,7 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         approveClaim,
         rejectClaim,
         resolveClaimDispute,
+        appealClaim,
         notifications,
         addNotification,
         removeNotification,
