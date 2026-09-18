@@ -71,13 +71,28 @@ app.get('/api/webhooks/paystack', (req, res) => {
 const DEMO_PROCESSED_PAYSTACK_TXNS = new Set();
 
 async function processPaystackEvent(event) {
-  if (event.event !== 'charge.success') return;
+  if (event.event === 'charge.success') {
+    return handleChargeSuccess(event.data);
+  }
+  if (event.event === 'dedicatedaccount.assign.success') {
+    console.log('[webhook/paystack] DVA assignment confirmed:', event.data.dedicated_account?.account_number);
+    return; // informational only, nothing to reconcile
+  }
+  console.log(`[webhook/paystack] Unhandled event type: ${event.event}`);
+}
 
-  const { reference, amount, customer, id: paystackTransactionId } = event.data;
+async function handleChargeSuccess(data) {
+  const { reference, amount, customer, id: paystackTransactionId, channel, authorization } = data;
   const amountNaira = amount / 100;
+  const isDVA = channel === 'dedicated_nuban';
+
+  const description = isDVA
+    ? (data.narration || authorization?.sender_bank_account_number || 'Bank transfer — DVA')
+    : reference;
+  const paymentChannel = isDVA ? 'Bank transfer' : 'Paystack';
 
   let matchedInvoiceId = null, matchedStatus = 'unmatched', confidence = null;
-  const invoiceMatch = reference && reference.match(/^(INV-\d+)/);
+  const invoiceMatch = !isDVA && reference && reference.match(/^(INV-\d+)/);
 
   if (!pool) {
     if (DEMO_PROCESSED_PAYSTACK_TXNS.has(paystackTransactionId)) {
@@ -108,22 +123,24 @@ async function processPaystackEvent(event) {
         date: todayStr,
         amount: amountNaira,
         formattedAmount: `₦${amountNaira.toLocaleString()}`,
-        channel: 'Paystack',
-        description: `Paystack Online Payment (${reference})`,
-        rawDetails: reference,
+        channel: paymentChannel,
+        description: isDVA ? `DVA Bank Transfer: ${description}` : `Paystack Online Payment (${reference})`,
+        rawDetails: isDVA ? (data.narration || reference) : reference,
         status: matchedStatus,
         confirmedAt: matchedStatus === 'confirmed' ? nowTime : null,
         aiMatch: {
-          confidence: confidence || 0,
+          confidence: confidence || (isDVA ? 40 : 0),
           isHighConfidence: confidence === 100,
-          targetName: customer?.email || 'Direct Patient',
+          targetName: customer?.email || (isDVA ? 'Bank Transfer Patient' : 'Direct Patient'),
           invoiceNumber: invoiceMatch ? invoiceMatch[1] : 'N/A',
-          explanation: confidence === 100 ? 'Exact match by invoice reference' : 'Unmatched online payment'
+          explanation: isDVA 
+            ? 'Incoming NIP bank transfer to hospital DVA awaiting cashier review'
+            : (confidence === 100 ? 'Exact match by invoice reference' : 'Unmatched online payment')
         }
       });
     }
 
-    console.log(`[webhook/paystack] Recorded txn ${paystackTransactionId}, matched=${matchedStatus} (demo mode)`);
+    console.log(`[webhook/paystack] Recorded txn ${paystackTransactionId} (${channel}), matched=${matchedStatus} (demo mode)`);
     return;
   }
 
@@ -141,8 +158,6 @@ async function processPaystackEvent(event) {
       return;
     }
 
-    let matchedInvoiceId = null, matchedStatus = 'unmatched', confidence = null;
-    const invoiceMatch = reference && reference.match(/^(INV-\d+)/);
     if (invoiceMatch) {
       const inv = await client.query(
         'SELECT id, invoice_number FROM invoices WHERE invoice_number = $1',
@@ -159,9 +174,10 @@ async function processPaystackEvent(event) {
       INSERT INTO reconciliation_entries
         (date, amount, description, channel, matched_invoice_id, reconciliation_status,
          confidence_score, paystack_transaction_id, paystack_reference, raw_customer_email)
-      VALUES (NOW(), $1, $2, 'Paystack', $3, $4, $5, $6, $7, $8)
+      VALUES (NOW(), $1, $2, $3, $4, $5, $6, $7, $8, $9)
     `, [
-      amountNaira, reference, matchedInvoiceId, matchedStatus, confidence,
+      amountNaira, description, paymentChannel,
+      matchedInvoiceId, matchedStatus, confidence,
       paystackTransactionId, reference, customer?.email || null,
     ]);
 
@@ -175,16 +191,19 @@ async function processPaystackEvent(event) {
         ai_invoice_number, ai_confidence, ai_is_high_confidence, ai_explanation,
         paystack_transaction_id, paystack_reference, raw_customer_email
       ) VALUES (
-        $1, 'org-lagoon', 'Paystack', $2, $3, $4,
-        $5, $6, $7, $8,
-        $9, $10, $11, $12,
-        $13, $14, $15
+        $1, 'org-lagoon', $2, $3, $4, $5,
+        $6, $7, $8, $9,
+        $10, $11, $12, $13,
+        $14, $15, $16
       ) ON CONFLICT (id) DO NOTHING
     `, [
-      paymentId, amountNaira, `₦${amountNaira.toLocaleString()}`, reference,
-      `Paystack Online Payment (${reference})`, matchedStatus, todayStr, customer?.email || 'Direct Patient',
-      invoiceMatch ? invoiceMatch[1] : null, confidence, confidence === 100,
-      confidence === 100 ? 'Exact match by invoice reference' : 'Unmatched Paystack checkout payment',
+      paymentId, paymentChannel, amountNaira, `₦${amountNaira.toLocaleString()}`, reference,
+      isDVA ? `DVA Bank Transfer: ${description}` : `Paystack Online Payment (${reference})`,
+      matchedStatus, todayStr, customer?.email || 'Bank Transfer Patient',
+      invoiceMatch ? invoiceMatch[1] : null, confidence || (isDVA ? 40 : 0), confidence === 100,
+      isDVA 
+        ? 'Incoming NIP bank transfer to hospital DVA awaiting cashier review'
+        : (confidence === 100 ? 'Exact match by invoice reference' : 'Unmatched online payment'),
       paystackTransactionId, reference, customer?.email || null
     ]);
 
@@ -196,7 +215,7 @@ async function processPaystackEvent(event) {
     }
 
     await client.query('COMMIT');
-    console.log(`[webhook/paystack] Recorded txn ${paystackTransactionId}, matched=${matchedStatus}`);
+    console.log(`[webhook/paystack] Recorded txn ${paystackTransactionId} (${channel}), matched=${matchedStatus}`);
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
