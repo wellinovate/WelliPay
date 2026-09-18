@@ -158,6 +158,14 @@ export interface InvoiceOrder {
   performedAt?: string;
 }
 
+export interface InvoiceLineItem {
+  id: string;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  totalAmount: number;
+}
+
 export interface Invoice {
   id?: string;
   invoice_number: string;
@@ -189,6 +197,20 @@ export interface Invoice {
   isInpatient?: boolean;
   discharge_status?: 'awaiting_settlement' | 'cleared' | null;
   dischargeStatus?: 'awaiting_settlement' | 'cleared' | null;
+  payer_type?: 'self-pay' | 'hmo' | 'corporate';
+  payerType?: 'self-pay' | 'hmo' | 'corporate';
+  payer_name?: string;
+  payerName?: string;
+  policy_number?: string;
+  policyNumber?: string;
+  copay_amount?: number;
+  copayAmount?: number;
+  claim_amount?: number;
+  claimAmount?: number;
+  pre_auth_code?: string;
+  preAuthCode?: string;
+  line_items?: InvoiceLineItem[];
+  lineItems?: InvoiceLineItem[];
   orders?: InvoiceOrder[];
 }
 

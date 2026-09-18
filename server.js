@@ -1970,24 +1970,57 @@ app.get('/api/invoices/:id', requireAuth, async (req, res) => {
 });
 
 app.post('/api/invoices', requireAuth, async (req, res) => {
-  const { patient_name, service_description, total_amount, due_date } = req.body;
-  if (!patient_name || !service_description || !total_amount) {
-    return res.status(400).json({ error: 'patient_name, service_description, and total_amount are required.' });
+  const { 
+    patient_id,
+    patient_name, 
+    patient_mrn,
+    service_description, 
+    total_amount, 
+    due_date,
+    payer_type,
+    payer_name,
+    policy_number,
+    copay_amount,
+    claim_amount,
+    pre_auth_code,
+    line_items
+  } = req.body;
+
+  if (!patient_name || (!service_description && (!line_items || line_items.length === 0)) || !total_amount) {
+    return res.status(400).json({ error: 'patient_name, service/line_items, and total_amount are required.' });
   }
+
+  const finalDescription = service_description || (line_items && line_items.length > 0 
+    ? line_items.map(it => it.description).join(', ') 
+    : 'Clinical Services');
 
   const invoiceNumber = `INV-${Math.floor(90000 + Math.random() * 9999)}`;
   const formattedAmount = `₦${Number(total_amount).toLocaleString()}`;
+  const effectiveMrn = patient_mrn || `MRN-LSH-${Math.floor(10060 + Math.random() * 30)}`;
+
+  const orders = Array.isArray(line_items) && line_items.length > 0
+    ? line_items.map((item, idx) => ({
+        id: `ORD-${invoiceNumber}-${idx + 1}`,
+        patientName: patient_name,
+        patientMrn: effectiveMrn,
+        serviceType: item.description,
+        amount: Number(item.totalAmount || (item.quantity * item.unitPrice)),
+        formattedAmount: `₦${Number(item.totalAmount || (item.quantity * item.unitPrice)).toLocaleString()}`,
+        status: 'invoiced',
+        performedAt: new Date().toISOString()
+      }))
+    : undefined;
 
   if (pool) {
     try {
       const result = await pool.query(`
         INSERT INTO invoices
-          (id, invoice_number, patient_id, patient_name, service_description,
-           total_amount, formatted_amount, paid_amount, status, status_label, due_date, created_at)
-        VALUES ($1, $1, NULL, $2, $3, $4, $5, 0, 'pending', 'Pending Match', $6, NOW())
+          (id, invoice_number, patient_id, patient_name, patient_mrn, service_description,
+           total_amount, formatted_amount, paid_amount, status, status_label, due_date, is_inpatient, created_at)
+        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, 0, 'pending', 'Pending Match', $8, false, NOW())
         RETURNING *
       `, [
-        invoiceNumber, patient_name, service_description, total_amount,
+        invoiceNumber, patient_id || null, patient_name, effectiveMrn, finalDescription, total_amount,
         formattedAmount, due_date || null,
       ]);
 
@@ -1997,8 +2030,12 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
           ...row,
           invoice_number: row.invoice_number,
           invoiceNumber: row.invoice_number,
+          patient_id: row.patient_id,
+          patientId: row.patient_id,
           patient_name: row.patient_name,
           patientName: row.patient_name,
+          patient_mrn: row.patient_mrn || effectiveMrn,
+          patientMrn: row.patient_mrn || effectiveMrn,
           service_description: row.service_description,
           serviceDescription: row.service_description,
           total_amount: parseFloat(row.total_amount),
@@ -2009,7 +2046,26 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
           dueDate: row.due_date,
           status: row.status,
           status_label: row.status_label,
-          statusLabel: row.status_label
+          statusLabel: row.status_label,
+          payer_type: payer_type || 'self-pay',
+          payerType: payer_type || 'self-pay',
+          payer_name: payer_name,
+          payerName: payer_name,
+          policy_number: policy_number,
+          policyNumber: policy_number,
+          copay_amount: copay_amount ? Number(copay_amount) : undefined,
+          copayAmount: copay_amount ? Number(copay_amount) : undefined,
+          claim_amount: claim_amount ? Number(claim_amount) : undefined,
+          claimAmount: claim_amount ? Number(claim_amount) : undefined,
+          pre_auth_code: pre_auth_code,
+          preAuthCode: pre_auth_code,
+          line_items: line_items,
+          lineItems: line_items,
+          orders: orders,
+          is_inpatient: false,
+          isInpatient: false,
+          discharge_status: null,
+          dischargeStatus: null
         }
       });
     } catch (err) {
@@ -2026,10 +2082,14 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
     id: invoiceNumber,
     invoiceNumber,
     invoice_number: invoiceNumber,
+    patientId: patient_id || null,
+    patient_id: patient_id || null,
     patientName: patient_name,
     patient_name: patient_name,
-    serviceDescription: service_description,
-    service_description: service_description,
+    patientMrn: effectiveMrn,
+    patient_mrn: effectiveMrn,
+    serviceDescription: finalDescription,
+    service_description: finalDescription,
     totalAmount: Number(total_amount),
     total_amount: Number(total_amount),
     formattedAmount,
@@ -2042,7 +2102,26 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
     dueDate: due_date || 'In 7 days',
     due_date: due_date || 'In 7 days',
     createdAt: new Date().toISOString(),
-    created_at: new Date().toISOString()
+    created_at: new Date().toISOString(),
+    payerType: payer_type || 'self-pay',
+    payer_type: payer_type || 'self-pay',
+    payerName: payer_name,
+    payer_name: payer_name,
+    policyNumber: policy_number,
+    policy_number: policy_number,
+    copayAmount: copay_amount ? Number(copay_amount) : undefined,
+    copay_amount: copay_amount ? Number(copay_amount) : undefined,
+    claimAmount: claim_amount ? Number(claim_amount) : undefined,
+    claim_amount: claim_amount ? Number(claim_amount) : undefined,
+    preAuthCode: pre_auth_code,
+    pre_auth_code: pre_auth_code,
+    lineItems: line_items,
+    line_items: line_items,
+    orders: orders,
+    isInpatient: false,
+    is_inpatient: false,
+    dischargeStatus: null,
+    discharge_status: null
   };
   FALLBACK_INVOICES.unshift(newInv);
   res.json({ invoice: newInv });

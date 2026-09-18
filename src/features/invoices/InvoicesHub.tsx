@@ -16,7 +16,14 @@ import {
   FileSpreadsheet,
   X,
   Printer,
-  Calendar
+  Calendar,
+  AlertTriangle,
+  Trash2,
+  UserPlus,
+  Link as LinkIcon,
+  ShieldCheck,
+  Building2,
+  User
 } from 'lucide-react';
 
 const PAY_BASE_URL = 'https://wellipay.onrender.com/pay';
@@ -298,7 +305,7 @@ export default function InvoicesHub() {
           className="inline-flex items-center gap-1.5 bg-[#12244D] hover:bg-[#0A152E] text-white rounded-lg px-4 py-2 text-xs font-bold transition-all shadow-xs cursor-pointer self-start md:self-auto"
         >
           <Plus className="w-3.5 h-3.5" />
-          + New Invoice
+          New invoice
         </button>
       </div>
 
@@ -697,7 +704,15 @@ export default function InvoicesHub() {
 
       {/* New Invoice Modal */}
       {showNewForm && (
-        <NewInvoiceModal onClose={() => setShowNewForm(false)} onCreated={fetchInvoices} />
+        <NewInvoiceModal 
+          onClose={() => setShowNewForm(false)} 
+          onCreated={(createdInv, shouldCopy) => {
+            fetchInvoices();
+            if (shouldCopy && createdInv?.invoice_number) {
+              handleCopyLink(createdInv.invoice_number);
+            }
+          }} 
+        />
       )}
 
       {/* Official Receipt Modal */}
@@ -708,98 +723,842 @@ export default function InvoicesHub() {
   );
 }
 
-function NewInvoiceModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
-  const [patientName, setPatientName] = useState('');
-  const [serviceDescription, setServiceDescription] = useState('');
-  const [amount, setAmount] = useState('');
-  const [dueDate, setDueDate] = useState('');
+interface PatientRecord {
+  id: string;
+  mrn: string;
+  fullName: string;
+  phone: string;
+  hmoName?: string;
+  hmoPolicyNumber?: string;
+}
+
+const FALLBACK_PATIENT_RECORDS: PatientRecord[] = [
+  { id: '1', mrn: 'MRN-LSH-10004', fullName: 'T. Adeyemi', phone: '+234 803 219 4410', hmoName: 'Reliance HMO', hmoPolicyNumber: 'REL-8912-A' },
+  { id: '2', mrn: 'MRN-LSH-10008', fullName: 'Chinedu Eze', phone: '+234 802 443 1290', hmoName: 'AXA Mansard', hmoPolicyNumber: 'AXA-4491-01' },
+  { id: '3', mrn: 'MRN-LSH-10006', fullName: 'John Umar', phone: '+234 818 902 3341', hmoName: 'Hygeia HMO', hmoPolicyNumber: 'HYG-7821-X' },
+  { id: '4', mrn: 'MRN-LSH-10005', fullName: 'Mariam Bello', phone: '+234 805 771 8892', hmoName: 'Leadway Health', hmoPolicyNumber: 'LDW-5510-B' },
+  { id: '5', mrn: 'MRN-LSH-10015', fullName: 'Grace Okafor', phone: '+234 809 332 5541' },
+  { id: '6', mrn: 'MRN-LSH-10018', fullName: 'Ibrahim Danjuma', phone: '+234 812 665 4432' },
+  { id: '7', mrn: 'MRN-LSH-10019', fullName: 'Zainab Abiola', phone: '+234 803 778 9901' },
+  { id: '8', mrn: 'MRN-LSH-10020', fullName: 'Samuel Ogundipe', phone: '+234 816 554 2210' },
+  { id: '9', mrn: 'MRN-LSH-10021', fullName: 'Folake Adeleke', phone: '+234 808 119 4430' },
+];
+
+const CLINICAL_CATALOG = [
+  { name: 'General Outpatient Consultation', price: 10000 },
+  { name: 'Specialist Cardiology Consultation', price: 25000 },
+  { name: 'Full Blood Count (FBC)', price: 8500 },
+  { name: 'Comprehensive Metabolic Panel (CMP)', price: 18000 },
+  { name: 'Lipid Profile Panels', price: 12000 },
+  { name: 'Renal Function Tests (RFT)', price: 15000 },
+  { name: 'Emergency Room Triage & Observation', price: 20000 },
+  { name: 'Chest X-Ray (AP/Lateral)', price: 18000 },
+  { name: 'Abdomino-Pelvic Ultrasound', price: 25000 },
+  { name: 'Inpatient Ward Bed (Per Night)', price: 35000 },
+  { name: 'Pharmacy: Prescribed Antibiotics & Analgesics', price: 14500 },
+  { name: 'Custom Clinical Procedure...', price: 0 }
+];
+
+interface FormLineItem {
+  id: string;
+  catalogName: string;
+  customDescription: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+function getNigerianDate(offsetDays: number): { iso: string; formatted: string } {
+  // Base date for WelliPay simulation: 2026-09-18
+  const base = new Date('2026-09-18T10:00:00Z');
+  base.setDate(base.getDate() + offsetDays);
+  const day = base.getDate().toString().padStart(2, '0');
+  const month = base.toLocaleDateString('en-US', { month: 'short' });
+  const year = base.getFullYear();
+  const iso = base.toISOString().split('T')[0];
+  return {
+    iso,
+    formatted: `${day} ${month} ${year}`
+  };
+}
+
+function NewInvoiceModal({ 
+  onClose, 
+  onCreated 
+}: { 
+  onClose: () => void; 
+  onCreated: (createdInv?: Invoice, shouldCopy?: boolean) => void;
+}) {
+  // Patient registry state
+  const [patients, setPatients] = useState<PatientRecord[]>(FALLBACK_PATIENT_RECORDS);
+  const [patientSearch, setPatientSearch] = useState('');
+  const [selectedPatient, setSelectedPatient] = useState<PatientRecord | null>(null);
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // New patient manual entry fields
+  const [newPatientName, setNewPatientName] = useState('');
+  const [newPatientPhone, setNewPatientPhone] = useState('');
+  const [newPatientMrn, setNewPatientMrn] = useState(() => `MRN-LSH-${Math.floor(10060 + Math.random() * 30)}`);
+
+  // Payer & insurance state
+  const [payerType, setPayerType] = useState<'self-pay' | 'hmo' | 'corporate'>('self-pay');
+  const [hmoName, setHmoName] = useState('Reliance HMO');
+  const [hmoPlan, setHmoPlan] = useState<'silver' | 'gold' | 'standard'>('silver');
+  const [policyNumber, setPolicyNumber] = useState('');
+  const [corporateName, setCorporateName] = useState('Shell Nigeria Retainer');
+  const [corporateStaffId, setCorporateStaffId] = useState('');
+  const [preAuthCode, setPreAuthCode] = useState('');
+
+  // Line items state (initialized with 1 standard item)
+  const [lineItems, setLineItems] = useState<FormLineItem[]>([
+    {
+      id: 'item-1',
+      catalogName: 'General Outpatient Consultation',
+      customDescription: '',
+      quantity: 1,
+      unitPrice: 10000
+    }
+  ]);
+
+  // Due date scheduling state (defaults to 7 days per hospital standard)
+  const [dateChip, setDateChip] = useState<'today' | '7d' | '14d' | '30d' | 'custom'>('7d');
+  const [customDueDate, setCustomDueDate] = useState('2026-09-25');
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSubmit = async () => {
-    if (!patientName || !serviceDescription || !amount) {
-      setError('Patient name, service, and amount are required.');
+  // Fetch live patient registry on mount
+  useEffect(() => {
+    const fetchPatients = async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch('/api/patients', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.patients && data.patients.length > 0) {
+            setPatients(data.patients);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load patient registry', err);
+      }
+    };
+    fetchPatients();
+  }, []);
+
+  // Filtered patient records
+  const filteredPatients = useMemo(() => {
+    if (!patientSearch.trim()) return patients.slice(0, 5);
+    const q = patientSearch.toLowerCase().trim();
+    return patients.filter(p => 
+      p.fullName.toLowerCase().includes(q) ||
+      p.mrn.toLowerCase().includes(q) ||
+      p.phone.includes(q) ||
+      (p.hmoPolicyNumber && p.hmoPolicyNumber.toLowerCase().includes(q))
+    ).slice(0, 6);
+  }, [patients, patientSearch]);
+
+  const handleSelectPatient = (patient: PatientRecord) => {
+    setSelectedPatient(patient);
+    setPatientSearch(patient.fullName);
+    setIsSearchOpen(false);
+
+    // Auto-detect payer coverage from patient folder
+    if (patient.hmoName) {
+      setPayerType('hmo');
+      setHmoName(patient.hmoName);
+      setPolicyNumber(patient.hmoPolicyNumber || 'POL-REL-8821');
+    } else {
+      setPayerType('self-pay');
+    }
+  };
+
+  const handleAddLineItem = () => {
+    setLineItems(prev => [
+      ...prev,
+      {
+        id: `item-${Date.now()}-${Math.random()}`,
+        catalogName: 'Full Blood Count (FBC)',
+        customDescription: '',
+        quantity: 1,
+        unitPrice: 8500
+      }
+    ]);
+  };
+
+  const handleRemoveLineItem = (id: string) => {
+    if (lineItems.length <= 1) return;
+    setLineItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const handleUpdateLineItem = (id: string, updates: Partial<FormLineItem>) => {
+    setLineItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const updated = { ...item, ...updates };
+      // If catalog selection changed, update unit price from tariff
+      if (updates.catalogName && updates.catalogName !== item.catalogName) {
+        const found = CLINICAL_CATALOG.find(c => c.name === updates.catalogName);
+        if (found) {
+          updated.unitPrice = found.price;
+        }
+      }
+      return updated;
+    }));
+  };
+
+  // Financial calculations
+  const totalAmount = useMemo(() => {
+    return lineItems.reduce((sum, it) => sum + (Math.max(1, it.quantity) * Math.max(0, it.unitPrice)), 0);
+  }, [lineItems]);
+
+  const copayRate = useMemo(() => {
+    if (payerType === 'self-pay') return 1.0;
+    if (payerType === 'corporate') return 0.0;
+    if (hmoPlan === 'silver') return 0.10; // 10% patient copay
+    if (hmoPlan === 'gold') return 0.00; // 0% patient copay
+    if (hmoPlan === 'standard') return 0.20; // 20% patient copay
+    return 0.10;
+  }, [payerType, hmoPlan]);
+
+  const patientCopay = useMemo(() => {
+    if (payerType === 'self-pay') return totalAmount;
+    if (payerType === 'corporate') return 0;
+    return Math.round(totalAmount * copayRate);
+  }, [totalAmount, copayRate, payerType]);
+
+  const claimAmount = useMemo(() => {
+    if (payerType === 'self-pay') return 0;
+    return totalAmount - patientCopay;
+  }, [totalAmount, patientCopay, payerType]);
+
+  // Pre-authorization warning for HMO above ₦100,000 (Silver Plan rule)
+  const requiresPreAuth = payerType === 'hmo' && (hmoPlan === 'silver' || true) && totalAmount > 100000;
+
+  // Due date resolution
+  const resolvedDueDate = useMemo(() => {
+    if (dateChip === 'today') return getNigerianDate(0);
+    if (dateChip === '7d') return getNigerianDate(7);
+    if (dateChip === '14d') return getNigerianDate(14);
+    if (dateChip === '30d') return getNigerianDate(30);
+    // Custom date
+    const d = new Date(customDueDate);
+    if (isNaN(d.getTime())) return getNigerianDate(7);
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = d.toLocaleDateString('en-US', { month: 'short' });
+    const year = d.getFullYear();
+    return {
+      iso: customDueDate,
+      formatted: `${day} ${month} ${year}`
+    };
+  }, [dateChip, customDueDate]);
+
+  // Form validity check
+  const isPatientValid = isAddingNew
+    ? newPatientName.trim().length > 0 && newPatientPhone.trim().length > 0
+    : !!selectedPatient;
+
+  const isItemsValid = lineItems.length > 0 && totalAmount > 0 && lineItems.every(it => 
+    it.catalogName !== 'Custom Clinical Procedure...' || it.customDescription.trim().length > 0
+  );
+
+  const isFormValid = isPatientValid && isItemsValid;
+
+  const handleSubmit = async (shouldCopyLink: boolean) => {
+    if (!isFormValid) {
+      setError('Please select a patient beneficiary and add at least one clinical service item.');
       return;
     }
+
     setSubmitting(true);
     setError('');
+
+    const patientName = isAddingNew ? newPatientName.trim() : selectedPatient!.fullName;
+    const patientMrn = isAddingNew ? newPatientMrn.trim() : selectedPatient!.mrn;
+    const patientId = isAddingNew ? undefined : selectedPatient!.id;
+
+    const serviceDescription = lineItems.map(it => 
+      it.catalogName === 'Custom Clinical Procedure...' ? it.customDescription.trim() : it.catalogName
+    ).join(', ');
+
+    const formattedLineItems = lineItems.map((it, idx) => ({
+      id: `ITEM-${idx + 1}`,
+      description: it.catalogName === 'Custom Clinical Procedure...' ? it.customDescription.trim() : it.catalogName,
+      quantity: Math.max(1, it.quantity),
+      unitPrice: it.unitPrice,
+      totalAmount: Math.max(1, it.quantity) * it.unitPrice
+    }));
+
+    const payload = {
+      patient_id: patientId,
+      patient_name: patientName,
+      patient_mrn: patientMrn,
+      service_description: serviceDescription,
+      total_amount: totalAmount,
+      due_date: resolvedDueDate.iso,
+      payer_type: payerType,
+      payer_name: payerType === 'hmo' ? hmoName : payerType === 'corporate' ? corporateName : 'Patient Self-Pay',
+      policy_number: payerType === 'hmo' ? policyNumber : payerType === 'corporate' ? corporateStaffId : undefined,
+      copay_amount: patientCopay,
+      claim_amount: claimAmount,
+      pre_auth_code: requiresPreAuth ? preAuthCode : undefined,
+      line_items: formattedLineItems
+    };
+
     try {
       const token = await auth.currentUser?.getIdToken();
       const res = await fetch('/api/invoices', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          patient_name: patientName,
-          service_description: serviceDescription,
-          total_amount: Number(amount),
-          due_date: dueDate || null,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
-      if (data.error) { setError(data.error); setSubmitting(false); return; }
-      onCreated();
+      if (data.error) {
+        setError(data.error);
+        setSubmitting(false);
+        return;
+      }
+
+      if (shouldCopyLink && data.invoice?.invoice_number) {
+        navigator.clipboard.writeText(`${PAY_BASE_URL}/${data.invoice.invoice_number}`);
+      }
+
+      onCreated(data.invoice, shouldCopyLink);
       onClose();
     } catch {
-      setError('Failed to create invoice.');
+      setError('Failed to create invoice. Please check network connection.');
       setSubmitting(false);
     }
   };
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 font-sans">
-      <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl border border-slate-200">
-        <h2 className="text-lg font-bold text-[#12244D] mb-4">New Hospital Invoice</h2>
-        <div className="space-y-3 text-xs">
+      <div className="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[92vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        {/* Modal Header */}
+        <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
           <div>
-            <label className="block font-medium text-slate-700 mb-1">Patient Beneficiary Name</label>
-            <input
-              placeholder="e.g. Adebayo Ogunlesi"
-              value={patientName}
-              onChange={e => setPatientName(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#12244D]/20 focus:border-[#12244D]"
-            />
+            <h2 className="text-base font-bold text-[#12244D]">
+              Create invoice
+            </h2>
+            <p className="text-[11px] text-slate-500 mt-0.5">
+              Compose a patient billing statement, itemize services, and generate a payment link.
+            </p>
           </div>
-          <div>
-            <label className="block font-medium text-slate-700 mb-1">Clinical Service Description</label>
-            <input
-              placeholder="e.g. Emergency Room Consultation & Lab Panel"
-              value={serviceDescription}
-              onChange={e => setServiceDescription(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#12244D]/20 focus:border-[#12244D]"
-            />
-          </div>
-          <div>
-            <label className="block font-medium text-slate-700 mb-1">Total Billed Amount (₦)</label>
-            <input
-              type="number"
-              placeholder="e.g. 25000"
-              value={amount}
-              onChange={e => setAmount(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#12244D]/20 focus:border-[#12244D]"
-            />
-          </div>
-          <div>
-            <label className="block font-medium text-slate-700 mb-1">Due Date</label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={e => setDueDate(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-[#12244D]/20 focus:border-[#12244D]"
-            />
-          </div>
-          {error && <p className="text-xs text-red-600 bg-red-50 border border-red-200 p-2 rounded-lg">{error}</p>}
+          <button 
+            onClick={onClose} 
+            className="text-slate-400 hover:text-slate-700 p-1 rounded-md transition-colors cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
-        <div className="flex gap-2 mt-5">
-          <button onClick={onClose} className="flex-1 border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg py-2 text-xs font-semibold transition-colors cursor-pointer">
+
+        {/* Modal Body */}
+        <div className="p-6 overflow-y-auto space-y-5 text-xs">
+          {/* Section 1: Patient Selection */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="font-semibold text-slate-800 flex items-center gap-1">
+                Patient beneficiary <span className="text-red-500">*</span>
+              </label>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingNew(!isAddingNew);
+                  setSelectedPatient(null);
+                  setPatientSearch('');
+                }}
+                className="text-[11px] font-semibold text-[#12244D] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                {isAddingNew ? (
+                  <>← Select existing patient</>
+                ) : (
+                  <>
+                    <UserPlus className="w-3.5 h-3.5" /> + Add new patient
+                  </>
+                )}
+              </button>
+            </div>
+
+            {isAddingNew ? (
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    Full name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newPatientName}
+                    onChange={e => setNewPatientName(e.target.value)}
+                    placeholder="e.g. Adebayo Ogunlesi"
+                    className="w-full bg-white border border-slate-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#12244D]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    Phone number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newPatientPhone}
+                    onChange={e => setNewPatientPhone(e.target.value)}
+                    placeholder="e.g. +234 803 123 4567"
+                    className="w-full bg-white border border-slate-300 rounded-md px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#12244D]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    Hospital MRN
+                  </label>
+                  <input
+                    type="text"
+                    value={newPatientMrn}
+                    onChange={e => setNewPatientMrn(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-md px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#12244D]"
+                  />
+                </div>
+              </div>
+            ) : selectedPatient ? (
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-[#12244D]/10 text-[#12244D] flex items-center justify-center font-bold text-xs">
+                    {selectedPatient.fullName.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="font-bold text-slate-900 flex items-center gap-2">
+                      <span>{selectedPatient.fullName}</span>
+                      <span className="font-mono text-[10px] bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded">
+                        {selectedPatient.mrn}
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                      <span>{selectedPatient.phone}</span>
+                      <span>•</span>
+                      <span>{selectedPatient.hmoName ? `Covered by ${selectedPatient.hmoName}` : 'Self-Pay'}</span>
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPatient(null);
+                    setPatientSearch('');
+                    setIsSearchOpen(true);
+                  }}
+                  className="text-xs text-[#12244D] font-semibold hover:underline px-2 py-1 cursor-pointer"
+                >
+                  Change
+                </button>
+              </div>
+            ) : (
+              <div className="relative">
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                  <input
+                    type="text"
+                    placeholder="Search patient by name, MRN, phone, or HMO policy #..."
+                    value={patientSearch}
+                    onChange={e => {
+                      setPatientSearch(e.target.value);
+                      setIsSearchOpen(true);
+                    }}
+                    onFocus={() => setIsSearchOpen(true)}
+                    className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-[#12244D]/20 focus:border-[#12244D]"
+                  />
+                </div>
+
+                {isSearchOpen && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-slate-200 rounded-lg shadow-lg z-20 max-h-48 overflow-y-auto">
+                    {filteredPatients.length > 0 ? (
+                      filteredPatients.map(p => (
+                        <div
+                          key={p.id}
+                          onClick={() => handleSelectPatient(p)}
+                          className="px-3 py-2 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-b-0 flex items-center justify-between"
+                        >
+                          <div>
+                            <div className="font-semibold text-slate-900 flex items-center gap-2">
+                              <span>{p.fullName}</span>
+                              <span className="font-mono text-[10px] bg-slate-100 text-slate-600 px-1 rounded">
+                                {p.mrn}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-500">
+                              {p.phone} {p.hmoName && `· ${p.hmoName}`}
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700">
+                            {p.hmoName ? 'HMO' : 'Self-Pay'}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-3 text-center text-slate-500 text-xs">
+                        No matching patients found.
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Section 2: Payer & Copay Architecture */}
+          <div className="border border-slate-200 rounded-lg p-3.5 bg-slate-50/50 space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="font-semibold text-slate-800">
+                Payer coverage & financial split
+              </label>
+              <div className="inline-flex rounded-md border border-slate-200 bg-white p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setPayerType('self-pay')}
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded cursor-pointer transition-colors ${
+                    payerType === 'self-pay' ? 'bg-[#12244D] text-white' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Self-Pay
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPayerType('hmo')}
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded cursor-pointer transition-colors ${
+                    payerType === 'hmo' ? 'bg-[#12244D] text-white' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  HMO Insurance
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPayerType('corporate')}
+                  className={`px-2.5 py-1 text-[11px] font-semibold rounded cursor-pointer transition-colors ${
+                    payerType === 'corporate' ? 'bg-[#12244D] text-white' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Corporate Retainer
+                </button>
+              </div>
+            </div>
+
+            {payerType === 'hmo' && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    HMO Underwriter
+                  </label>
+                  <select
+                    value={hmoName}
+                    onChange={e => setHmoName(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#12244D]"
+                  >
+                    <option value="Reliance HMO">Reliance HMO</option>
+                    <option value="AXA Mansard">AXA Mansard</option>
+                    <option value="Hygeia HMO">Hygeia HMO</option>
+                    <option value="Leadway Health">Leadway Health</option>
+                    <option value="Other Payer">Other HMO Payer</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    Plan Tier & Copay Rule
+                  </label>
+                  <select
+                    value={hmoPlan}
+                    onChange={e => setHmoPlan(e.target.value as any)}
+                    className="w-full bg-white border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#12244D]"
+                  >
+                    <option value="silver">Silver Plan (10% Copay)</option>
+                    <option value="gold">Gold Comprehensive (0% Copay)</option>
+                    <option value="standard">Standard HMO (20% Copay)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    Policy / Enrollee ID
+                  </label>
+                  <input
+                    type="text"
+                    value={policyNumber}
+                    onChange={e => setPolicyNumber(e.target.value)}
+                    placeholder="e.g. REL-8912-A"
+                    className="w-full bg-white border border-slate-300 rounded-md px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#12244D]"
+                  />
+                </div>
+              </div>
+            )}
+
+            {payerType === 'corporate' && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    Corporate Retainer Client
+                  </label>
+                  <select
+                    value={corporateName}
+                    onChange={e => setCorporateName(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#12244D]"
+                  >
+                    <option value="Shell Nigeria Retainer">Shell Nigeria Retainer</option>
+                    <option value="MTN Nigeria Corporate">MTN Nigeria Corporate</option>
+                    <option value="Chevron Nigeria Healthcare">Chevron Nigeria Healthcare</option>
+                    <option value="NNPC E&P Retainer">NNPC E&P Retainer</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    Staff ID / Auth Reference
+                  </label>
+                  <input
+                    type="text"
+                    value={corporateStaffId}
+                    onChange={e => setCorporateStaffId(e.target.value)}
+                    placeholder="e.g. STF-SHL-4491"
+                    className="w-full bg-white border border-slate-300 rounded-md px-2.5 py-1.5 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-[#12244D]"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Real-time Financial Split Preview */}
+            <div className="bg-white border border-slate-200 rounded-md p-2.5 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1.5 font-medium text-slate-700">
+                <ShieldCheck className="w-4 h-4 text-[#12244D]" />
+                <span>Financial liability breakdown:</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-slate-600">
+                  Patient copay: <strong className="font-mono text-slate-900">₦{patientCopay.toLocaleString()}</strong> ({Math.round(copayRate * 100)}%)
+                </span>
+                {payerType !== 'self-pay' && (
+                  <>
+                    <span className="text-slate-300">•</span>
+                    <span className="text-slate-600">
+                      Payer claim: <strong className="font-mono text-emerald-800">₦{claimAmount.toLocaleString()}</strong> ({100 - Math.round(copayRate * 100)}%)
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Pre-authorization Safety Warning for HMO above ₦100,000 */}
+            {requiresPreAuth && (
+              <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 text-xs space-y-2 text-amber-900">
+                <div className="flex items-center gap-1.5 font-bold text-amber-800">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Pre-authorization required for HMO claims exceeding ₦100,000</span>
+                </div>
+                <p className="text-amber-700 text-[11px] leading-relaxed">
+                  Silver Plan guidelines mandate a verified pre-authorization approval code before billing procedures over ₦100,000 to avoid payer claim rejection.
+                </p>
+                <div className="pt-0.5">
+                  <label className="block text-[11px] font-semibold text-amber-900 mb-1">
+                    Pre-authorization code <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={preAuthCode}
+                    onChange={e => setPreAuthCode(e.target.value)}
+                    placeholder="e.g. AUTH-REL-8821"
+                    className="w-full bg-white border border-amber-300 rounded-md px-2.5 py-1.5 text-xs font-mono font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Section 3: Clinical Catalog Line Items */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="font-semibold text-slate-800 flex items-center gap-1">
+                Clinical service line items <span className="text-red-500">*</span>
+              </label>
+              <button
+                type="button"
+                onClick={handleAddLineItem}
+                className="text-[11px] font-semibold text-[#12244D] hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" /> Add line item
+              </button>
+            </div>
+
+            <div className="border border-slate-200 rounded-lg overflow-hidden">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold text-[11px]">
+                  <tr>
+                    <th className="px-3 py-2">Clinical Service / Procedure</th>
+                    <th className="px-2 py-2 w-16 text-center">Qty</th>
+                    <th className="px-3 py-2 w-28 text-right">Unit Price (₦)</th>
+                    <th className="px-3 py-2 w-28 text-right">Total (₦)</th>
+                    <th className="px-2 py-2 w-8"></th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {lineItems.map(item => (
+                    <tr key={item.id} className="hover:bg-slate-50/50">
+                      <td className="px-3 py-2">
+                        <select
+                          value={item.catalogName}
+                          onChange={e => handleUpdateLineItem(item.id, { catalogName: e.target.value })}
+                          className="w-full border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#12244D]"
+                        >
+                          {CLINICAL_CATALOG.map(cat => (
+                            <option key={cat.name} value={cat.name}>
+                              {cat.name} {cat.price > 0 && `(₦${cat.price.toLocaleString()})`}
+                            </option>
+                          ))}
+                        </select>
+                        {item.catalogName === 'Custom Clinical Procedure...' && (
+                          <input
+                            type="text"
+                            placeholder="Specify custom procedure name..."
+                            value={item.customDescription}
+                            onChange={e => handleUpdateLineItem(item.id, { customDescription: e.target.value })}
+                            className="mt-1.5 w-full border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#12244D]"
+                          />
+                        )}
+                      </td>
+                      <td className="px-2 py-2">
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.quantity}
+                          onChange={e => handleUpdateLineItem(item.id, { quantity: Math.max(1, parseInt(e.target.value) || 1) })}
+                          className="w-full border border-slate-300 rounded px-2 py-1 text-xs text-center focus:outline-none focus:ring-1 focus:ring-[#12244D]"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-right">
+                        <input
+                          type="number"
+                          min="0"
+                          value={item.unitPrice}
+                          onChange={e => handleUpdateLineItem(item.id, { unitPrice: Math.max(0, parseFloat(e.target.value) || 0) })}
+                          className="w-full border border-slate-300 rounded px-2 py-1 text-xs text-right font-mono focus:outline-none focus:ring-1 focus:ring-[#12244D]"
+                        />
+                      </td>
+                      <td className="px-3 py-2 text-right font-mono font-semibold text-slate-900">
+                        ₦{(item.quantity * item.unitPrice).toLocaleString()}
+                      </td>
+                      <td className="px-2 py-2 text-center">
+                        {lineItems.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveLineItem(item.id)}
+                            className="text-slate-400 hover:text-rose-600 p-1 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Section 4: Compact Row: Due Date Chips & Billed Total */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+            {/* Due Date Scheduling */}
+            <div className="border border-slate-200 rounded-lg p-3 bg-slate-50/50 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="font-semibold text-slate-800">
+                  Payment due date
+                </label>
+                <span className="font-mono text-[11px] font-bold text-[#12244D]">
+                  {resolvedDueDate.formatted}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setDateChip('today')}
+                  className={`flex-1 py-1 text-[11px] font-semibold rounded border cursor-pointer transition-colors ${
+                    dateChip === 'today' ? 'bg-[#12244D] text-white border-[#12244D]' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  Today
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDateChip('7d')}
+                  className={`flex-1 py-1 text-[11px] font-semibold rounded border cursor-pointer transition-colors ${
+                    dateChip === '7d' ? 'bg-[#12244D] text-white border-[#12244D]' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  7 days
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDateChip('14d')}
+                  className={`flex-1 py-1 text-[11px] font-semibold rounded border cursor-pointer transition-colors ${
+                    dateChip === '14d' ? 'bg-[#12244D] text-white border-[#12244D]' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  14 days
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDateChip('30d')}
+                  className={`flex-1 py-1 text-[11px] font-semibold rounded border cursor-pointer transition-colors ${
+                    dateChip === '30d' ? 'bg-[#12244D] text-white border-[#12244D]' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  30 days
+                </button>
+              </div>
+            </div>
+
+            {/* Total Computed Summary */}
+            <div className="border border-slate-200 rounded-lg p-3 bg-white flex flex-col justify-between">
+              <div className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider">
+                Total Billed Amount
+              </div>
+              <div className="font-heading text-2xl font-extrabold text-[#12244D] tracking-tight">
+                ₦{totalAmount.toLocaleString()}
+              </div>
+              <div className="text-[11px] text-slate-500 flex items-center justify-between pt-1 border-t border-slate-100">
+                <span>{lineItems.length} {lineItems.length === 1 ? 'item' : 'items'} itemized</span>
+                <span className="font-medium text-slate-700">Nigerian clinical tariff</span>
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-2.5 text-xs">
+              {error}
+            </div>
+          )}
+        </div>
+
+        {/* Modal Footer Actions */}
+        <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50 flex items-center justify-between">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-600 hover:text-slate-900 text-xs font-semibold px-2 py-1.5 transition-colors cursor-pointer"
+          >
             Cancel
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={submitting}
-            className="flex-1 bg-[#12244D] hover:bg-[#0A152E] text-white rounded-lg py-2 text-xs font-bold disabled:opacity-50 transition-colors cursor-pointer"
-          >
-            {submitting ? 'Creating…' : 'Create Invoice'}
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleSubmit(false)}
+              disabled={!isFormValid || submitting}
+              className="border border-slate-300 hover:bg-white text-slate-700 rounded-lg px-3.5 py-2 text-xs font-semibold disabled:opacity-40 transition-colors cursor-pointer"
+            >
+              Create
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSubmit(true)}
+              disabled={!isFormValid || submitting}
+              className="bg-[#12244D] hover:bg-[#0A152E] text-white rounded-lg px-4 py-2 text-xs font-bold disabled:opacity-40 transition-colors shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+            >
+              <LinkIcon className="w-3.5 h-3.5" />
+              {submitting ? 'Creating…' : 'Create and copy pay link'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
