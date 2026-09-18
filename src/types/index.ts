@@ -122,6 +122,8 @@ export interface Patient {
   outstandingCopay: number;
   formattedOutstandingCopay: string;
   status: 'active' | 'flagged' | 'archived';
+  policyVerificationStatus?: 'verified' | 'expired' | 'not_checked' | 'self_pay';
+  policyVerificationLabel?: string;
   createdAt: string;
 }
 
@@ -129,6 +131,8 @@ export interface PatientDirectoryMetrics {
   totalPatients: number;
   insuredCount: number;
   selfPayCount: number;
+  verifiedCount?: number;
+  unsettledCount?: number;
   totalOutstandingCopays: number;
   formattedTotalOutstandingCopays: string;
 }

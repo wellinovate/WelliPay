@@ -1007,7 +1007,7 @@ const FALLBACK_INVOICES = [
     id: 'INV-93105',
     invoiceNumber: 'INV-93105',
     patientId: 'PAT-1082',
-    patientName: 'T. Adeyemi',
+    patientName: 'Taiwo Adeyemi',
     patientMrn: 'MRN-LSH-10004',
     serviceDescription: 'Pediatric Inpatient Observation',
     totalAmount: 11500,
@@ -1024,7 +1024,7 @@ const FALLBACK_INVOICES = [
     id: 'INV-92831',
     invoiceNumber: 'INV-92831',
     patientId: 'PAT-1094',
-    patientName: 'J. Umar',
+    patientName: 'John Umar',
     patientMrn: 'MRN-LSH-10006',
     serviceDescription: 'Cardiology Consultation & ECG',
     totalAmount: 25000,
@@ -1042,7 +1042,7 @@ const FALLBACK_INVOICES = [
     id: 'INV-93010',
     invoiceNumber: 'INV-93010',
     patientId: 'PAT-1102',
-    patientName: 'M. Bello',
+    patientName: 'Mariam Bello',
     patientMrn: 'MRN-LSH-10005',
     serviceDescription: 'Pharmacy Prescription Checkout',
     totalAmount: 8500,
@@ -1445,6 +1445,8 @@ const FALLBACK_PATIENTS = (SCALED_SEED_DATA?.patients && SCALED_SEED_DATA.patien
       outstandingCopay: p.outstanding_copay,
       formattedOutstandingCopay: `₦${p.outstanding_copay.toLocaleString()}`,
       status: p.status,
+      policyVerificationStatus: p.policy_verification_status || (p.hmo_name ? 'verified' : 'self_pay'),
+      policyVerificationLabel: p.policy_verification_label || (p.hmo_name ? 'Verified 12 Sep' : '—'),
       createdAt: '2026-08-15'
     }))
   : [];
@@ -1544,16 +1546,21 @@ app.get('/api/patients', requireAuth, async (req, res) => {
   }
   if (coverage === 'hmo') filtered = filtered.filter(p => !!p.hmoName);
   if (coverage === 'self-pay') filtered = filtered.filter(p => !p.hmoName);
-  if (hasOutstanding === 'true') filtered = filtered.filter(p => p.outstandingCopay > 0);
+  if (coverage === 'unsettled' || hasOutstanding === 'true') filtered = filtered.filter(p => p.outstandingCopay > 0);
 
   const totalCopay = FALLBACK_PATIENTS.reduce((sum, p) => sum + p.outstandingCopay, 0);
+  const insuredCount = FALLBACK_PATIENTS.filter(p => !!p.hmoName).length;
+  const verifiedCount = FALLBACK_PATIENTS.filter(p => p.policyVerificationStatus === 'verified').length;
+  const unsettledCount = FALLBACK_PATIENTS.filter(p => p.outstandingCopay > 0).length;
 
   res.json({
     source: 'fallback',
     metrics: {
       totalPatients: FALLBACK_PATIENTS.length,
-      insuredCount: FALLBACK_PATIENTS.filter(p => !!p.hmoName).length,
+      insuredCount,
       selfPayCount: FALLBACK_PATIENTS.filter(p => !p.hmoName).length,
+      verifiedCount,
+      unsettledCount,
       totalOutstandingCopays: totalCopay,
       formattedTotalOutstandingCopays: `₦${totalCopay.toLocaleString()}`
     },

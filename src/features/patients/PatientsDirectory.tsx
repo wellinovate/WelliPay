@@ -9,16 +9,7 @@ import {
   ShieldCheck, 
   AlertCircle, 
   Phone, 
-  Mail, 
-  FileText, 
-  CreditCard, 
-  Calendar, 
-  Hash, 
-  Shield, 
-  CheckCircle2, 
-  ArrowRight,
-  ExternalLink,
-  DollarSign
+  CreditCard
 } from 'lucide-react';
 import { 
   Patient, 
@@ -29,23 +20,38 @@ import {
   HMOClaim 
 } from '../../types';
 
+// Helper to format Date of Birth and calculate age: "16 Sep 1984 (42 yrs)"
+const formatDobWithAge = (dobString?: string): string => {
+  if (!dobString) return 'N/A';
+  const d = new Date(dobString);
+  if (isNaN(d.getTime())) return dobString;
+  const day = d.getDate();
+  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = monthNames[d.getMonth()];
+  const year = d.getFullYear();
+  const diffMs = Date.now() - d.getTime();
+  const age = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 365.25));
+  return `${day} ${month} ${year} (${age} yrs)`;
+};
+
 export const PatientsDirectory: React.FC = () => {
   const { addNotification } = useWelliPay();
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [metrics, setMetrics] = useState<PatientDirectoryMetrics>({
-    totalPatients: 8,
-    insuredCount: 6,
-    selfPayCount: 2,
-    totalOutstandingCopays: 28500,
-    formattedTotalOutstandingCopays: '₦28,500'
+    totalPatients: 38,
+    insuredCount: 30,
+    selfPayCount: 8,
+    totalOutstandingCopays: 78000,
+    formattedTotalOutstandingCopays: '₦78,000',
+    verifiedCount: 26,
+    unsettledCount: 4
   });
   const [loading, setLoading] = useState(true);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState('');
-  const [coverageFilter, setCoverageFilter] = useState<'all' | 'hmo' | 'self-pay'>('all');
-  const [onlyOutstanding, setOnlyOutstanding] = useState(false);
+  const [coverageFilter, setCoverageFilter] = useState<'all' | 'hmo' | 'self-pay' | 'unsettled'>('all');
 
   // Selected Patient Dossier State
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null);
@@ -104,7 +110,6 @@ export const PatientsDirectory: React.FC = () => {
       const params = new URLSearchParams();
       if (searchQuery.trim()) params.append('search', searchQuery.trim());
       if (coverageFilter !== 'all') params.append('coverage', coverageFilter);
-      if (onlyOutstanding) params.append('hasOutstanding', 'true');
 
       const res = await fetch(`/api/patients?${params.toString()}`, { headers });
       const data: PatientDirectoryResponse = await res.json();
@@ -118,11 +123,23 @@ export const PatientsDirectory: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [getAuthHeaders, searchQuery, coverageFilter, onlyOutstanding]);
+  }, [getAuthHeaders, searchQuery, coverageFilter]);
 
   useEffect(() => {
     fetchPatients();
   }, [fetchPatients]);
+
+  // Default sorting: unsettled copays first (highest balance to lowest), then by MRN
+  const sortedPatients = useMemo(() => {
+    return [...patients].sort((a, b) => {
+      const aCopay = a.outstandingCopay || 0;
+      const bCopay = b.outstandingCopay || 0;
+      if (bCopay > 0 && aCopay === 0) return 1;
+      if (aCopay > 0 && bCopay === 0) return -1;
+      if (bCopay > 0 && aCopay > 0) return bCopay - aCopay;
+      return a.mrn.localeCompare(b.mrn);
+    });
+  }, [patients]);
 
   // Fetch Patient Dossier Details
   const fetchDossier = useCallback(async (id: string) => {
@@ -254,7 +271,7 @@ export const PatientsDirectory: React.FC = () => {
             Patients
           </h1>
           <p className="text-sm text-[#475569] mt-1 font-sans">
-            Enterprise Master Patient Index (EMPI), HMO policy verifications, outstanding copay ledgers, and visit billing histories.
+            Patient records, coverage and copay balances.
           </p>
         </div>
         <div className="flex items-center gap-2.5">
@@ -263,7 +280,7 @@ export const PatientsDirectory: React.FC = () => {
             className="text-xs font-sans font-bold px-3.5 py-2 bg-[#12244D] hover:bg-[#0A152E] text-white rounded-lg flex items-center gap-1.5 shadow-card transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            Register Patient
+            Register patient
           </button>
         </div>
       </div>
@@ -271,7 +288,10 @@ export const PatientsDirectory: React.FC = () => {
       {/* Directory KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Total Patients */}
-        <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#12244D]/30 transition-all">
+        <div 
+          onClick={() => setCoverageFilter('all')}
+          className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#12244D]/30 transition-all cursor-pointer"
+        >
           <div className="flex items-center justify-between">
             <div className="font-sans text-3xl font-extrabold text-[#12244D] tracking-tight">
               {metrics.totalPatients}
@@ -289,7 +309,10 @@ export const PatientsDirectory: React.FC = () => {
         </div>
 
         {/* HMO Insured */}
-        <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#0B6B69]/40 transition-all">
+        <div 
+          onClick={() => setCoverageFilter('hmo')}
+          className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#0B6B69]/40 transition-all cursor-pointer"
+        >
           <div className="flex items-center justify-between">
             <div className="font-sans text-3xl font-extrabold text-[#0B6B69] tracking-tight">
               {metrics.insuredCount}
@@ -302,12 +325,15 @@ export const PatientsDirectory: React.FC = () => {
             HMO Insured Enrollees
           </div>
           <div className="mt-2 text-xs text-emerald-700 font-sans font-medium">
-            Active electronic pre-auth
+            {metrics.verifiedCount ?? 26} with a verified policy
           </div>
         </div>
 
         {/* Self-Pay Direct */}
-        <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#12244D]/30 transition-all">
+        <div 
+          onClick={() => setCoverageFilter('self-pay')}
+          className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#12244D]/30 transition-all cursor-pointer"
+        >
           <div className="flex items-center justify-between">
             <div className="font-sans text-3xl font-extrabold text-[#12244D] tracking-tight">
               {metrics.selfPayCount}
@@ -325,9 +351,16 @@ export const PatientsDirectory: React.FC = () => {
         </div>
 
         {/* Outstanding Copays */}
-        <div className={`bg-white border rounded-xl p-4 shadow-subtle transition-all ${
-          metrics.totalOutstandingCopays > 0 ? 'border-rose-200 hover:border-rose-300' : 'border-[#e2e8f0]'
-        }`}>
+        <div 
+          onClick={() => setCoverageFilter('unsettled')}
+          className={`bg-white border rounded-xl p-4 shadow-subtle transition-all cursor-pointer ${
+            coverageFilter === 'unsettled'
+              ? 'border-rose-400 ring-2 ring-rose-100'
+              : (metrics.totalOutstandingCopays || 0) > 0 
+                ? 'border-rose-200 hover:border-rose-300' 
+                : 'border-[#e2e8f0]'
+          }`}
+        >
           <div className="flex items-center justify-between">
             <div className="font-sans text-3xl font-extrabold text-rose-700 tracking-tight">
               {metrics.formattedTotalOutstandingCopays}
@@ -339,8 +372,9 @@ export const PatientsDirectory: React.FC = () => {
           <div className="text-[11px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-1">
             Outstanding Copay Total
           </div>
-          <div className="mt-2 text-xs text-rose-600 font-sans font-medium">
-            Unsettled at front desk
+          <div className="mt-2 text-xs text-rose-600 font-sans font-medium flex items-center justify-between">
+            <span>{metrics.unsettledCount ?? 4} patients owe copays</span>
+            <span className="text-[10px] text-rose-500 font-semibold underline">Filter list →</span>
           </div>
         </div>
       </div>
@@ -359,51 +393,72 @@ export const PatientsDirectory: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* Coverage Filter Tabs */}
+          {/* Unified Filter Tabs with Live Counts */}
           <div className="inline-flex rounded-lg border border-[#e2e8f0] p-0.5 bg-[#f8fafc] text-xs font-sans">
             <button
               onClick={() => setCoverageFilter('all')}
-              className={`px-3 py-1 rounded-md transition-colors ${
+              className={`px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 ${
                 coverageFilter === 'all' 
                   ? 'bg-white font-bold text-[#12244D] shadow-xs' 
                   : 'text-[#64748b] hover:text-[#0f172a]'
               }`}
             >
-              All
+              <span>All</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                coverageFilter === 'all' ? 'bg-slate-100 text-[#12244D]' : 'bg-slate-200/70 text-[#64748b]'
+              }`}>
+                {metrics.totalPatients}
+              </span>
             </button>
+
             <button
               onClick={() => setCoverageFilter('hmo')}
-              className={`px-3 py-1 rounded-md transition-colors ${
+              className={`px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 ${
                 coverageFilter === 'hmo' 
                   ? 'bg-white font-bold text-[#0B6B69] shadow-xs' 
                   : 'text-[#64748b] hover:text-[#0f172a]'
               }`}
             >
-              HMO Insured
+              <span>HMO Insured</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                coverageFilter === 'hmo' ? 'bg-[#0B6B69]/10 text-[#0B6B69]' : 'bg-slate-200/70 text-[#64748b]'
+              }`}>
+                {metrics.insuredCount}
+              </span>
             </button>
+
             <button
               onClick={() => setCoverageFilter('self-pay')}
-              className={`px-3 py-1 rounded-md transition-colors ${
+              className={`px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 ${
                 coverageFilter === 'self-pay' 
                   ? 'bg-white font-bold text-[#12244D] shadow-xs' 
                   : 'text-[#64748b] hover:text-[#0f172a]'
               }`}
             >
-              Self-Pay
+              <span>Self-Pay</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                coverageFilter === 'self-pay' ? 'bg-slate-100 text-[#12244D]' : 'bg-slate-200/70 text-[#64748b]'
+              }`}>
+                {metrics.selfPayCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setCoverageFilter('unsettled')}
+              className={`px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 ${
+                coverageFilter === 'unsettled' 
+                  ? 'bg-white font-bold text-rose-700 shadow-xs' 
+                  : 'text-[#64748b] hover:text-rose-700'
+              }`}
+            >
+              <span>Copay due</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                coverageFilter === 'unsettled' ? 'bg-rose-100 text-rose-800 font-bold' : 'bg-rose-50 text-rose-600'
+              }`}>
+                {metrics.unsettledCount ?? 4}
+              </span>
             </button>
           </div>
-
-          {/* Outstanding Only Pill */}
-          <button
-            onClick={() => setOnlyOutstanding(!onlyOutstanding)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-sans font-semibold border transition-all ${
-              onlyOutstanding 
-                ? 'bg-rose-50 border-rose-300 text-rose-700 shadow-xs' 
-                : 'bg-white border-[#cbd5e1] text-[#64748b] hover:text-[#0f172a]'
-            }`}
-          >
-            Has Unsettled Copay
-          </button>
         </div>
       </div>
 
@@ -412,151 +467,182 @@ export const PatientsDirectory: React.FC = () => {
         <table className="broadsheet-table w-full">
           <thead>
             <tr className="bg-[#f8fafc] text-[#475569]">
-              <th style={{ width: '130px' }}>MRN</th>
-              <th>Patient Name</th>
-              <th>Contact Details</th>
-              <th>Primary Coverage & Policy</th>
-              <th style={{ width: '150px' }}>Outstanding Copay</th>
-              <th style={{ width: '110px' }}>Status</th>
-              <th style={{ width: '100px' }} className="text-right">Action</th>
+              <th style={{ width: '90px' }}>MRN</th>
+              <th>Patient</th>
+              <th>Coverage & Policy</th>
+              <th style={{ width: '150px' }}>Copay due</th>
+              <th style={{ width: '160px' }}>Policy verification</th>
+              <th style={{ width: '110px' }} className="text-right">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#f1f5f9]">
             {loading ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-[#64748b] text-xs font-sans">
+                <td colSpan={6} className="py-12 text-center text-[#64748b] text-xs font-sans">
                   Loading patient registry...
                 </td>
               </tr>
-            ) : patients.length === 0 ? (
+            ) : sortedPatients.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-12 text-center text-[#64748b] text-xs font-sans">
+                <td colSpan={6} className="py-12 text-center text-[#64748b] text-xs font-sans">
                   No matching patients found in registry.
                 </td>
               </tr>
             ) : (
-              patients.map((p) => (
-                <tr
-                  key={p.id}
-                  onClick={() => handleOpenDossier(p)}
-                  className="hover:bg-[#f8fafc] cursor-pointer transition-colors"
-                >
-                  <td>
-                    <span className="font-mono text-xs font-bold text-[#12244D] bg-slate-100 px-2 py-0.5 rounded">
-                      {p.mrn}
-                    </span>
-                  </td>
-                  <td>
-                    <div className="font-semibold text-sm text-[#0f172a]">
-                      {p.fullName}
-                    </div>
-                    <div className="text-[11px] text-[#64748b] capitalize">
-                      {p.gender} · Born {p.dateOfBirth || '1988'}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="flex items-center gap-1.5 text-xs text-[#334155]">
-                      <Phone className="w-3 h-3 text-[#94a3b8]" />
-                      <span>{p.phone}</span>
-                    </div>
-                    {p.email && (
-                      <div className="flex items-center gap-1.5 text-[11px] text-[#64748b] mt-0.5">
-                        <Mail className="w-3 h-3 text-[#94a3b8]" />
-                        <span>{p.email}</span>
+              sortedPatients.map((p) => {
+                const isUnsettled = (p.outstandingCopay || 0) > 0;
+                const isSelfPay = p.primaryCoverage && p.primaryCoverage.toLowerCase().includes('self-pay');
+                return (
+                  <tr
+                    key={p.id}
+                    onClick={() => handleOpenDossier(p)}
+                    className={`cursor-pointer transition-colors ${
+                      isUnsettled 
+                        ? 'bg-rose-50/40 hover:bg-rose-50/70 border-l-2 border-l-rose-500' 
+                        : 'hover:bg-[#f8fafc]'
+                    }`}
+                  >
+                    {/* MRN Column: #{digits} without wrapping */}
+                    <td className="whitespace-nowrap">
+                      <span className="font-mono text-xs font-bold text-[#12244D] bg-slate-100 px-2 py-0.5 rounded" title={p.mrn}>
+                        #{p.mrn.replace(/^MRN-LSH-/, '')}
+                      </span>
+                    </td>
+
+                    {/* Patient Column: 1 line of identity (Name + Phone) */}
+                    <td>
+                      <div className="font-semibold text-sm text-[#0f172a] leading-tight">
+                        {p.fullName}
                       </div>
-                    )}
-                  </td>
-                  <td>
-                    <div className="font-medium text-xs text-[#0f172a]">
-                      {p.primaryCoverage}
-                    </div>
-                    {p.hmoPolicyNumber && (
-                      <div className="flex items-center gap-1 mt-0.5">
-                        <span className="font-mono text-[10px] text-[#0B6B69] font-bold bg-[#0B6B69]/10 px-1.5 py-0.5 rounded">
-                          {p.hmoPolicyNumber}
-                        </span>
-                        {p.hmoEnrolleeId && (
-                          <span className="text-[10px] text-[#64748b]">
-                            · {p.hmoEnrolleeId}
-                          </span>
-                        )}
+                      <div className="text-[11px] text-[#64748b] mt-0.5 flex items-center gap-1">
+                        <Phone className="w-2.5 h-2.5 text-[#94a3b8]" />
+                        <span>{p.phone}</span>
                       </div>
-                    )}
-                  </td>
-                  <td>
-                    {p.outstandingCopay > 0 ? (
-                      <div>
-                        <div className="font-bold text-xs text-rose-700">
-                          {p.formattedOutstandingCopay}
+                    </td>
+
+                    {/* Coverage & Policy Column: 1 line */}
+                    <td>
+                      <div className="font-medium text-xs text-[#0f172a] leading-tight">
+                        {p.primaryCoverage}
+                      </div>
+                      {p.hmoPolicyNumber && (
+                        <div className="text-[10px] text-[#64748b] font-mono mt-0.5">
+                          {p.hmoPolicyNumber}{p.hmoEnrolleeId ? ` · ${p.hmoEnrolleeId}` : ''}
                         </div>
-                        <span className="inline-block text-[10px] font-bold uppercase tracking-wider text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded mt-0.5">
-                          Unsettled
+                      )}
+                    </td>
+
+                    {/* Copay Due Column: ₦X,XXX unsettled or clean dash */}
+                    <td>
+                      {isUnsettled ? (
+                        <span className="font-bold text-xs text-rose-700">
+                          {p.formattedOutstandingCopay} unsettled
                         </span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-xs text-emerald-700 font-medium">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Up to date</span>
-                      </div>
-                    )}
-                  </td>
-                  <td>
-                    <StatusChip status={p.status === 'active' ? 'paid' : 'pending'} label={p.status === 'active' ? 'Active' : 'Flagged'} />
-                  </td>
-                  <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                    <button
-                      onClick={() => handleOpenDossier(p)}
-                      className="px-2.5 py-1 text-xs font-bold rounded-md border border-[#cbd5e1] text-[#12244D] hover:bg-[#12244D] hover:text-white transition-all shadow-2xs"
-                    >
-                      Dossier
-                    </button>
-                  </td>
-                </tr>
-              ))
+                      ) : (
+                        <span className="text-slate-400 font-medium">—</span>
+                      )}
+                    </td>
+
+                    {/* Policy Verification Column */}
+                    <td>
+                      {isSelfPay ? (
+                        <span className="text-slate-400 font-medium">—</span>
+                      ) : p.policyVerificationStatus === 'verified' ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-full">
+                          <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
+                          {p.policyVerificationLabel || 'Verified 12 Sep'}
+                        </span>
+                      ) : p.policyVerificationStatus === 'expired' ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200/60 px-2 py-0.5 rounded-full">
+                          <AlertCircle className="w-3 h-3 text-amber-600 shrink-0" />
+                          {p.policyVerificationLabel || 'Expired 31 Aug'}
+                        </span>
+                      ) : p.policyVerificationStatus === 'not_checked' ? (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-full">
+                          Not checked
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-2 py-0.5 rounded-full">
+                          <ShieldCheck className="w-3 h-3 text-emerald-600 shrink-0" />
+                          Verified 12 Sep
+                        </span>
+                      )}
+                    </td>
+
+                    {/* Action Column: Open record button */}
+                    <td className="text-right" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        onClick={() => handleOpenDossier(p)}
+                        className="px-2.5 py-1 text-xs font-semibold rounded-md border border-[#cbd5e1] text-[#12244D] hover:bg-[#12244D] hover:text-white transition-all shadow-2xs cursor-pointer"
+                      >
+                        Open record
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Patient Dossier Modal */}
+      {/* Patient Detail Modal ("Open record") */}
       <Modal
         isOpen={!!selectedPatientId}
         onClose={() => setSelectedPatientId(null)}
-        title={dossierData.patient ? `${dossierData.patient.fullName}` : 'Patient Dossier'}
+        title={dossierData.patient ? dossierData.patient.fullName : 'Patient record'}
         subtitle={dossierData.patient ? `${dossierData.patient.mrn} · Lagoon Specialist Hospital` : ''}
       >
         {dossierLoading ? (
           <div className="py-12 text-center text-xs text-[#64748b]">
-            Loading patient dossier from database...
+            Loading patient record from database...
           </div>
         ) : dossierData.patient ? (
           <div className="space-y-4 font-sans text-xs">
-            {/* Demographic & Insurance Banner */}
+            {/* Demographic & Insurance Banner: full details including Email & formatted DOB with age */}
             <div className="bg-[#F8FAFC] p-4 rounded-xl border border-[#e2e8f0] space-y-3">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
-                  <span className="text-[#64748b] block text-[11px]">Gender / Age</span>
+                  <span className="text-[#64748b] block text-[11px]">Date of birth / Age</span>
                   <span className="font-bold text-[#12244D] capitalize">
-                    {dossierData.patient.gender} · {dossierData.patient.dateOfBirth || 'N/A'}
+                    {formatDobWithAge(dossierData.patient.dateOfBirth)}
+                  </span>
+                  <span className="text-[10px] text-[#64748b] block capitalize mt-0.5">
+                    Gender: {dossierData.patient.gender}
                   </span>
                 </div>
                 <div>
-                  <span className="text-[#64748b] block text-[11px]">Contact Mobile</span>
-                  <span className="font-bold text-[#12244D]">
+                  <span className="text-[#64748b] block text-[11px]">Contact details</span>
+                  <span className="font-bold text-[#12244D] block">
                     {dossierData.patient.phone}
                   </span>
+                  {dossierData.patient.email && (
+                    <span className="text-[10px] text-[#64748b] block mt-0.5 truncate">
+                      {dossierData.patient.email}
+                    </span>
+                  )}
                 </div>
                 <div>
-                  <span className="text-[#64748b] block text-[11px]">Primary Coverage</span>
-                  <span className="font-bold text-[#0B6B69]">
+                  <span className="text-[#64748b] block text-[11px]">Primary coverage</span>
+                  <span className="font-bold text-[#0B6B69] block">
                     {dossierData.patient.primaryCoverage}
                   </span>
+                  {dossierData.patient.policyVerificationLabel && (
+                    <span className="text-[10px] text-emerald-700 block mt-0.5">
+                      {dossierData.patient.policyVerificationLabel}
+                    </span>
+                  )}
                 </div>
                 <div>
-                  <span className="text-[#64748b] block text-[11px]">HMO Policy / Enrollee</span>
-                  <span className="font-mono font-bold text-[#12244D]">
-                    {dossierData.patient.hmoPolicyNumber || 'Direct Payer'}
+                  <span className="text-[#64748b] block text-[11px]">HMO policy / Enrollee</span>
+                  <span className="font-mono font-bold text-[#12244D] block">
+                    {dossierData.patient.hmoPolicyNumber || 'Direct payer'}
                   </span>
+                  {dossierData.patient.hmoEnrolleeId && (
+                    <span className="text-[10px] text-[#64748b] font-mono block mt-0.5">
+                      ID: {dossierData.patient.hmoEnrolleeId}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -579,20 +665,19 @@ export const PatientsDirectory: React.FC = () => {
                       setCopayAmount(dossierData.patient?.outstandingCopay || 0);
                       setIsCopayModalOpen(true);
                     }}
-                    className="px-3 py-1.5 text-xs font-bold bg-rose-700 hover:bg-rose-800 text-white rounded-lg shadow-xs transition-colors shrink-0"
+                    className="px-3 py-1.5 text-xs font-bold bg-rose-700 hover:bg-rose-800 text-white rounded-lg shadow-xs transition-colors shrink-0 cursor-pointer"
                   >
-                    Collect Copay
+                    Collect copay
                   </button>
                 </div>
               ) : (
-                <div className="mt-2 bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg flex items-center gap-2 text-emerald-800 text-xs">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>Account balance in good standing. No outstanding patient copays.</span>
+                <div className="mt-2 bg-slate-50 border border-slate-200 p-2.5 rounded-lg flex items-center gap-2 text-slate-700 text-xs">
+                  <span>Account balance is settled. No outstanding patient copays.</span>
                 </div>
               )}
             </div>
 
-            {/* Dossier Tabs: Visit Billing Ledger vs HMO Claims */}
+            {/* Record Tabs: Visit Billing Ledger vs HMO Claims */}
             <div>
               <div className="flex items-center border-b border-[#e2e8f0] mb-3">
                 <button
@@ -703,7 +788,7 @@ export const PatientsDirectory: React.FC = () => {
             <div className="flex justify-end pt-3 border-t border-[#e2e8f0]">
               <button
                 onClick={() => setSelectedPatientId(null)}
-                className="px-4 py-2 rounded-lg text-xs font-bold bg-[#12244D] hover:bg-[#0A152E] text-white transition-colors"
+                className="px-4 py-2 rounded-lg text-xs font-bold bg-[#12244D] hover:bg-[#0A152E] text-white transition-colors cursor-pointer"
               >
                 Done
               </button>
@@ -716,13 +801,13 @@ export const PatientsDirectory: React.FC = () => {
       <Modal
         isOpen={isCopayModalOpen}
         onClose={() => setIsCopayModalOpen(false)}
-        title="Collect Patient Copay Settlement"
+        title="Collect patient copay settlement"
         subtitle={dossierData.patient ? `Record payment for ${dossierData.patient.fullName} (${dossierData.patient.mrn})` : ''}
       >
         <form onSubmit={handleCollectCopay} className="space-y-4 font-sans text-xs">
           <div>
             <label className="block text-[#334155] font-semibold mb-1">
-              Payment Amount (₦)
+              Payment amount (₦)
             </label>
             <input
               type="number"
@@ -739,17 +824,17 @@ export const PatientsDirectory: React.FC = () => {
 
           <div>
             <label className="block text-[#334155] font-semibold mb-1">
-              Payment Channel
+              Payment channel
             </label>
             <select
               value={copayChannel}
               onChange={(e) => setCopayChannel(e.target.value as any)}
               className="w-full px-3 py-2 border border-[#cbd5e1] rounded-lg text-sm bg-white text-[#0f172a] focus:outline-none focus:border-[#0B6B69]"
             >
-              <option value="POS card">POS Card (Terminal)</option>
-              <option value="Bank transfer">Bank Transfer Direct</option>
-              <option value="USSD">USSD Mobile Money</option>
-              <option value="Cash">Cash at Counter</option>
+              <option value="POS card">POS card (Terminal)</option>
+              <option value="Bank transfer">Bank transfer direct</option>
+              <option value="USSD">USSD mobile money</option>
+              <option value="Cash">Cash at counter</option>
             </select>
           </div>
 
@@ -757,7 +842,7 @@ export const PatientsDirectory: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsCopayModalOpen(false)}
-              className="px-3 py-1.5 text-xs text-[#64748b] hover:text-[#0f172a]"
+              className="px-3 py-1.5 text-xs text-[#64748b] hover:text-[#0f172a] cursor-pointer"
             >
               Cancel
             </button>
@@ -766,7 +851,7 @@ export const PatientsDirectory: React.FC = () => {
               disabled={isSubmittingCopay || copayAmount <= 0}
               className="px-4 py-2 bg-[#0B6B69] hover:bg-[#074C4A] text-white font-bold rounded-lg transition-colors cursor-pointer disabled:opacity-50"
             >
-              {isSubmittingCopay ? 'Recording...' : `Confirm Collection (₦${copayAmount.toLocaleString()})`}
+              {isSubmittingCopay ? 'Recording...' : `Confirm collection (₦${copayAmount.toLocaleString()})`}
             </button>
           </div>
         </form>
@@ -776,12 +861,12 @@ export const PatientsDirectory: React.FC = () => {
       <Modal
         isOpen={isRegisterModalOpen}
         onClose={() => setIsRegisterModalOpen(false)}
-        title="Register New Patient"
+        title="Register new patient"
         subtitle="Create master medical record & link HMO health insurance policy"
       >
         <form onSubmit={handleRegisterPatient} className="space-y-3 font-sans text-xs">
           <div>
-            <label className="block text-[#334155] font-semibold mb-1">Full Name *</label>
+            <label className="block text-[#334155] font-semibold mb-1">Full name *</label>
             <input
               type="text"
               placeholder="e.g. Oluwaseun Adeleke"
@@ -794,7 +879,7 @@ export const PatientsDirectory: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-[#334155] font-semibold mb-1">Phone Number</label>
+              <label className="block text-[#334155] font-semibold mb-1">Phone number</label>
               <input
                 type="text"
                 placeholder="+234 803 000 0000"
@@ -804,10 +889,10 @@ export const PatientsDirectory: React.FC = () => {
               />
             </div>
             <div>
-              <label className="block text-[#334155] font-semibold mb-1">Email Address</label>
+              <label className="block text-[#334155] font-semibold mb-1">Email address</label>
               <input
                 type="email"
-                placeholder="patient@example.ng"
+                placeholder="patient@gmail.com"
                 value={newPatientForm.email}
                 onChange={(e) => setNewPatientForm({ ...newPatientForm, email: e.target.value })}
                 className="w-full px-3 py-2 border border-[#cbd5e1] rounded-lg text-sm bg-white text-[#0f172a] focus:outline-none focus:border-[#0B6B69]"
@@ -828,7 +913,7 @@ export const PatientsDirectory: React.FC = () => {
               </select>
             </div>
             <div>
-              <label className="block text-[#334155] font-semibold mb-1">Date of Birth</label>
+              <label className="block text-[#334155] font-semibold mb-1">Date of birth</label>
               <input
                 type="date"
                 value={newPatientForm.dateOfBirth}
@@ -839,7 +924,7 @@ export const PatientsDirectory: React.FC = () => {
           </div>
 
           <div>
-            <label className="block text-[#334155] font-semibold mb-1">Coverage Model</label>
+            <label className="block text-[#334155] font-semibold mb-1">Coverage model</label>
             <div className="flex gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -848,7 +933,7 @@ export const PatientsDirectory: React.FC = () => {
                   checked={newPatientForm.coverageType === 'hmo'}
                   onChange={() => setNewPatientForm({ ...newPatientForm, coverageType: 'hmo' })}
                 />
-                <span>HMO Insured</span>
+                <span>HMO insured</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
@@ -857,7 +942,7 @@ export const PatientsDirectory: React.FC = () => {
                   checked={newPatientForm.coverageType === 'self-pay'}
                   onChange={() => setNewPatientForm({ ...newPatientForm, coverageType: 'self-pay' })}
                 />
-                <span>Self-Pay / Direct Payer</span>
+                <span>Self-pay / Direct payer</span>
               </label>
             </div>
           </div>
@@ -865,7 +950,7 @@ export const PatientsDirectory: React.FC = () => {
           {newPatientForm.coverageType === 'hmo' && (
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-2.5">
               <div>
-                <label className="block text-[#334155] font-semibold mb-1">HMO Provider</label>
+                <label className="block text-[#334155] font-semibold mb-1">HMO provider</label>
                 <select
                   value={newPatientForm.hmoName}
                   onChange={(e) => setNewPatientForm({ ...newPatientForm, hmoName: e.target.value })}
@@ -881,7 +966,7 @@ export const PatientsDirectory: React.FC = () => {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[#334155] font-semibold mb-1">Policy Number</label>
+                  <label className="block text-[#334155] font-semibold mb-1">Policy number</label>
                   <input
                     type="text"
                     placeholder="e.g. REL-882190-A"
@@ -908,7 +993,7 @@ export const PatientsDirectory: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsRegisterModalOpen(false)}
-              className="px-3 py-1.5 text-xs text-[#64748b] hover:text-[#0f172a]"
+              className="px-3 py-1.5 text-xs text-[#64748b] hover:text-[#0f172a] cursor-pointer"
             >
               Cancel
             </button>
@@ -917,7 +1002,7 @@ export const PatientsDirectory: React.FC = () => {
               disabled={isRegistering}
               className="px-4 py-2 bg-[#12244D] hover:bg-[#0A152E] text-white font-bold rounded-lg transition-colors cursor-pointer disabled:opacity-50"
             >
-              {isRegistering ? 'Registering...' : 'Register Patient'}
+              {isRegistering ? 'Registering...' : 'Register patient'}
             </button>
           </div>
         </form>

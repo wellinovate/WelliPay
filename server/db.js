@@ -96,8 +96,16 @@ const NIGERIAN_NAMES = [
   'Grace Effiong', 'Musa Abubakar', 'Blessing Uche', 'Segun Ogundipe',
   'Aisha Garba', 'Chukwuemeka Nnaji', 'Bisi Ogunleye', 'David Etim',
   'Rukayat Bello', 'Obinna Chukwu', 'Fatima Yakubu', 'Wale Ojo',
-  'Comfort Ekpo', 'Ahmed Sani', 'J. Umar', 'M. Bello', 'J. Adeyemi', 'T. Yusuf', 'T. Adeyemi'
+  'Comfort Ekpo', 'Ahmed Sani', 'John Umar', 'Mariam Bello', 'Jadesola Adeyemi', 'Tariq Yusuf', 'Taiwo Adeyemi'
 ];
+
+const FEMALE_NAMES = new Set([
+  'Kemi Adeleke', 'Amina Bello', 'Ngozi Okoro', 'Funmilayo Adebayo', 'Halima Suleiman',
+  'Chiamaka Nwosu', 'Folake Adeyemi', 'Zainab Aliyu', 'Grace Effiong', 'Blessing Uche',
+  'Aisha Garba', 'Bisi Ogunleye', 'Rukayat Bello', 'Fatima Yakubu', 'Comfort Ekpo',
+  'Mariam Bello', 'Jadesola Adeyemi', 'Grace Okafor', 'Halima Bello', 'Zainab Abiola',
+  'Folake Adeleke', 'Ngozi Okonjo', 'Fatima Abubakar'
+]);
 
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
@@ -404,30 +412,77 @@ export function generateScaledSeedData() {
 
   // ---- 3. Patients table: expand to back every claim + named transaction ----
   // Build from the union of names used above so nothing is orphaned.
-  const allPatientNames = [...new Set([
+  const rawPatientNames = [...new Set([
     ...hmoClaims.map(c => c.patient_name),
     ...allTransactions.map(t => t.patient_or_service.split(' — ')[0].trim()),
-    'J. Umar', 'M. Bello', 'J. Adeyemi', 'T. Yusuf', 'Kemi Adeleke', 'Amina Bello', 'Babatunde Fashola', 'Chinedu Eze'
+    'John Umar', 'Mariam Bello', 'Jadesola Adeyemi', 'Tariq Yusuf', 'Taiwo Adeyemi',
+    'Kemi Adeleke', 'Amina Bello', 'Babatunde Fashola', 'Chinedu Eze', 'Sunday Okafor'
   ])];
 
+  const canonicalNameMap = {
+    'J. Umar': 'John Umar',
+    'M. Bello': 'Mariam Bello',
+    'T. Yusuf': 'Tariq Yusuf',
+    'J. Adeyemi': 'Jadesola Adeyemi',
+    'T. Adeyemi': 'Taiwo Adeyemi',
+  };
+
+  const allPatientNames = [...new Set(rawPatientNames.map(n => canonicalNameMap[n] || n))];
+
+  // Specific patients with unsettled copay totaling exactly ₦78,000 (matching red KPI card)
+  const UNSETTLED_COPAY_MAP = {
+    'Sunday Okafor': 7000,
+    'Folake Adeyemi': 15000,
+    'Ibrahim Musa': 24000,
+    'Babatunde Fashola': 32000
+  };
+
   const patients = allPatientNames.map((name, i) => {
-    const hasHmo = Math.random() < 0.7; // ~70% insured, rest self-pay
-    const outstandingCopay = hasHmo && Math.random() < 0.25 ? randInt(2, 15) * 1000 : 0;
-    const hmoName = hasHmo ? pick(['Hygeia HMO', 'Reliance HMO', 'AXA Mansard', 'Avon HMO', 'Leadway Health']) : null;
+    const isUnsettled = UNSETTLED_COPAY_MAP[name] !== undefined;
+    // Unsettled copay patients must have HMO
+    const hasHmo = isUnsettled || (i % 5 !== 0); // ~80% insured, rest self-pay
+    const outstandingCopay = UNSETTLED_COPAY_MAP[name] || 0;
+    const hmoName = hasHmo ? (name === 'Sunday Okafor' ? 'Reliance HMO' : pick(['Hygeia HMO', 'Reliance HMO', 'AXA Mansard', 'Avon HMO', 'Leadway Health'])) : null;
+    const gender = FEMALE_NAMES.has(name) ? 'female' : 'male';
+    const cleanName = name.toLowerCase().replace(/[^a-z0-9]/g, '.');
+    const emailDomain = (i % 3 === 0) ? 'gmail.com' : (i % 3 === 1) ? 'yahoo.com' : 'outlook.com';
+
+    // Policy verification status
+    let policyVerificationStatus = 'self_pay';
+    let policyVerificationLabel = '—';
+    if (hasHmo) {
+      if (i % 10 === 7) {
+        policyVerificationStatus = 'expired';
+        policyVerificationLabel = 'Expired 31 Aug';
+      } else if (i % 10 === 9) {
+        policyVerificationStatus = 'not_checked';
+        policyVerificationLabel = 'Not checked';
+      } else {
+        policyVerificationStatus = 'verified';
+        policyVerificationLabel = `Verified ${pick(['10 Sep', '12 Sep', '14 Sep'])}`;
+      }
+    }
+
+    const birthYear = 1968 + (i * 7) % 32;
+    const birthMonth = String(1 + (i * 3) % 12).padStart(2, '0');
+    const birthDay = String(1 + (i * 5) % 28).padStart(2, '0');
+
     return {
-      id: `PAT-${String(1000 + i)}`,
-      mrn: `MRN-LSH-${String(10000 + i)}`,
+      id: `PAT-${String(1001 + i)}`,
+      mrn: `MRN-LSH-${String(10001 + i)}`,
       full_name: name,
       phone: `+234 ${pick(['802', '803', '805', '809', '813', '814', '818'])} ${randInt(100, 999)} ${randInt(1000, 9999)}`,
-      email: `${name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@lagoonhealth.ng`,
-      gender: pick(['female', 'male']),
-      date_of_birth: `19${randInt(65, 99)}-${String(randInt(1, 12)).padStart(2, '0')}-${String(randInt(1, 28)).padStart(2, '0')}`,
+      email: `${cleanName}@${emailDomain}`,
+      gender,
+      date_of_birth: `${birthYear}-${birthMonth}-${birthDay}`,
       primary_coverage: hasHmo ? `${hmoName} (${pick(['Silver Plan', 'Gold Plan', 'Executive', 'Premium'])})` : 'Self-Pay / Direct',
       hmo_name: hmoName,
       hmo_policy_number: hasHmo ? `POL-${randInt(100000, 999999)}` : null,
       hmo_enrollee_id: hasHmo ? `ENR-${randInt(10000, 99999)}` : null,
       outstanding_copay: outstandingCopay,
       status: 'active',
+      policy_verification_status: policyVerificationStatus,
+      policy_verification_label: policyVerificationLabel,
     };
   });
 
@@ -717,9 +772,9 @@ export async function initializeDatabase() {
         -- 5 Electrolytes, Urea & Creatinine orders (₦140,000 total, ₦28,000 each)
         ('LAB-EUC-01', 'Grace Okafor', 'MRN-LSH-10015', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
         ('LAB-EUC-02', 'Oluwaseun Bakare', 'MRN-LSH-10017', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
-        ('LAB-EUC-03', 'T. Adeyemi', 'MRN-LSH-10004', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
-        ('LAB-EUC-04', 'M. Bello', 'MRN-LSH-10005', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
-        ('LAB-EUC-05', 'J. Umar', 'MRN-LSH-10006', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
+        ('LAB-EUC-03', 'Taiwo Adeyemi', 'MRN-LSH-10004', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
+        ('LAB-EUC-04', 'Mariam Bello', 'MRN-LSH-10005', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
+        ('LAB-EUC-05', 'John Umar', 'MRN-LSH-10006', 'Electrolytes, Urea & Creatinine', 'Chemical Pathology', 28000, 'unbilled'),
         -- 4 Lipid Profile Panels (₦104,000 total, ₦26,000 each)
         ('LAB-LIP-01', 'Ibrahim Danjuma', 'MRN-LSH-10018', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
         ('LAB-LIP-02', 'Zainab Abiola', 'MRN-LSH-10019', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
@@ -774,9 +829,9 @@ export async function initializeDatabase() {
           total_amount, formatted_amount, paid_amount, status, status_label,
           due_date, paid_date, is_inpatient, discharge_status
         ) VALUES
-        ('INV-93105', 'INV-93105', 'PAT-1082', 'T. Adeyemi', 'MRN-LSH-10004', 'Pediatric Inpatient Observation', 11500, '₦11,500', 0, 'pending', 'Pending Payment', '2026-09-19', NULL, true, 'awaiting_settlement'),
-        ('INV-92831', 'INV-92831', 'PAT-1094', 'J. Umar', 'MRN-LSH-10006', 'Cardiology Consultation & ECG', 25000, '₦25,000', 25000, 'paid', 'Reconciled', '2026-09-17', '2026-09-17', false, NULL),
-        ('INV-93010', 'INV-93010', 'PAT-1102', 'M. Bello', 'MRN-LSH-10005', 'Pharmacy Prescription Checkout', 8500, '₦8,500', 8500, 'paid', 'Reconciled', '2026-09-17', '2026-09-17', false, NULL),
+        ('INV-93105', 'INV-93105', 'PAT-1082', 'Taiwo Adeyemi', 'MRN-LSH-10004', 'Pediatric Inpatient Observation', 11500, '₦11,500', 0, 'pending', 'Pending Payment', '2026-09-19', NULL, true, 'awaiting_settlement'),
+        ('INV-92831', 'INV-92831', 'PAT-1094', 'John Umar', 'MRN-LSH-10006', 'Cardiology Consultation & ECG', 25000, '₦25,000', 25000, 'paid', 'Reconciled', '2026-09-17', '2026-09-17', false, NULL),
+        ('INV-93010', 'INV-93010', 'PAT-1102', 'Mariam Bello', 'MRN-LSH-10005', 'Pharmacy Prescription Checkout', 8500, '₦8,500', 8500, 'paid', 'Reconciled', '2026-09-17', '2026-09-17', false, NULL),
         ('INV-93044', 'INV-93044', 'PAT-1120', 'ABC Diagnostics', 'EXT-ACC-1120', 'Referred Pathology Panel Batch', 12000, '₦12,000', 12000, 'paid', 'Reconciled', '2026-09-17', '2026-09-17', false, NULL)
         ON CONFLICT (id) DO UPDATE SET
           patient_name = EXCLUDED.patient_name,
