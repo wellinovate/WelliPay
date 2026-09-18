@@ -68,6 +68,7 @@ export default function InvoicesHub() {
   };
 
   const isReconciled = (inv: Invoice) => inv.status === 'paid';
+  const isBatchInvoice = (inv: Invoice) => inv.patient_name === 'Multiple Patients';
 
   return (
     <div className="p-6">
@@ -127,7 +128,13 @@ export default function InvoicesHub() {
               {filtered.map(inv => (
                 <tr key={inv.invoice_number} className="hover:bg-slate-50/70 transition-colors">
                   <td className="px-4 py-3 font-medium text-[#12244D]">{inv.invoice_number}</td>
-                  <td className="px-4 py-3 font-medium text-slate-900">{inv.patient_name}</td>
+                  <td className="px-4 py-3">
+                    {isBatchInvoice(inv) ? (
+                      <span className="text-slate-500 italic">{inv.patient_name}</span>
+                    ) : (
+                      <span className="font-medium text-slate-900">{inv.patient_name}</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-slate-600">{inv.service_description}</td>
                   <td className="px-4 py-3 font-semibold text-slate-900">{inv.formatted_amount}</td>
                   <td className="px-4 py-3 text-slate-500">{inv.due_date}</td>
@@ -143,7 +150,7 @@ export default function InvoicesHub() {
                     </span>
                   </td>
                   <td className="px-4 py-3">
-                    {!isReconciled(inv) && (
+                    {!isReconciled(inv) && !isBatchInvoice(inv) && (
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleCopyLink(inv.invoice_number)}
@@ -158,6 +165,9 @@ export default function InvoicesHub() {
                           WhatsApp
                         </button>
                       </div>
+                    )}
+                    {!isReconciled(inv) && isBatchInvoice(inv) && (
+                      <span className="text-xs text-slate-400 italic">Batch record — no direct patient link</span>
                     )}
                   </td>
                 </tr>
