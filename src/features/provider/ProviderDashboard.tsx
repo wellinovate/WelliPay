@@ -12,7 +12,8 @@ import {
   Plus,
   Zap,
   DollarSign,
-  Loader2
+  Loader2,
+  X
 } from 'lucide-react';
 import { ProviderTransaction } from '../../types';
 
@@ -30,6 +31,7 @@ export const ProviderDashboard: React.FC = () => {
   const [isLeakageModalOpen, setIsLeakageModalOpen] = useState(false);
   const [isNewTxnModalOpen, setIsNewTxnModalOpen] = useState(false);
   const [billing, setBilling] = useState(false);
+  const [dismissResolved, setDismissResolved] = useState(false);
 
   const handleBillExposure = async () => {
     setBilling(true);
@@ -46,7 +48,7 @@ export const ProviderDashboard: React.FC = () => {
   const activeChannelsCount = useMemo(() => {
     const channels = new Set(
       providerTransactions
-        .filter(t => t.status === 'paid')
+        .filter(t => t.status === 'paid' && !['HMO', 'Corporate'].includes(t.channel))
         .map(t => t.channel)
     );
     return channels.size || 4;
@@ -80,96 +82,100 @@ export const ProviderDashboard: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-baseline justify-between gap-2">
         <div>
-          <h1 className="font-heading text-3xl font-bold tracking-tight text-[#12244D]">
+          <h1 className="font-heading text-2xl font-bold tracking-tight text-[#12244D]">
             Dashboard
           </h1>
-          <p className="text-sm text-[#475569] mt-1 font-sans">
+          <p className="text-xs text-[#475569] mt-0.5 font-sans">
             Real-time revenue by payment channel, outstanding HMO receivables, and clinical revenue leakage alerts.
           </p>
         </div>
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setIsNewTxnModalOpen(true)}
-            className="text-xs font-sans font-bold px-3.5 py-2 bg-[#12244D] hover:bg-[#0A152E] text-white rounded-lg flex items-center gap-1.5 shadow-card transition-colors cursor-pointer"
+            className="text-xs font-sans font-bold px-3 py-1.5 bg-[#12244D] hover:bg-[#0A152E] text-white rounded-lg flex items-center gap-1.5 shadow-card transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             New Payment
           </button>
-          <div className="font-sans text-xs text-[#475569] bg-white px-3 py-2 rounded-lg border border-[#e2e8f0] shadow-xs">
-            <span className="font-bold text-[#12244D]">{dashboardMetrics.formattedTotalToday} today</span> · {activeChannelsCount} channels active
+          <div className="font-sans text-xs text-[#475569] bg-white px-3 py-1.5 rounded-lg border border-[#e2e8f0] shadow-xs flex items-center gap-2">
+            <span className="font-bold text-[#12244D]">{dashboardMetrics.formattedTotalToday} collected today</span>
+            <span className="text-[#cbd5e1]">·</span>
+            <span className="font-semibold text-slate-600">{dashboardMetrics.formattedHmoReceivables} outstanding</span>
+            <span className="text-[#cbd5e1]">·</span>
+            <span className="text-slate-500">{activeChannelsCount} channels active</span>
           </div>
         </div>
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {/* Total Today */}
-        <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#12244D]/30 transition-all">
-          <div className="font-sans text-3xl font-extrabold text-[#12244D] tracking-tight">
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-3.5 shadow-subtle hover:border-[#12244D]/30 transition-all">
+          <div className="font-sans text-2xl font-extrabold text-[#12244D] tracking-tight">
             {dashboardMetrics.formattedTotalToday}
           </div>
-          <div className="text-[11px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-1">
-            Total Today
+          <div className="text-[10px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-0.5">
+            Total Collected Today
           </div>
-          <div className="mt-2 text-xs text-emerald-700 flex items-center gap-1 font-sans font-medium">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-600" />
-            <span>{dashboardMetrics.totalTodayTrend}</span>
+          <div className="mt-1.5 text-xs text-emerald-700 flex items-center gap-1 font-sans font-medium">
+            <TrendingUp className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+            <span>+14.2% vs yesterday (₦2.48M)</span>
           </div>
         </div>
 
         {/* Patient Direct */}
-        <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#12244D]/30 transition-all">
-          <div className="font-sans text-3xl font-extrabold text-[#12244D] tracking-tight">
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-3.5 shadow-subtle hover:border-[#12244D]/30 transition-all">
+          <div className="font-sans text-2xl font-extrabold text-[#12244D] tracking-tight">
             {dashboardMetrics.formattedPatientDirect}
           </div>
-          <div className="text-[11px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-1">
-            Patient Direct
+          <div className="text-[10px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-0.5">
+            Patient Direct Collections
           </div>
-          <div className="mt-2 text-xs text-[#64748b] font-sans">
-            POS & USSD copays
+          <div className="mt-1.5 text-xs text-slate-600 font-sans">
+            +8.5% vs yesterday · 52 copays & deposits
           </div>
         </div>
 
         {/* HMO Claims */}
-        <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#0B6B69]/40 transition-all">
-          <div className="font-sans text-3xl font-extrabold text-[#0B6B69] tracking-tight">
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-3.5 shadow-subtle hover:border-[#12244D]/30 transition-all">
+          <div className="font-sans text-2xl font-extrabold text-[#12244D] tracking-tight">
             {dashboardMetrics.formattedHmoReceivables}
           </div>
-          <div className="text-[11px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-1">
-            HMO Receivables
+          <div className="text-[10px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-0.5">
+            Outstanding HMO Receivables
           </div>
           <div 
-            className="mt-2 text-xs text-[#0B6B69] font-sans font-semibold cursor-pointer hover:underline flex items-center gap-1" 
+            className="mt-1.5 text-xs text-[#0B6B69] font-sans font-medium cursor-pointer hover:underline flex items-center gap-1" 
             onClick={() => setActiveTab('claims')}
           >
-            <span>View {dashboardMetrics.pendingClaimsCount} pending claims</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
+            <span>{dashboardMetrics.pendingClaimsCount || 48} claims unremitted · avg 14d aging</span>
+            <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
           </div>
         </div>
 
         {/* Corporate */}
-        <div className="bg-white border border-[#e2e8f0] rounded-xl p-4 shadow-subtle hover:border-[#12244D]/30 transition-all">
-          <div className="font-sans text-3xl font-extrabold text-[#12244D] tracking-tight">
+        <div className="bg-white border border-[#e2e8f0] rounded-xl p-3.5 shadow-subtle hover:border-[#12244D]/30 transition-all">
+          <div className="font-sans text-2xl font-extrabold text-[#12244D] tracking-tight">
             {dashboardMetrics.formattedCorporateRetainers}
           </div>
-          <div className="text-[11px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-1">
+          <div className="text-[10px] font-sans uppercase tracking-wider text-[#64748b] font-bold mt-0.5">
             Corporate Retainers
           </div>
-          <div className="mt-2 text-xs text-[#64748b] font-sans">
-            {dashboardMetrics.corporateCount} enterprise retainers
+          <div className="mt-1.5 text-xs text-slate-600 font-sans">
+            {dashboardMetrics.corporateCount} enterprise accounts on monthly cycle
           </div>
         </div>
       </div>
 
       {/* Revenue Leakage Alert Banner */}
       {!unbilledExposureResolved && leakageSummary.unbilledCount > 0 ? (
-        <div className="bg-[#fff1f4] border border-[#ff90b1] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-sm font-sans shadow-xs">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold uppercase bg-[#d6006c] text-white tracking-wider">
+        <div className="bg-[#fff1f4] border border-[#ff90b1] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-sans shadow-xs">
+          <div className="flex items-start gap-2.5">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#d6006c] text-white tracking-wider">
               Revenue Leakage
             </span>
             <div className="text-[#a5372c] leading-relaxed">
@@ -189,81 +195,95 @@ export const ProviderDashboard: React.FC = () => {
               type="button"
               onClick={handleBillExposure}
               disabled={billing}
-              className="inline-flex items-center gap-2 whitespace-nowrap px-4 py-2 text-xs font-bold rounded-lg bg-[#d6006c] hover:bg-[#aa0b56] text-white transition-colors shadow-xs cursor-pointer disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap px-3.5 py-1.5 text-xs font-bold rounded-lg bg-[#d6006c] hover:bg-[#aa0b56] text-white transition-colors shadow-xs cursor-pointer disabled:opacity-60"
             >
               {billing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               {billing ? 'Billing Exposure...' : 'Review & Bill Exposure'}
             </button>
           </div>
         </div>
-      ) : (
-        <div className="bg-[#eafaf0] border border-[#2a9d5c]/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-sans text-[#1e7e47] shadow-xs">
+      ) : !dismissResolved ? (
+        <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-lg px-3.5 py-2 flex items-center justify-between text-xs font-sans text-emerald-800 shadow-xs">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-[#2a9d5c] shrink-0" />
-            <span className="font-medium">All 17 laboratory procedures invoiced and attributed to patient folders. ₦340,000 recovered.</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span>Revenue leakage resolved: 17 laboratory procedures invoiced (₦340,000 recovered to billing ledger).</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full">
-              Resolved
-            </span>
-            <button
-              type="button"
-              onClick={handleBillExposure}
-              disabled={billing}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-emerald-100/90 hover:bg-emerald-200/80 text-emerald-900 border border-emerald-300/60 transition-colors cursor-pointer disabled:opacity-60"
-              title="Click to verify 409 response when no unbilled exposure remains"
-            >
-              {billing && <Loader2 className="w-3 h-3 animate-spin" />}
-              Review & Bill Exposure
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => setDismissResolved(true)}
+            className="text-emerald-700 hover:text-emerald-900 p-1 rounded hover:bg-emerald-100/60 transition-colors cursor-pointer"
+            title="Dismiss notification"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
-      )}
+      ) : null}
 
       {/* Recent Transactions Section */}
-      <div className="space-y-3">
+      <div className="space-y-2.5">
         <div className="flex items-center justify-between">
-          <h4 className="font-heading text-lg font-bold text-[#12244D]">
+          <h4 className="font-heading text-base font-bold text-[#12244D]">
             Recent transactions
           </h4>
-          <span className="text-xs text-[#64748b] font-sans font-medium">
+          <span className="text-xs text-[#64748b] font-sans font-medium flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             Live EHR & POS sync active
           </span>
         </div>
 
         <div className="bg-white border border-[#e2e8f0] rounded-xl shadow-subtle overflow-hidden">
-          <table className="broadsheet-table">
+          <table className="w-full text-left text-sm font-sans border-collapse">
             <thead>
-              <tr className="bg-[#f8fafc]">
-                <th style={{ width: '85px' }}>Time</th>
-                <th>Patient / service</th>
-                <th style={{ width: '130px' }}>Amount</th>
-                <th style={{ width: '140px' }}>Channel</th>
-                <th style={{ width: '110px' }} className="text-right">Status</th>
+              <tr className="bg-[#f8fafc] border-b border-[#e2e8f0] text-[11px] font-semibold text-[#64748b] uppercase tracking-wider">
+                <th className="py-2.5 px-4 w-20">Time</th>
+                <th className="py-2.5 px-4">Patient / Clinical Service</th>
+                <th className="py-2.5 px-4 w-36 text-right">Amount</th>
+                <th className="py-2.5 px-4 w-32">Channel</th>
+                <th className="py-2.5 px-4 w-28 text-right">Status</th>
               </tr>
             </thead>
-            <tbody>
-              {providerTransactions.map((txn) => (
-                <tr key={txn.id} className="hover:bg-[#f8fafc] transition-colors">
-                  <td className="font-sans text-xs text-[#64748b]">
-                    {txn.time}
-                  </td>
-                  <td className="font-sans font-semibold text-sm text-[#0f172a]">
-                    {txn.patientOrService}
-                  </td>
-                  <td className="font-sans font-bold text-sm text-[#12244D]">
-                    {txn.formattedAmount}
-                  </td>
-                  <td className="font-sans text-xs text-[#475569]">
-                    <span className="inline-block px-2.5 py-0.5 rounded-full bg-[#f1f5f9] border border-[#cbd5e1] text-[11px] font-medium">
-                      {txn.channel}
-                    </span>
-                  </td>
-                  <td className="text-right">
-                    <StatusChip status={txn.status} />
-                  </td>
-                </tr>
-              ))}
+            <tbody className="divide-y divide-slate-100 text-xs">
+              {providerTransactions.map((txn, idx) => {
+                const isException = txn.status !== 'paid';
+                return (
+                  <tr 
+                    key={txn.id} 
+                    className={`transition-colors hover:bg-blue-50/40 ${
+                      idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
+                    }`}
+                  >
+                    <td className="py-2 px-4 font-mono text-slate-500 whitespace-nowrap">
+                      {txn.time}
+                    </td>
+                    <td className="py-2 px-4 font-medium text-slate-900">
+                      {txn.patientOrService}
+                    </td>
+                    <td className="py-2 px-4 font-bold text-[#12244D] text-right whitespace-nowrap">
+                      {txn.formattedAmount}
+                    </td>
+                    <td className="py-2 px-4 text-slate-600 whitespace-nowrap">
+                      <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200/80 text-[11px] font-medium text-slate-700">
+                        {txn.channel}
+                      </span>
+                    </td>
+                    <td className="py-2 px-4 text-right whitespace-nowrap">
+                      {isException ? (
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                          txn.status === 'failed'
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : txn.status === 'pending'
+                            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                            : 'bg-orange-50 text-orange-700 border border-orange-200'
+                        }`}>
+                          {txn.status.toUpperCase()}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300 text-[11px] font-medium">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>

@@ -121,28 +121,121 @@ function distributeAmount(targetTotal, count, minAmt, maxAmt) {
   return amounts;
 }
 
-function randomTimeToday() {
-  const h = randInt(9, 21);
-  const m = randInt(0, 59);
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-}
-
 function randomPastDate(daysBackMax) {
   const d = new Date();
   d.setDate(d.getDate() - randInt(0, daysBackMax));
   return d;
 }
 
+function generateDynamicTimestamps(totalCount) {
+  const now = new Date();
+  const currentTotalMinutes = now.getHours() * 60 + now.getMinutes();
+  // Clinics open ~08:00 (480 mins). If current time is early, span back appropriately.
+  const startOfDayMinutes = Math.min(480, Math.max(360, currentTotalMinutes - 180));
+  const span = Math.max(90, currentTotalMinutes - startOfDayMinutes);
+
+  const times = [];
+  for (let i = 0; i < totalCount; i++) {
+    // i = 0 is latest (2 to 4 mins ago); as i increases, steps back towards morning
+    const progress = i / Math.max(1, totalCount - 1);
+    const minutesAgo = Math.floor(Math.pow(progress, 1.15) * (span - 4)) + 2;
+    const txnMins = Math.max(startOfDayMinutes, currentTotalMinutes - minutesAgo);
+    const h = Math.floor(txnMins / 60) % 24;
+    const m = txnMins % 60;
+    times.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+  }
+  // times is chronologically DESC
+  return times;
+}
+
+function getClinicalServiceForAmount(amount) {
+  if (amount >= 70000) {
+    return pick([
+      'Emergency Inpatient Admission Deposit',
+      'Elective Surgical Pre-auth Deposit',
+      'Maternity Care & Delivery Suite Booking'
+    ]);
+  }
+  if (amount >= 22000) {
+    return pick([
+      'CT Abdominal Imaging Scan',
+      'Cardiology Echocardiogram & Specialist Review',
+      'Endoscopy Diagnostic Procedure',
+      'Consultant Pediatrician Extended Review'
+    ]);
+  }
+  if (amount >= 8000) {
+    return pick([
+      'Pelvic & Abdominal Ultrasound Scan',
+      'Comprehensive Metabolic Blood Panel',
+      'Electrocardiogram (ECG) & Chest X-Ray',
+      'Wound Debridement & Minor Suturing',
+      'Dental Scaling, Polishing & Triage'
+    ]);
+  }
+  return pick([
+    'Outpatient Pharmacy Prescription Checkout',
+    'Rapid Malaria & Widal Diagnostic Screen',
+    'Routine Antenatal Triage & BP Check',
+    'Pediatric Immunization Administration',
+    'General Medical Consultation Copay'
+  ]);
+}
+
+function generateRealisticDirectAmounts(targetTotal, count) {
+  const amounts = [];
+  let remaining = targetTotal;
+
+  // 2 High-value surgical/admission deposits (75k - 115k)
+  const high1 = randInt(105, 118) * 1000;
+  const high2 = randInt(65, 82) * 1000;
+  amounts.push(high1, high2);
+  remaining -= (high1 + high2);
+
+  // 6 Specialized diagnostic/consultation procedures (22k - 45k)
+  for (let i = 0; i < 6; i++) {
+    const amt = randInt(22, 42) * 1000;
+    amounts.push(amt);
+    remaining -= amt;
+  }
+
+  // 18 Standard outpatient procedures & comprehensive labs (8k - 20k)
+  for (let i = 0; i < 18; i++) {
+    const amt = randInt(8, 20) * 1000;
+    amounts.push(amt);
+    remaining -= amt;
+  }
+
+  // 26 Routine pharmacy, rapid test & triage copays (1.5k - 6.5k)
+  const routineCount = count - amounts.length;
+  for (let i = 0; i < routineCount - 1; i++) {
+    const avgRoutine = remaining / (routineCount - i);
+    const low = Math.max(1500, Math.floor(avgRoutine * 0.4));
+    const high = Math.min(8500, Math.ceil(avgRoutine * 1.6));
+    const amt = Math.round(randInt(low, high) / 500) * 500;
+    amounts.push(amt);
+    remaining -= amt;
+  }
+  // Final absorber guarantees exact match to the single kobo
+  amounts.push(remaining);
+
+  // Shuffle so high, medium, and low amounts are naturally distributed
+  for (let i = amounts.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [amounts[i], amounts[j]] = [amounts[j], amounts[i]];
+  }
+  return amounts;
+}
+
 export function generateScaledSeedData() {
   // ---- 1. Patient-direct transactions -> target ₦640,000 ----
   const PATIENT_DIRECT_TARGET = 640000;
   const PATIENT_TXN_COUNT = 52;
-  const patientTxnAmounts = distributeAmount(PATIENT_DIRECT_TARGET, PATIENT_TXN_COUNT, 2000, 60000);
+  const patientTxnAmounts = generateRealisticDirectAmounts(PATIENT_DIRECT_TARGET, PATIENT_TXN_COUNT);
   const CHANNELS = ['POS card', 'USSD', 'Bank transfer', 'Card'];
 
   const patientDirectTxns = patientTxnAmounts.map((amount) => ({
-    time_captured: randomTimeToday(),
-    patient_or_service: `${pick(NIGERIAN_NAMES)} — ${pick(['Consultation', 'Ultrasound', 'Pharmacy', 'Lab work', 'X-ray', 'Deposit', 'Minor procedure'])}`,
+    patient_or_service: `${pick(NIGERIAN_NAMES)} — ${getClinicalServiceForAmount(amount)}`,
     amount,
     formatted_amount: `₦${amount.toLocaleString()}`,
     channel: pick(CHANNELS),
@@ -152,7 +245,6 @@ export function generateScaledSeedData() {
   // 2 HMO remittance transactions received today
   const hmoRemittanceTxns = [
     {
-      time_captured: '11:15',
       patient_or_service: 'Reliance HMO — Capitation Remittance (Batch REL-09)',
       amount: 1200000,
       formatted_amount: '₦1,200,000',
@@ -160,7 +252,6 @@ export function generateScaledSeedData() {
       status: 'paid',
     },
     {
-      time_captured: '15:20',
       patient_or_service: 'Hygeia HMO — Settled Claims Remittance',
       amount: 700000,
       formatted_amount: '₦700,000',
@@ -172,7 +263,6 @@ export function generateScaledSeedData() {
   // 1 Corporate retainer payment received today
   const corporateRetainerTxns = [
     {
-      time_captured: '13:45',
       patient_or_service: 'Dangote Industries — Retainer Settlement (Sept)',
       amount: 300000,
       formatted_amount: '₦300,000',
@@ -181,16 +271,25 @@ export function generateScaledSeedData() {
     },
   ];
 
-  // 4 Failed cashier attempts realistically spaced out across the day (not clumped at the top)
+  // 4 Failed cashier attempts realistically spaced out across the day
   const failedTxns = [
-    { time_captured: '09:35', patient_or_service: 'M. Bello — Pharmacy checkout', amount: 8500, formatted_amount: '₦8,500', channel: 'Card', status: 'failed' },
-    { time_captured: '11:50', patient_or_service: 'Chinedu Eze — Ultrasound deposit', amount: 15000, formatted_amount: '₦15,000', channel: 'POS card', status: 'failed' },
-    { time_captured: '14:40', patient_or_service: 'Kemi Adeleke — Lab blood panel', amount: 12000, formatted_amount: '₦12,000', channel: 'USSD', status: 'failed' },
-    { time_captured: '17:25', patient_or_service: 'Sunday Okafor — Consultation copay', amount: 20000, formatted_amount: '₦20,000', channel: 'Card', status: 'failed' },
+    { patient_or_service: 'M. Bello — Outpatient Pharmacy Checkout', amount: 8500, formatted_amount: '₦8,500', channel: 'Card', status: 'failed' },
+    { patient_or_service: 'Chinedu Eze — Pelvic Ultrasound Deposit', amount: 15000, formatted_amount: '₦15,000', channel: 'POS card', status: 'failed' },
+    { patient_or_service: 'Kemi Adeleke — Comprehensive Blood Panel', amount: 12000, formatted_amount: '₦12,000', channel: 'USSD', status: 'failed' },
+    { patient_or_service: 'Sunday Okafor — Specialist Consultation Copay', amount: 20000, formatted_amount: '₦20,000', channel: 'Card', status: 'failed' },
   ];
 
-  // Combine and sort chronologically DESC so recent transactions show a realistic success mix
-  const rawTransactions = [...patientDirectTxns, ...hmoRemittanceTxns, ...corporateRetainerTxns, ...failedTxns];
+  // Combine all 59 transactions
+  const combinedRaw = [...patientDirectTxns, ...hmoRemittanceTxns, ...corporateRetainerTxns, ...failedTxns];
+  const timestamps = generateDynamicTimestamps(combinedRaw.length);
+
+  // Assign timestamps in descending order (most recent first)
+  const rawTransactions = combinedRaw.map((t, idx) => ({
+    time_captured: timestamps[idx],
+    ...t,
+  }));
+
+  // Ensure strict chronological DESC sort
   rawTransactions.sort((a, b) => b.time_captured.localeCompare(a.time_captured));
 
   const allTransactions = rawTransactions.map((t, idx) => ({

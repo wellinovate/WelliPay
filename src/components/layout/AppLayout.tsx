@@ -97,25 +97,25 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               </span>
             </div>
 
-            <nav className="flex items-center gap-1 font-sans text-sm">
+            <nav className="flex items-center gap-1 font-sans text-sm h-16">
               {navItems.map((tab) => {
                 const isActive = activeTab === tab.id;
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`px-3 py-1.5 rounded-md font-medium text-xs transition-all duration-150 flex items-center gap-1.5 ${
+                    className={`h-full px-3.5 font-medium text-xs transition-all duration-150 flex items-center gap-1.5 border-b-2 cursor-pointer ${
                       isActive
-                        ? 'text-[#12244D] bg-[#F0F4FA] font-bold shadow-xs border border-[#12244D]/10'
-                        : 'text-[#475569] hover:text-[#12244D] hover:bg-[#F8FAFC]'
+                        ? 'text-[#12244D] border-[#12244D] font-bold'
+                        : 'text-[#64748b] border-transparent hover:text-[#12244D] hover:border-slate-300'
                     }`}
                   >
                     <span>{tab.label}</span>
                     {tab.badge !== undefined && tab.badge > 0 && (
                       <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold font-sans ${
                         isActive
-                          ? 'bg-[#0B6B69] text-white'
-                          : 'bg-[#0B6B69]/10 text-[#0B6B69] border border-[#0B6B69]/20'
+                          ? 'bg-[#12244D] text-white'
+                          : 'bg-slate-100 text-slate-600 border border-slate-200'
                       }`}>
                         {tab.badge}
                       </span>
@@ -166,7 +166,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       </header>
 
       {/* Main Screen Content */}
-      <main className="flex-1 max-w-[1280px] w-full mx-auto px-6 py-7">
+      <main className="flex-1 max-w-[1280px] w-full mx-auto px-6 py-4">
         {children}
       </main>
     </div>
