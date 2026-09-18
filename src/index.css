@@ -18,6 +18,11 @@
   --font-serif: "Source Serif 4", Georgia, serif;
 }
 
+html {
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
 body {
   margin: 0;
   background-color: var(--color-bg);

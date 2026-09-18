@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   ReconciliationItem,
+  AIMatchSuggestion,
   ProviderTransaction,
   HMOClaim,
   PersonaType,
@@ -31,7 +32,8 @@ interface WelliPayContextType {
   reconciliationItems: ReconciliationItem[];
   toggleSelectReconItem: (id: string) => void;
   selectAllReconItems: (selected: boolean) => void;
-  confirmReconItem: (id: string) => void;
+  selectOnlyReconIds: (ids: string[]) => void;
+  confirmReconItem: (id: string, candidateMatch?: Partial<AIMatchSuggestion>) => void;
   rejectReconItem: (id: string, reason?: string) => void;
   bulkConfirmSelected: () => void;
   filterReconStatus: 'unmatched' | 'suggested' | 'confirmed';
@@ -232,27 +234,40 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
   };
 
-  const confirmReconItem = (id: string) => {
+  const selectOnlyReconIds = (ids: string[]) => {
+    const idSet = new Set(ids);
+    setReconciliationItems(prev => prev.map(item => ({
+      ...item,
+      selected: idSet.has(item.id)
+    })));
+  };
+
+  const confirmReconItem = (id: string, candidateMatch?: Partial<AIMatchSuggestion>) => {
     const target = reconciliationItems.find(i => i.id === id);
     if (!target) return;
+
+    const mergedMatch = candidateMatch 
+      ? { ...target.aiMatch, ...candidateMatch, isHighConfidence: true, confidence: candidateMatch.confidence ?? 95 }
+      : target.aiMatch;
 
     setReconciliationItems(prev => prev.map(item => 
       item.id === id ? { 
         ...item, 
+        aiMatch: mergedMatch,
         status: 'confirmed', 
         selected: false, 
         confirmedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
       } : item
     ));
 
-    addNotification(`Matched ${target.formattedAmount} (${target.description}) to ${target.aiMatch.targetName} (${target.aiMatch.invoiceNumber || 'Account'})`, 'success');
+    addNotification(`Matched ${target.formattedAmount} (${target.description}) to ${mergedMatch.targetName} (${mergedMatch.invoiceNumber || 'Account'})`, 'success');
 
     // Sync to PostgreSQL backend
     getAuthHeaders().then(headers => {
       fetch('/api/reconciliation/confirm', {
         method: 'POST',
         headers,
-        body: JSON.stringify({ id })
+        body: JSON.stringify({ id, candidateMatch: mergedMatch })
       }).catch(() => {});
     });
   };
@@ -464,6 +479,7 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         reconciliationItems,
         toggleSelectReconItem,
         selectAllReconItems,
+        selectOnlyReconIds,
         confirmReconItem,
         rejectReconItem,
         bulkConfirmSelected,

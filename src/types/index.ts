@@ -17,6 +17,8 @@ export interface AIMatchSuggestion {
   isHighConfidence: boolean;
   targetName: string; // e.g. "J. Umar"
   invoiceNumber?: string; // e.g. "INV-92831"
+  invoiceAmount?: number; // e.g. 25000
+  matchReason?: string; // e.g. "Name + exact amount match"
   explanation?: string;
 }
 

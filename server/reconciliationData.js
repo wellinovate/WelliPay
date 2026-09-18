@@ -21,6 +21,8 @@ export const UNMATCHED_RECONCILIATION_ITEMS = [
       isHighConfidence: true,
       targetName: 'J. Umar',
       invoiceNumber: 'INV-92831',
+      invoiceAmount: 25000,
+      matchReason: 'Name match 98% + amount exact',
       explanation: 'Name match 98% with patient registry + exact amount match on pending cardiology bill.'
     }
   },
@@ -39,6 +41,8 @@ export const UNMATCHED_RECONCILIATION_ITEMS = [
       isHighConfidence: true,
       targetName: 'M. Bello',
       invoiceNumber: 'INV-93010',
+      invoiceAmount: 8500,
+      matchReason: 'Terminal ID & counter timestamp match',
       explanation: 'Terminal ID 02 matched Pharmacy counter at 10:05 + outpatient prescription total.'
     }
   },
@@ -57,6 +61,8 @@ export const UNMATCHED_RECONCILIATION_ITEMS = [
       isHighConfidence: true,
       targetName: 'ABC Diagnostics',
       invoiceNumber: 'INV-93044',
+      invoiceAmount: 12000,
+      matchReason: 'Corporate vendor code & ledger exact',
       explanation: 'Vendor corporate code matched partner referral reconciliation ledger.'
     }
   },
@@ -74,6 +80,7 @@ export const UNMATCHED_RECONCILIATION_ITEMS = [
       confidence: 34,
       isHighConfidence: false,
       targetName: 'Unassigned patient',
+      matchReason: 'Unlisted phone session · manual check',
       explanation: 'Session phone number unlisted in hospital EMR. Requires cashier manual lookup.'
     }
   },
@@ -92,6 +99,8 @@ export const UNMATCHED_RECONCILIATION_ITEMS = [
       isHighConfidence: true,
       targetName: 'E. Okafor',
       invoiceNumber: 'INV-93050',
+      invoiceAmount: 15000,
+      matchReason: 'Reference string & intake slip match',
       explanation: 'Reference string and deposit slip time matched triage intake.'
     }
   },
@@ -110,6 +119,8 @@ export const UNMATCHED_RECONCILIATION_ITEMS = [
       isHighConfidence: true,
       targetName: 'S. Ibrahim',
       invoiceNumber: 'INV-93062',
+      invoiceAmount: 4500,
+      matchReason: 'Mobile number match on antenatal record',
       explanation: 'Phone number matched patient mobile for antenatal clinic visit.'
     }
   },
@@ -120,7 +131,7 @@ export const UNMATCHED_RECONCILIATION_ITEMS = [
     formattedAmount: '₦65,000',
     channel: 'Bank transfer',
     description: 'HMO remittance schedule',
-    rawDetails: '"RELIANCE COPAY"',
+    rawDetails: '"RELIANCE HMO REMITTANCE"',
     status: 'unmatched',
     selected: false,
     aiMatch: {
@@ -128,6 +139,8 @@ export const UNMATCHED_RECONCILIATION_ITEMS = [
       isHighConfidence: true,
       targetName: 'Reliance HMO',
       invoiceNumber: 'BATCH-892',
+      invoiceAmount: 65000,
+      matchReason: 'HMO schedule & claims batch exact',
       explanation: 'Monthly remittance schedule matched electronic claims batch.'
     }
   },
@@ -146,7 +159,9 @@ export const UNMATCHED_RECONCILIATION_ITEMS = [
       isHighConfidence: true,
       targetName: 'C. Nwosu',
       invoiceNumber: 'INV-93077',
-      explanation: 'Cashier desk 1 terminal transaction matched surgical consult copay.'
+      invoiceAmount: 20000,
+      matchReason: 'Desk 1 terminal match (partial payment)',
+      explanation: 'Cashier desk 1 terminal transaction matched surgical consult copay. Note: ₦2,000 balance remaining.'
     }
   },
   {
@@ -163,6 +178,7 @@ export const UNMATCHED_RECONCILIATION_ITEMS = [
       confidence: 42,
       isHighConfidence: false,
       targetName: 'Multiple candidates (2)',
+      matchReason: 'Ambiguous · 2 candidate invoices found',
       explanation: 'Two active invoices found with ₦2,500 balance at OPD registration.'
     }
   },
@@ -181,6 +197,8 @@ export const UNMATCHED_RECONCILIATION_ITEMS = [
       isHighConfidence: true,
       targetName: 'K. Danjuma',
       invoiceNumber: 'INV-93090',
+      invoiceAmount: 35000,
+      matchReason: 'Room 304 admission slip match',
       explanation: 'Admission deposit receipt matched Room 304 admission slip.'
     }
   },
@@ -199,6 +217,8 @@ export const UNMATCHED_RECONCILIATION_ITEMS = [
       isHighConfidence: true,
       targetName: 'P. Adeleke',
       invoiceNumber: 'INV-93101',
+      invoiceAmount: 7200,
+      matchReason: 'Lab desk payment & order match',
       explanation: 'Laboratory desk payment matched urgent blood panel order.'
     }
   },
@@ -217,6 +237,8 @@ export const UNMATCHED_RECONCILIATION_ITEMS = [
       isHighConfidence: true,
       targetName: 'T. Adeyemi',
       invoiceNumber: 'INV-93105',
+      invoiceAmount: 11500,
+      matchReason: 'Name match + pediatric ward invoice exact',
       explanation: 'Direct name match with pediatric ward invoice.'
     }
   }
@@ -401,7 +423,7 @@ export const CONFIRMED_RECONCILIATION_ITEMS = [
     formattedAmount: '₦65,000',
     channel: 'Bank transfer',
     description: 'HMO remittance schedule',
-    rawDetails: 'RELIANCE COPAY',
+    rawDetails: 'RELIANCE HMO REMITTANCE',
     status: 'confirmed',
     selected: false,
     confirmedAt: 'Sep 15, 11:30',

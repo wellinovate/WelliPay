@@ -33,9 +33,9 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   const { user, logout } = useAuth();
 
-  const navItems: { id: NavTab; label: string; badge?: number }[] = [
+  const navItems: { id: NavTab; label: string }[] = [
     { id: 'dashboard', label: 'Dashboard' },
-    { id: 'reconciliation', label: 'Reconciliation', badge: unmatchedCount },
+    { id: 'reconciliation', label: 'Reconciliation' },
     { id: 'claims', label: 'Claims' },
     { id: 'invoices', label: 'Invoices' },
     { id: 'patients', label: 'Patients' },
@@ -104,22 +104,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`h-full px-3.5 font-medium text-xs transition-all duration-150 flex items-center gap-1.5 border-b-2 cursor-pointer ${
+                    className={`h-full px-3.5 font-semibold text-xs transition-colors duration-150 flex items-center border-b-2 cursor-pointer ${
                       isActive
-                        ? 'text-[#12244D] border-[#12244D] font-bold'
+                        ? 'text-[#12244D] border-[#12244D]'
                         : 'text-[#64748b] border-transparent hover:text-[#12244D] hover:border-slate-300'
                     }`}
                   >
                     <span>{tab.label}</span>
-                    {tab.badge !== undefined && tab.badge > 0 && (
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold font-sans ${
-                        isActive
-                          ? 'bg-[#12244D] text-white'
-                          : 'bg-slate-100 text-slate-600 border border-slate-200'
-                      }`}>
-                        {tab.badge}
-                      </span>
-                    )}
                   </button>
                 );
               })}
