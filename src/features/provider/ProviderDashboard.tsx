@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useWelliPay } from '../../context/WelliPayContext';
 import { StatusChip } from '../../components/ui/StatusChip';
 import { Modal } from '../../components/ui/Modal';
+import { RecordPaymentModal } from './RecordPaymentModal';
 import { 
   TrendingUp, 
   AlertTriangle, 
@@ -54,33 +55,6 @@ export const ProviderDashboard: React.FC = () => {
     return channels.size || 4;
   }, [providerTransactions]);
 
-  // New Transaction Form State
-  const [newPatient, setNewPatient] = useState('');
-  const [newService, setNewService] = useState('Consultation');
-  const [newAmount, setNewAmount] = useState('');
-  const [newChannel, setNewChannel] = useState<'USSD' | 'HMO' | 'Transfer' | 'Card' | 'Bank transfer'>('Card');
-
-  const handleCreateTxn = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newPatient || !newAmount) return;
-
-    const numAmount = parseInt(newAmount.replace(/[^0-9]/g, ''), 10) || 5000;
-    const newTxn: ProviderTransaction = {
-      id: `TXN-${Date.now().toString().slice(-4)}`,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      patientOrService: `${newPatient} — ${newService}`,
-      amount: numAmount,
-      formattedAmount: `₦${numAmount.toLocaleString()}`,
-      channel: newChannel,
-      status: 'paid'
-    };
-
-    addProviderTransaction(newTxn);
-    setIsNewTxnModalOpen(false);
-    setNewPatient('');
-    setNewAmount('');
-  };
-
   return (
     <div className="space-y-4">
       {/* Header Section */}
@@ -99,7 +73,7 @@ export const ProviderDashboard: React.FC = () => {
             className="text-xs font-sans font-bold px-3 py-1.5 bg-[#12244D] hover:bg-[#0A152E] text-white rounded-lg flex items-center gap-1.5 shadow-card transition-colors cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            New Payment
+            Record payment
           </button>
           <div className="font-sans text-xs text-[#475569] bg-white px-3 py-1.5 rounded-lg border border-[#e2e8f0] shadow-xs flex items-center gap-2">
             <span className="font-bold text-[#12244D]">{dashboardMetrics.formattedTotalToday} collected today</span>
@@ -336,82 +310,11 @@ export const ProviderDashboard: React.FC = () => {
         </div>
       </Modal>
 
-      {/* New Payment Modal */}
-      <Modal
+      {/* Record Payment Modal */}
+      <RecordPaymentModal
         isOpen={isNewTxnModalOpen}
         onClose={() => setIsNewTxnModalOpen(false)}
-        title="Record Direct Patient Payment"
-        subtitle="Post direct transaction into hospital revenue ledger"
-      >
-        <form onSubmit={handleCreateTxn} className="space-y-3 font-sans text-xs">
-          <div>
-            <label className="block text-[#334155] font-semibold mb-1">Patient Name</label>
-            <input
-              type="text"
-              required
-              value={newPatient}
-              onChange={(e) => setNewPatient(e.target.value)}
-              placeholder="e.g. O. Adeleke"
-              className="w-full px-3 py-2 border border-[#cbd5e1] rounded-lg text-sm text-[#0f172a] focus:outline-none focus:border-[#0B6B69] focus:ring-1 focus:ring-[#0B6B69]"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[#334155] font-semibold mb-1">Service</label>
-            <input
-              type="text"
-              value={newService}
-              onChange={(e) => setNewService(e.target.value)}
-              placeholder="e.g. Consultation / Radiology"
-              className="w-full px-3 py-2 border border-[#cbd5e1] rounded-lg text-sm text-[#0f172a] focus:outline-none focus:border-[#0B6B69] focus:ring-1 focus:ring-[#0B6B69]"
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-[#334155] font-semibold mb-1">Amount (₦)</label>
-              <input
-                type="number"
-                required
-                value={newAmount}
-                onChange={(e) => setNewAmount(e.target.value)}
-                placeholder="e.g. 15000"
-                className="w-full px-3 py-2 border border-[#cbd5e1] rounded-lg text-sm text-[#0f172a] focus:outline-none focus:border-[#0B6B69] focus:ring-1 focus:ring-[#0B6B69]"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[#334155] font-semibold mb-1">Channel</label>
-              <select
-                value={newChannel}
-                onChange={(e) => setNewChannel(e.target.value as any)}
-                className="w-full px-3 py-2 border border-[#cbd5e1] rounded-lg text-sm bg-white text-[#0f172a] focus:outline-none focus:border-[#0B6B69] focus:ring-1 focus:ring-[#0B6B69]"
-              >
-                <option value="Card">Card (POS)</option>
-                <option value="USSD">USSD</option>
-                <option value="Bank transfer">Bank transfer</option>
-                <option value="HMO">HMO Copay</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-2 pt-3">
-            <button
-              type="button"
-              onClick={() => setIsNewTxnModalOpen(false)}
-              className="px-3 py-1.5 text-xs text-[#64748b] hover:text-[#0f172a]"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 text-xs font-bold bg-[#0B6B69] hover:bg-[#074C4A] text-white rounded-lg shadow-card cursor-pointer"
-            >
-              Post Payment
-            </button>
-          </div>
-        </form>
-      </Modal>
+      />
     </div>
   );
 };

@@ -45,6 +45,12 @@ export interface ProviderTransaction {
   formattedAmount: string;
   channel: PaymentChannel;
   status: 'paid' | 'pending' | 'failed';
+  reference?: string;
+  invoiceNumber?: string;
+  mrn?: string;
+  patientName?: string;
+  service?: string;
+  recordedBy?: string;
 }
 
 export interface HMOClaim {

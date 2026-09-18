@@ -1239,6 +1239,19 @@ app.post('/api/dashboard/transactions', requireAuth, async (req, res) => {
   res.json({ success: true, transaction: req.body, mode: 'demo' });
 });
 
+// 7b. Void / Delete Provider Transaction
+app.delete('/api/dashboard/transactions/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  try {
+    if (pool) {
+      await query('DELETE FROM provider_transactions WHERE id = $1', [id]);
+    }
+  } catch (err) {
+    console.error('[API DELETE /api/dashboard/transactions] DB error:', err.message);
+  }
+  res.json({ success: true, id, message: 'Transaction voided and deleted from ledger' });
+});
+
 // 8. Generate Invoices from Unbilled Clinical Leakage (Grouped by Category / Service Type)
 app.post('/api/leakage/bill', requireAuth, async (req, res) => {
   if (pool) {

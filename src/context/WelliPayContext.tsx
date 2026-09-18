@@ -57,6 +57,7 @@ interface WelliPayContextType {
   resolveUnbilledExposure: () => Promise<{ success: boolean; count?: number; error?: string }>;
   refreshDashboard: () => Promise<void>;
   addProviderTransaction: (t: ProviderTransaction) => void;
+  voidProviderTransaction: (id: string) => void;
 
   // HMO Claims Data & Operations
   hmoClaims: HMOClaim[];
@@ -404,6 +405,40 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
+  const voidProviderTransaction = (id: string) => {
+    setProviderTransactions(prev => {
+      const txn = prev.find(t => t.id === id);
+      if (!txn) return prev;
+      if (txn.status === 'paid') {
+        setDashboardMetrics(m => {
+          const newPatientDirect = Math.max(0, m.patientDirect - txn.amount);
+          const newTotal = Math.max(0, m.totalToday - txn.amount);
+          return {
+            ...m,
+            patientDirect: newPatientDirect,
+            formattedPatientDirect: newPatientDirect >= 1000000 
+              ? `₦${(newPatientDirect / 1000000).toFixed(2)}M` 
+              : `₦${Math.round(newPatientDirect / 1000)}K`,
+            totalToday: newTotal,
+            formattedTotalToday: newTotal >= 1000000 
+              ? `₦${(newTotal / 1000000).toFixed(2)}M` 
+              : `₦${Math.round(newTotal / 1000)}K`
+          };
+        });
+      }
+      return prev.filter(t => t.id !== id);
+    });
+
+    getAuthHeaders().then(headers => {
+      fetch(`/api/dashboard/transactions/${id}`, {
+        method: 'DELETE',
+        headers
+      }).catch(() => {});
+    });
+
+    addNotification('Transaction voided successfully. Ledger entry reversed.', 'info');
+  };
+
   // HMO Actions
   const approveClaim = (id: string) => {
     setHmoClaims(prev => prev.map(c => 
@@ -529,6 +564,7 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         resolveUnbilledExposure,
         refreshDashboard,
         addProviderTransaction,
+        voidProviderTransaction,
         hmoClaims,
         approveClaim,
         rejectClaim,
