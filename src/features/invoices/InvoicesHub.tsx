@@ -67,8 +67,12 @@ export default function InvoicesHub() {
     window.open(`https://wa.me/?text=${message}`, '_blank');
   };
 
-  const isReconciled = (inv: Invoice) => inv.status === 'paid';
-  const isBatchInvoice = (inv: Invoice) => inv.patient_name === 'Multiple Patients';
+  const isReconciled = (inv: Invoice) => {
+    const status = (inv.status || '').trim().toLowerCase();
+    const label = (inv.status_label || (inv as any).statusLabel || '').trim().toLowerCase();
+    return status === 'paid' || label === 'reconciled';
+  };
+  const isBatchInvoice = (inv: Invoice) => (inv.patient_name || (inv as any).patientName) === 'Multiple Patients';
 
   return (
     <div className="p-6">
