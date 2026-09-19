@@ -75,7 +75,50 @@ export interface HMOClaim {
 
 export type PersonaType = 'provider' | 'hmo';
 
-export type NavTab = 'dashboard' | 'reconciliation' | 'claims' | 'invoices' | 'patients' | 'settings';
+export type NavTab = 'dashboard' | 'reconciliation' | 'claims' | 'invoices' | 'patients' | 'catalogue' | 'settings';
+
+export interface MasterService {
+  id: number;
+  providerType: string;
+  department: string;
+  serviceName: string;
+  serviceCode: string;
+  description: string;
+  specimenType?: string;
+  benchmarkTurnaround?: string;
+  isActive: boolean;
+}
+
+export interface ProviderAccount {
+  id: string;
+  name: string;
+  providerType: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  isActive: boolean;
+}
+
+export interface ProviderCatalogueItem {
+  id: number;
+  providerId: string;
+  masterServiceId: number;
+  price: number;
+  turnaroundTime: string;
+  availability: string;
+  hmoAccepted: string[];
+  isPublished: boolean;
+  createdAt?: string;
+  serviceName: string;
+  serviceCode: string;
+  department: string;
+  description?: string;
+  specimenType?: string;
+  benchmarkTurnaround?: string;
+  providerType?: string;
+  providerName?: string;
+  providerAccountType?: string;
+}
 
 export interface DashboardMetrics {
   totalToday: number;

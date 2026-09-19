@@ -9,6 +9,7 @@ import PDFDocument from 'pdfkit';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { pool, checkDatabaseHealth, initializeDatabase, query, SCALED_SEED_DATA } from './server/db.js';
+import { SEED_PROVIDERS, MASTER_DIAGNOSTIC_SERVICES, INITIAL_PROVIDER_TARIFFS } from './server/directoryData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2273,6 +2274,450 @@ app.post('/api/settings/test-channel/:channelId', requireAuth, (req, res) => {
     latencyMs: channel.latencyMs,
     status: 'active',
     message: `Ping successful: ${channel.name} responded in ${channel.latencyMs}ms.`
+  });
+});
+
+// ==========================================
+// Master Service Directory & Provider Catalogue Endpoints
+// ==========================================
+
+let MOCK_PROVIDERS_STATE = [...SEED_PROVIDERS];
+let MOCK_MASTER_DIRECTORY_STATE = MASTER_DIAGNOSTIC_SERVICES.map((s, idx) => ({
+  id: idx + 1,
+  ...s,
+  is_active: true
+}));
+let MOCK_PROVIDER_CATALOGUE_STATE = INITIAL_PROVIDER_TARIFFS.map((t, idx) => {
+  const master = MOCK_MASTER_DIRECTORY_STATE.find(m => m.service_code === t.service_code);
+  return {
+    id: idx + 1,
+    provider_id: t.provider_id,
+    master_service_id: master?.id || (idx + 1),
+    price: t.price,
+    turnaround_time: t.turnaround_time,
+    availability: 'available',
+    hmo_accepted: t.hmo_accepted,
+    is_published: t.is_published,
+    created_at: new Date().toISOString()
+  };
+});
+
+// 1. Get Master Service Directory (Public / Authenticated)
+app.get('/api/directory/master', async (req, res) => {
+  const { provider_type = 'laboratory', department, search } = req.query;
+
+  if (pool) {
+    try {
+      let conditions = ['is_active = true'];
+      let params = [];
+      let paramIdx = 1;
+
+      if (provider_type) {
+        conditions.push(`provider_type = $${paramIdx++}`);
+        params.push(provider_type);
+      }
+      if (department && department !== 'all') {
+        conditions.push(`department = $${paramIdx++}`);
+        params.push(department);
+      }
+      if (search && search.trim()) {
+        conditions.push(`(service_name ILIKE $${paramIdx} OR service_code ILIKE $${paramIdx} OR description ILIKE $${paramIdx})`);
+        params.push(`%${search.trim()}%`);
+        paramIdx++;
+      }
+
+      const whereClause = `WHERE ${conditions.join(' AND ')}`;
+      const result = await query(`
+        SELECT id, provider_type, department, service_name, service_code, description, specimen_type, benchmark_turnaround, is_active, created_at
+        FROM master_service_directory
+        ${whereClause}
+        ORDER BY department ASC, service_name ASC
+      `, params);
+
+      const allDeptsRes = await query(`
+        SELECT DISTINCT department 
+        FROM master_service_directory 
+        WHERE provider_type = $1 AND is_active = true 
+        ORDER BY department ASC
+      `, [provider_type]);
+
+      return res.json({
+        success: true,
+        services: result.rows,
+        departments: allDeptsRes.rows.map(r => r.department),
+        total: result.rows.length
+      });
+    } catch (err) {
+      console.error('[API] Error fetching master directory:', err);
+      return res.status(500).json({ error: 'Failed to fetch master directory' });
+    }
+  }
+
+  // In-Memory Fallback
+  let filtered = MOCK_MASTER_DIRECTORY_STATE.filter(s => s.is_active);
+  if (provider_type) {
+    filtered = filtered.filter(s => s.provider_type === provider_type);
+  }
+  if (department && department !== 'all') {
+    filtered = filtered.filter(s => s.department === department);
+  }
+  if (search && search.trim()) {
+    const q = search.trim().toLowerCase();
+    filtered = filtered.filter(s => 
+      s.service_name.toLowerCase().includes(q) || 
+      s.service_code.toLowerCase().includes(q) ||
+      (s.description && s.description.toLowerCase().includes(q))
+    );
+  }
+
+  const depts = [...new Set(MOCK_MASTER_DIRECTORY_STATE.filter(s => s.provider_type === provider_type).map(s => s.department))];
+
+  return res.json({
+    success: true,
+    services: filtered,
+    departments: depts,
+    total: filtered.length
+  });
+});
+
+// 2. Get Providers List
+app.get('/api/directory/providers', async (req, res) => {
+  const { type, search } = req.query;
+
+  if (pool) {
+    try {
+      let conditions = ['is_active = true'];
+      let params = [];
+      let paramIdx = 1;
+
+      if (type && type !== 'all') {
+        conditions.push(`provider_type = $${paramIdx++}`);
+        params.push(type);
+      }
+      if (search && search.trim()) {
+        conditions.push(`(name ILIKE $${paramIdx} OR id ILIKE $${paramIdx})`);
+        params.push(`%${search.trim()}%`);
+        paramIdx++;
+      }
+
+      const whereClause = `WHERE ${conditions.join(' AND ')}`;
+      const result = await query(`
+        SELECT id, name, provider_type as "providerType", email, phone, address, is_active as "isActive", created_at as "createdAt"
+        FROM providers
+        ${whereClause}
+        ORDER BY name ASC
+      `, params);
+
+      return res.json({
+        success: true,
+        providers: result.rows,
+        total: result.rows.length
+      });
+    } catch (err) {
+      console.error('[API] Error fetching providers:', err);
+      return res.status(500).json({ error: 'Failed to fetch providers' });
+    }
+  }
+
+  // In-Memory Fallback
+  let filtered = MOCK_PROVIDERS_STATE.filter(p => p.is_active);
+  if (type && type !== 'all') {
+    filtered = filtered.filter(p => p.provider_type === type);
+  }
+  if (search && search.trim()) {
+    const q = search.trim().toLowerCase();
+    filtered = filtered.filter(p => p.name.toLowerCase().includes(q) || p.id.toLowerCase().includes(q));
+  }
+
+  return res.json({
+    success: true,
+    providers: filtered.map(p => ({
+      id: p.id,
+      name: p.name,
+      providerType: p.provider_type,
+      email: p.email,
+      phone: p.phone,
+      address: p.address,
+      isActive: p.is_active
+    })),
+    total: filtered.length
+  });
+});
+
+// 3. Get Provider Catalogue
+app.get('/api/directory/catalogue/:provider_id', async (req, res) => {
+  const { provider_id } = req.params;
+
+  if (pool) {
+    try {
+      const result = await query(`
+        SELECT 
+          c.id, c.provider_id as "providerId", c.master_service_id as "masterServiceId",
+          c.price, c.turnaround_time as "turnaroundTime", c.availability,
+          c.hmo_accepted as "hmoAccepted", c.is_published as "isPublished", c.created_at as "createdAt",
+          m.service_name as "serviceName", m.service_code as "serviceCode",
+          m.department, m.description, m.specimen_type as "specimenType",
+          m.benchmark_turnaround as "benchmarkTurnaround", m.provider_type as "providerType",
+          p.name as "providerName", p.provider_type as "providerAccountType"
+        FROM provider_catalogue c
+        JOIN master_service_directory m ON c.master_service_id = m.id
+        JOIN providers p ON c.provider_id = p.id
+        WHERE c.provider_id = $1
+        ORDER BY m.department ASC, m.service_name ASC
+      `, [provider_id]);
+
+      const providerInfo = await query(`SELECT id, name, provider_type FROM providers WHERE id = $1`, [provider_id]);
+
+      return res.json({
+        success: true,
+        provider: providerInfo.rows[0] || null,
+        catalogue: result.rows,
+        total: result.rows.length
+      });
+    } catch (err) {
+      console.error('[API] Error fetching provider catalogue:', err);
+      return res.status(500).json({ error: 'Failed to fetch provider catalogue' });
+    }
+  }
+
+  // In-Memory Fallback
+  const items = MOCK_PROVIDER_CATALOGUE_STATE.filter(c => c.provider_id === provider_id);
+  const provider = MOCK_PROVIDERS_STATE.find(p => p.id === provider_id);
+
+  const enriched = items.map(c => {
+    const master = MOCK_MASTER_DIRECTORY_STATE.find(m => m.id === c.master_service_id) || {};
+    return {
+      id: c.id,
+      providerId: c.provider_id,
+      masterServiceId: c.master_service_id,
+      price: c.price,
+      turnaroundTime: c.turnaround_time,
+      availability: c.availability,
+      hmoAccepted: c.hmo_accepted || [],
+      isPublished: c.is_published,
+      createdAt: c.created_at,
+      serviceName: master.service_name || 'Custom Service',
+      serviceCode: master.service_code || 'CUSTOM',
+      department: master.department || 'General',
+      description: master.description || '',
+      specimenType: master.specimen_type || '',
+      benchmarkTurnaround: master.benchmark_turnaround || '',
+      providerType: master.provider_type || 'laboratory',
+      providerName: provider?.name || provider_id,
+      providerAccountType: provider?.provider_type || 'laboratory'
+    };
+  });
+
+  return res.json({
+    success: true,
+    provider: provider ? { id: provider.id, name: provider.name, provider_type: provider.provider_type } : null,
+    catalogue: enriched,
+    total: enriched.length
+  });
+});
+
+// 4. Upsert Item in Provider Catalogue (Requires Auth)
+app.post('/api/directory/catalogue', requireAuth, async (req, res) => {
+  const { provider_id, master_service_id, price, turnaround_time, hmo_accepted, is_published } = req.body;
+
+  if (!provider_id || !master_service_id || price === undefined || price === null) {
+    return res.status(400).json({ error: 'Missing required fields: provider_id, master_service_id, and price are mandatory.' });
+  }
+
+  const numPrice = parseFloat(price);
+  if (isNaN(numPrice) || numPrice < 0) {
+    return res.status(400).json({ error: 'Price must be a valid non-negative number.' });
+  }
+
+  if (pool) {
+    try {
+      const result = await query(`
+        INSERT INTO provider_catalogue (
+          provider_id, master_service_id, price, turnaround_time, availability, hmo_accepted, is_published
+        )
+        VALUES ($1, $2, $3, $4, 'available', $5, $6)
+        ON CONFLICT (provider_id, master_service_id) DO UPDATE SET
+          price = EXCLUDED.price,
+          turnaround_time = EXCLUDED.turnaround_time,
+          hmo_accepted = EXCLUDED.hmo_accepted,
+          is_published = EXCLUDED.is_published
+        RETURNING *
+      `, [
+        provider_id,
+        master_service_id,
+        numPrice,
+        turnaround_time || 'Same day',
+        Array.isArray(hmo_accepted) ? hmo_accepted : [],
+        is_published ?? true
+      ]);
+
+      return res.status(201).json({
+        success: true,
+        item: result.rows[0],
+        message: 'Catalogue item saved successfully.'
+      });
+    } catch (err) {
+      console.error('[API] Error saving provider catalogue item:', err);
+      return res.status(500).json({ error: 'Failed to save catalogue item' });
+    }
+  }
+
+  // In-Memory Fallback
+  const existingIdx = MOCK_PROVIDER_CATALOGUE_STATE.findIndex(
+    c => c.provider_id === provider_id && c.master_service_id === Number(master_service_id)
+  );
+
+  const updatedItem = {
+    id: existingIdx >= 0 ? MOCK_PROVIDER_CATALOGUE_STATE[existingIdx].id : MOCK_PROVIDER_CATALOGUE_STATE.length + 1,
+    provider_id,
+    master_service_id: Number(master_service_id),
+    price: numPrice,
+    turnaround_time: turnaround_time || 'Same day',
+    availability: 'available',
+    hmo_accepted: Array.isArray(hmo_accepted) ? hmo_accepted : [],
+    is_published: is_published ?? true,
+    created_at: new Date().toISOString()
+  };
+
+  if (existingIdx >= 0) {
+    MOCK_PROVIDER_CATALOGUE_STATE[existingIdx] = updatedItem;
+  } else {
+    MOCK_PROVIDER_CATALOGUE_STATE.push(updatedItem);
+  }
+
+  return res.status(201).json({
+    success: true,
+    item: updatedItem,
+    message: 'Catalogue item saved successfully.'
+  });
+});
+
+// 5. Toggle Item Publish State (Requires Auth)
+app.patch('/api/directory/catalogue/:id/publish', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { is_published } = req.body;
+
+  if (typeof is_published !== 'boolean') {
+    return res.status(400).json({ error: 'is_published boolean field is required' });
+  }
+
+  if (pool) {
+    try {
+      const result = await query(`
+        UPDATE provider_catalogue
+        SET is_published = $1
+        WHERE id = $2
+        RETURNING *
+      `, [is_published, id]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Catalogue item not found' });
+      }
+
+      return res.json({
+        success: true,
+        item: result.rows[0],
+        message: is_published ? 'Service published live to catalogue.' : 'Service unpublished from public catalogue.'
+      });
+    } catch (err) {
+      console.error('[API] Error updating publish state:', err);
+      return res.status(500).json({ error: 'Failed to update publish state' });
+    }
+  }
+
+  // In-Memory Fallback
+  const item = MOCK_PROVIDER_CATALOGUE_STATE.find(c => String(c.id) === String(id));
+  if (!item) {
+    return res.status(404).json({ error: 'Catalogue item not found' });
+  }
+  item.is_published = is_published;
+
+  return res.json({
+    success: true,
+    item,
+    message: is_published ? 'Service published live to catalogue.' : 'Service unpublished from public catalogue.'
+  });
+});
+
+// 6. Delete Catalogue Item (Requires Auth)
+app.delete('/api/directory/catalogue/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+
+  if (pool) {
+    try {
+      const result = await query(`DELETE FROM provider_catalogue WHERE id = $1 RETURNING id`, [id]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'Catalogue item not found' });
+      }
+      return res.json({ success: true, message: 'Item deleted from provider catalogue.' });
+    } catch (err) {
+      console.error('[API] Error deleting catalogue item:', err);
+      return res.status(500).json({ error: 'Failed to delete catalogue item' });
+    }
+  }
+
+  // In-Memory Fallback
+  const idx = MOCK_PROVIDER_CATALOGUE_STATE.findIndex(c => String(c.id) === String(id));
+  if (idx === -1) {
+    return res.status(404).json({ error: 'Catalogue item not found' });
+  }
+  MOCK_PROVIDER_CATALOGUE_STATE.splice(idx, 1);
+  return res.json({ success: true, message: 'Item deleted from provider catalogue.' });
+});
+
+// 7. Add Standard Master Service (Requires Auth - Admin)
+app.post('/api/directory/master', requireAuth, async (req, res) => {
+  const { provider_type, department, service_name, service_code, description, specimen_type, benchmark_turnaround } = req.body;
+
+  if (!provider_type || !department || !service_name || !service_code) {
+    return res.status(400).json({ error: 'provider_type, department, service_name, and service_code are required.' });
+  }
+
+  if (pool) {
+    try {
+      const result = await query(`
+        INSERT INTO master_service_directory (
+          provider_type, department, service_name, service_code, description, specimen_type, benchmark_turnaround, is_active
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+        ON CONFLICT (service_code) DO UPDATE SET
+          service_name = EXCLUDED.service_name,
+          department = EXCLUDED.department,
+          description = EXCLUDED.description,
+          specimen_type = EXCLUDED.specimen_type,
+          benchmark_turnaround = EXCLUDED.benchmark_turnaround
+        RETURNING *
+      `, [provider_type, department, service_name, service_code, description || null, specimen_type || null, benchmark_turnaround || null]);
+
+      return res.status(201).json({
+        success: true,
+        service: result.rows[0],
+        message: 'Master service registered successfully.'
+      });
+    } catch (err) {
+      console.error('[API] Error creating master service:', err);
+      return res.status(500).json({ error: 'Failed to create master service' });
+    }
+  }
+
+  // In-Memory Fallback
+  const newItem = {
+    id: MOCK_MASTER_DIRECTORY_STATE.length + 1,
+    provider_type,
+    department,
+    service_name,
+    service_code,
+    description: description || '',
+    specimen_type: specimen_type || '',
+    benchmark_turnaround: benchmark_turnaround || '',
+    is_active: true
+  };
+  MOCK_MASTER_DIRECTORY_STATE.push(newItem);
+
+  return res.status(201).json({
+    success: true,
+    service: newItem,
+    message: 'Master service registered successfully.'
   });
 });
 

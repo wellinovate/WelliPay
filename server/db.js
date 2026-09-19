@@ -1,6 +1,7 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
 import { ALL_RECONCILIATION_ITEMS, CONFIRMED_RECONCILIATION_ITEMS, UNMATCHED_RECONCILIATION_ITEMS } from './reconciliationData.js';
+import { SEED_PROVIDERS, MASTER_DIAGNOSTIC_SERVICES, INITIAL_PROVIDER_TARIFFS } from './directoryData.js';
 
 dotenv.config();
 
@@ -658,6 +659,50 @@ export async function initializeDatabase() {
         ADD COLUMN IF NOT EXISTS paystack_transaction_id BIGINT UNIQUE,
         ADD COLUMN IF NOT EXISTS paystack_reference TEXT,
         ADD COLUMN IF NOT EXISTS raw_customer_email TEXT;
+
+      CREATE TABLE IF NOT EXISTS providers (
+        id VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(255) UNIQUE NOT NULL,
+        provider_type VARCHAR(50) NOT NULL,
+        email VARCHAR(255),
+        phone VARCHAR(50),
+        address TEXT,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      ALTER TABLE providers ADD COLUMN IF NOT EXISTS provider_type VARCHAR(50);
+
+      CREATE TABLE IF NOT EXISTS master_service_directory (
+        id SERIAL PRIMARY KEY,
+        provider_type VARCHAR(50) NOT NULL,
+        department VARCHAR(100) NOT NULL,
+        service_name VARCHAR(255) NOT NULL,
+        service_code VARCHAR(50) UNIQUE NOT NULL,
+        description TEXT,
+        specimen_type VARCHAR(100),
+        benchmark_turnaround VARCHAR(100),
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS provider_catalogue (
+        id SERIAL PRIMARY KEY,
+        provider_id VARCHAR(50) NOT NULL REFERENCES providers(id),
+        master_service_id INTEGER NOT NULL REFERENCES master_service_directory(id),
+        price NUMERIC(15, 2) NOT NULL,
+        turnaround_time VARCHAR(100),
+        availability VARCHAR(50) DEFAULT 'available',
+        hmo_accepted TEXT[],
+        is_published BOOLEAN DEFAULT FALSE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(provider_id, master_service_id)
+      );
+
+      ALTER TABLE hmo_claims ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
+      ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
+      ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS master_service_id INTEGER;
     `);
 
     // 2. Seed Organizations
@@ -852,6 +897,77 @@ export async function initializeDatabase() {
           discharge_status = EXCLUDED.discharge_status;
       `);
     }
+
+    // 9. Seed Providers if empty
+    const providerCountRes = await pool.query('SELECT COUNT(*) FROM providers');
+    if (parseInt(providerCountRes.rows[0].count, 10) === 0) {
+      console.log(`[DB] Seeding ${SEED_PROVIDERS.length} canonical providers...`);
+      for (const prv of SEED_PROVIDERS) {
+        await pool.query(`
+          INSERT INTO providers (id, name, provider_type, email, phone, address, is_active)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+          ON CONFLICT (id) DO UPDATE SET
+            name = EXCLUDED.name,
+            provider_type = EXCLUDED.provider_type,
+            email = EXCLUDED.email,
+            phone = EXCLUDED.phone,
+            address = EXCLUDED.address,
+            is_active = EXCLUDED.is_active;
+        `, [prv.id, prv.name, prv.provider_type, prv.email, prv.phone, prv.address, prv.is_active]);
+      }
+    }
+
+    // 10. Seed Master Service Directory if empty
+    const masterCountRes = await pool.query('SELECT COUNT(*) FROM master_service_directory');
+    if (parseInt(masterCountRes.rows[0].count, 10) === 0) {
+      console.log(`[DB] Seeding ${MASTER_DIAGNOSTIC_SERVICES.length} standardized master diagnostic services...`);
+      for (const s of MASTER_DIAGNOSTIC_SERVICES) {
+        await pool.query(`
+          INSERT INTO master_service_directory (provider_type, department, service_name, service_code, description, specimen_type, benchmark_turnaround, is_active)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+          ON CONFLICT (service_code) DO UPDATE SET
+            provider_type = EXCLUDED.provider_type,
+            department = EXCLUDED.department,
+            service_name = EXCLUDED.service_name,
+            description = EXCLUDED.description,
+            specimen_type = EXCLUDED.specimen_type,
+            benchmark_turnaround = EXCLUDED.benchmark_turnaround;
+        `, [s.provider_type, s.department, s.service_name, s.service_code, s.description, s.specimen_type, s.benchmark_turnaround]);
+      }
+    }
+
+    // 11. Seed Provider Catalogue Tariffs if empty
+    const catalogueCountRes = await pool.query('SELECT COUNT(*) FROM provider_catalogue');
+    if (parseInt(catalogueCountRes.rows[0].count, 10) === 0) {
+      console.log(`[DB] Seeding ${INITIAL_PROVIDER_TARIFFS.length} initial provider catalogue tariffs...`);
+      for (const t of INITIAL_PROVIDER_TARIFFS) {
+        const masterRes = await pool.query('SELECT id FROM master_service_directory WHERE service_code = $1', [t.service_code]);
+        if (masterRes.rows.length > 0) {
+          const masterId = masterRes.rows[0].id;
+          await pool.query(`
+            INSERT INTO provider_catalogue (provider_id, master_service_id, price, turnaround_time, availability, hmo_accepted, is_published)
+            VALUES ($1, $2, $3, $4, 'available', $5, $6)
+            ON CONFLICT (provider_id, master_service_id) DO UPDATE SET
+              price = EXCLUDED.price,
+              turnaround_time = EXCLUDED.turnaround_time,
+              hmo_accepted = EXCLUDED.hmo_accepted,
+              is_published = EXCLUDED.is_published;
+          `, [t.provider_id, masterId, t.price, t.turnaround_time, t.hmo_accepted, t.is_published]);
+        }
+      }
+    }
+
+    // 12. Run Canonical Provider & Service Backfill Updates
+    await pool.query(`
+      UPDATE hmo_claims SET provider_id = 'PRV-LAG-01' WHERE (provider = 'Lagoon Specialist Hospital' OR provider = 'Lagoon Hospital') AND provider_id IS NULL;
+      UPDATE hmo_claims SET provider_id = 'PRV-ABC-01' WHERE provider = 'ABC Diagnostics' AND provider_id IS NULL;
+      UPDATE invoices SET provider_id = 'PRV-ABC-01' WHERE (patient_mrn = 'EXT-ACC-1120' OR patient_name = 'ABC Diagnostics') AND provider_id IS NULL;
+      UPDATE invoices SET provider_id = 'PRV-LAG-01' WHERE provider_id IS NULL;
+      UPDATE clinical_service_orders SET provider_id = 'PRV-LAG-01' WHERE provider_id IS NULL;
+      UPDATE clinical_service_orders SET master_service_id = (SELECT id FROM master_service_directory WHERE service_code = 'LAB-HEM-FBC') WHERE service_type = 'Full Blood Count' AND master_service_id IS NULL;
+      UPDATE clinical_service_orders SET master_service_id = (SELECT id FROM master_service_directory WHERE service_code = 'LAB-CHM-EUCR') WHERE service_type = 'Electrolytes, Urea & Creatinine' AND master_service_id IS NULL;
+      UPDATE clinical_service_orders SET master_service_id = (SELECT id FROM master_service_directory WHERE service_code = 'LAB-CHM-LIP') WHERE service_type = 'Lipid Profile Panels' AND master_service_id IS NULL;
+    `);
 
     return { initialized: true };
   } catch (err) {
