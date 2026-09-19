@@ -3053,10 +3053,28 @@ app.get('/api/benefit-check', requireAuth, async (req, res) => {
 // ==========================================
 
 // Serve static files from Vite production build
-app.use(express.static(path.join(__dirname, 'dist')));
+app.use(express.static(path.join(__dirname, 'dist'), {
+  maxAge: '1y',
+  immutable: true,
+  setHeaders: (res, filePath) => {
+    if (filePath.endsWith('.html')) {
+      res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.set('Pragma', 'no-cache');
+      res.set('Expires', '0');
+    }
+  }
+}));
+
+// Guard: Static assets in /assets/ must return 404 if missing, never fall through to index.html
+app.use('/assets', (req, res) => {
+  res.status(404).type('text/plain').send('Asset not found');
+});
 
 // SPA Client-Side Routing Fallback (Express 5 compatible wildcard)
 app.get('/*splat', (req, res) => {
+  res.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
   res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
