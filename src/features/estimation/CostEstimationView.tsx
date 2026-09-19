@@ -666,27 +666,29 @@ export const CostEstimationView: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Pre-Authorization Alert Box */}
-                    {benefitResult.preAuthRequired ? (
-                      <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 flex items-start gap-3">
-                        <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                        <div className="text-xs">
-                          <span className="font-bold text-amber-900">Pre-Authorization Code Mandatory:</span>{' '}
-                          <span className="text-amber-800 leading-relaxed">
-                            {benefitResult.note}
-                          </span>
+                    {/* Pre-Authorization Alert Box — only relevant for covered/in-network services */}
+                    {benefitResult.status !== 'excluded' && benefitResult.status !== 'out_of_network' && (
+                      benefitResult.preAuthRequired ? (
+                        <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 flex items-start gap-3">
+                          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <div className="text-xs">
+                            <span className="font-bold text-amber-900">Pre-Authorization Code Mandatory:</span>{' '}
+                            <span className="text-amber-800 leading-relaxed">
+                              {benefitResult.note}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-start gap-3">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                        <div className="text-xs">
-                          <span className="font-bold text-emerald-900">Pre-Authorization Not Required:</span>{' '}
-                          <span className="text-emerald-800 leading-relaxed">
-                            {benefitResult.note}
-                          </span>
+                      ) : (
+                        <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
+                          <div className="text-xs">
+                            <span className="font-bold text-emerald-900">Pre-Authorization Not Required:</span>{' '}
+                            <span className="text-emerald-800 leading-relaxed">
+                              {benefitResult.note}
+                            </span>
+                          </div>
                         </div>
-                      </div>
+                      )
                     )}
 
                     {/* Diagnostic Investigation Details */}
