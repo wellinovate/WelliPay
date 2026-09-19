@@ -2723,6 +2723,66 @@ app.post('/api/directory/master', requireAuth, async (req, res) => {
   });
 });
 
+// 8. Cost Estimate (Price Lookup for Cost Estimation & Benefit Check)
+app.get('/api/cost-estimate', requireAuth, async (req, res) => {
+  const { providerId, masterServiceId } = req.query;
+  if (!providerId || !masterServiceId) {
+    return res.status(400).json({ error: 'providerId and masterServiceId are required.' });
+  }
+
+  if (pool) {
+    try {
+      const result = await query(`
+        SELECT
+          pc.price::float as price, pc.turnaround_time as "turnaroundTime", pc.hmo_accepted as "hmoAccepted",
+          pc.is_published as "isPublished",
+          msd.service_name as "serviceName", msd.department, msd.service_code as "serviceCode"
+        FROM provider_catalogue pc
+        JOIN master_service_directory msd ON msd.id = pc.master_service_id
+        WHERE pc.provider_id = $1 AND pc.master_service_id = $2
+      `, [providerId, masterServiceId]);
+
+      if (result.rows.length === 0) {
+        return res.status(404).json({ error: 'This provider does not offer that service, or has not priced it yet.' });
+      }
+      if (!result.rows[0].isPublished) {
+        return res.status(409).json({ error: 'This service is not yet published live by the provider.' });
+      }
+
+      return res.json({ estimate: result.rows[0] });
+    } catch (err) {
+      console.error('[API /api/cost-estimate] error:', err.message);
+      return res.status(500).json({ error: 'Failed to retrieve cost estimate.' });
+    }
+  }
+
+  // In-Memory Fallback
+  const catItem = MOCK_PROVIDER_CATALOGUE_STATE.find(
+    c => c.provider_id === providerId && c.master_service_id === Number(masterServiceId)
+  );
+
+  if (!catItem) {
+    return res.status(404).json({ error: 'This provider does not offer that service, or has not priced it yet.' });
+  }
+  if (!catItem.is_published) {
+    return res.status(409).json({ error: 'This service is not yet published live by the provider.' });
+  }
+
+  const master = MOCK_MASTER_DIRECTORY_STATE.find(m => m.id === Number(masterServiceId));
+
+  return res.json({
+    estimate: {
+      price: Number(catItem.price),
+      turnaroundTime: catItem.turnaround_time,
+      hmoAccepted: catItem.hmo_accepted || [],
+      isPublished: catItem.is_published,
+      serviceName: master ? master.service_name : 'Diagnostic Service',
+      department: master ? master.department : 'Laboratory',
+      serviceCode: master ? master.service_code : 'LAB'
+    }
+  });
+});
+
 // ==========================================
 // Static Assets & Client-Side SPA Routing
 // ==========================================

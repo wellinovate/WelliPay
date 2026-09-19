@@ -20,7 +20,8 @@ import {
   FileSpreadsheet,
   Globe,
   Trash2,
-  Edit2
+  Edit2,
+  Calculator
 } from 'lucide-react';
 import { useWelliPay } from '../../context/WelliPayContext';
 import { useAuth } from '../../context/AuthContext';
@@ -37,7 +38,7 @@ const NIGERIAN_HMOS = [
 ];
 
 export const ServiceCatalogueView: React.FC = () => {
-  const { addNotification } = useWelliPay();
+  const { addNotification, setActiveTab } = useWelliPay();
   const { user } = useAuth();
 
   const [providers, setProviders] = useState<ProviderAccount[]>([]);
@@ -415,6 +416,15 @@ export const ServiceCatalogueView: React.FC = () => {
             >
               <Globe className="w-3.5 h-3.5 text-emerald-600" />
               <span>Publish all</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('estimation')}
+              title="Open real-time cost estimation and tariff lookup"
+              className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-white border border-slate-300 hover:border-slate-400 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
+            >
+              <Calculator className="w-3.5 h-3.5 text-brand-navy" />
+              <span>Cost Estimator</span>
             </button>
           </div>
         </div>

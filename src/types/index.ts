@@ -75,7 +75,23 @@ export interface HMOClaim {
 
 export type PersonaType = 'provider' | 'hmo';
 
-export type NavTab = 'dashboard' | 'reconciliation' | 'claims' | 'invoices' | 'patients' | 'catalogue' | 'settings';
+export type NavTab = 'dashboard' | 'reconciliation' | 'claims' | 'invoices' | 'patients' | 'catalogue' | 'estimation' | 'settings';
+
+export interface CostEstimate {
+  price: number;
+  turnaroundTime: string;
+  hmoAccepted: string[];
+  isPublished: boolean;
+  serviceName: string;
+  department: string;
+  serviceCode: string;
+}
+
+export interface CostEstimateResponse {
+  estimate?: CostEstimate;
+  error?: string;
+  message?: string;
+}
 
 export interface MasterService {
   id: number;

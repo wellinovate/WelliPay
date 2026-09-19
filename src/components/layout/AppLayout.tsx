@@ -40,6 +40,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     { id: 'invoices', label: 'Invoices' },
     { id: 'patients', label: 'Patients' },
     { id: 'catalogue', label: 'Catalogue' },
+    { id: 'estimation', label: 'Cost Estimator' },
     { id: 'settings', label: 'Settings' },
   ];
 

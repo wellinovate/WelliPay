@@ -10,6 +10,7 @@ import { PatientsDirectory } from './features/patients/PatientsDirectory';
 import InvoicesHub from './features/invoices/InvoicesHub';
 import { SettingsView } from './features/settings/SettingsView';
 import { ServiceCatalogueView } from './features/catalogue/ServiceCatalogueView';
+import { CostEstimationView } from './features/estimation/CostEstimationView';
 import { PlaceholderView } from './features/common/PlaceholderView';
 import { Login } from './components/Login';
 import PublicInvoicePay from './pages/PublicInvoicePay';
@@ -25,6 +26,7 @@ const AppContent: React.FC = () => {
       {activeTab === 'patients' && <PatientsDirectory />}
       {activeTab === 'invoices' && <InvoicesHub />}
       {activeTab === 'catalogue' && <ServiceCatalogueView />}
+      {activeTab === 'estimation' && <CostEstimationView />}
       {activeTab === 'settings' && <SettingsView />}
     </AppLayout>
   );
