@@ -1795,6 +1795,8 @@ app.get('/api/invoices', requireAuth, async (req, res) => {
         paramIdx++;
       }
 
+      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
       const listRes = await query(`
         SELECT 
           id, invoice_number as "invoiceNumber", patient_id as "patientId",
