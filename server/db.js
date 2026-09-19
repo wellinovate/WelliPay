@@ -1,7 +1,7 @@
 import pg from 'pg';
 import dotenv from 'dotenv';
 import { ALL_RECONCILIATION_ITEMS, CONFIRMED_RECONCILIATION_ITEMS, UNMATCHED_RECONCILIATION_ITEMS } from './reconciliationData.js';
-import { SEED_PROVIDERS, MASTER_DIAGNOSTIC_SERVICES, INITIAL_PROVIDER_TARIFFS } from './directoryData.js';
+import { SEED_PROVIDERS, MASTER_DIAGNOSTIC_SERVICES, INITIAL_PROVIDER_TARIFFS, SEED_PAYER_PLAN_RULES } from './directoryData.js';
 
 dotenv.config();
 
@@ -699,6 +699,20 @@ export async function initializeDatabase() {
         UNIQUE(provider_id, master_service_id)
       );
 
+      CREATE TABLE IF NOT EXISTS payer_plan_rules (
+        id SERIAL PRIMARY KEY,
+        payer_name VARCHAR(100) NOT NULL,
+        plan_name VARCHAR(100) NOT NULL,
+        copay_percentage NUMERIC(5,2) NOT NULL,
+        preauth_threshold NUMERIC(15,2),
+        deductible NUMERIC(15,2) DEFAULT 0,
+        covered_categories TEXT[],
+        excluded_services TEXT[],
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(payer_name, plan_name)
+      );
+
       ALTER TABLE hmo_claims ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
       ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
@@ -957,7 +971,37 @@ export async function initializeDatabase() {
       }
     }
 
-    // 12. Run Canonical Provider & Service Backfill Updates
+    // 12. Seed Payer Plan Rules if empty
+    const rulesCountRes = await pool.query('SELECT COUNT(*) FROM payer_plan_rules');
+    if (parseInt(rulesCountRes.rows[0].count, 10) === 0) {
+      console.log(`[DB] Seeding ${SEED_PAYER_PLAN_RULES.length} payer plan coverage rules...`);
+      for (const r of SEED_PAYER_PLAN_RULES) {
+        await pool.query(`
+          INSERT INTO payer_plan_rules (
+            payer_name, plan_name, copay_percentage, preauth_threshold, deductible, covered_categories, excluded_services, is_active
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          ON CONFLICT (payer_name, plan_name) DO UPDATE SET
+            copay_percentage = EXCLUDED.copay_percentage,
+            preauth_threshold = EXCLUDED.preauth_threshold,
+            deductible = EXCLUDED.deductible,
+            covered_categories = EXCLUDED.covered_categories,
+            excluded_services = EXCLUDED.excluded_services,
+            is_active = EXCLUDED.is_active;
+        `, [
+          r.payer_name,
+          r.plan_name,
+          r.copay_percentage,
+          r.preauth_threshold,
+          r.deductible || 0,
+          r.covered_categories,
+          r.excluded_services || [],
+          r.is_active ?? true
+        ]);
+      }
+    }
+
+    // 13. Run Canonical Provider & Service Backfill Updates
     await pool.query(`
       UPDATE hmo_claims SET provider_id = 'PRV-LAG-01' WHERE (provider = 'Lagoon Specialist Hospital' OR provider = 'Lagoon Hospital') AND provider_id IS NULL;
       UPDATE hmo_claims SET provider_id = 'PRV-ABC-01' WHERE provider = 'ABC Diagnostics' AND provider_id IS NULL;

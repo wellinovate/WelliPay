@@ -93,6 +93,48 @@ export interface CostEstimateResponse {
   message?: string;
 }
 
+export interface PayerPlanRule {
+  id: number;
+  payerName: string;
+  planName: string;
+  copayPercentage: number;
+  preauthThreshold: number | null;
+  deductible: number;
+  coveredCategories: string[] | null;
+  excludedServices: string[];
+  isActive: boolean;
+}
+
+export interface BenefitCheckRequest {
+  providerId: string;
+  masterServiceId: number;
+  payerName: string;
+  planName: string;
+  patientId?: string;
+}
+
+export interface BenefitCheckResult {
+  status: 'covered' | 'out_of_network' | 'excluded';
+  isCovered: boolean;
+  isNetworkAccepted: boolean;
+  price: number;
+  copayPercentage: number;
+  patientCopayAmount: number;
+  hmoCoverageAmount: number;
+  preAuthRequired: boolean;
+  preAuthThreshold: number | null;
+  serviceName: string;
+  serviceCode: string;
+  department: string;
+  turnaroundTime: string;
+  providerId: string;
+  providerName: string;
+  payerName: string;
+  planName: string;
+  patientId: string | null;
+  note: string;
+}
+
 export interface MasterService {
   id: number;
   providerType: string;

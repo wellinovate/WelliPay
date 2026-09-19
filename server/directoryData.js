@@ -573,3 +573,123 @@ export const INITIAL_PROVIDER_TARIFFS = [
     is_published: false
   }
 ];
+
+export const SEED_PAYER_PLAN_RULES = [
+  // 1. Reliance HMO
+  {
+    payer_name: 'Reliance HMO',
+    plan_name: 'Silver Plan',
+    copay_percentage: 20.00,
+    preauth_threshold: 100000,
+    deductible: 0,
+    covered_categories: ['Haematology', 'Chemical Pathology', 'Medical Microbiology', 'Immunology & Serology', 'Diagnostic Ultrasound', 'Diagnostic Radiology'],
+    excluded_services: ['Comprehensive Executive Health Check'],
+    is_active: true
+  },
+  {
+    payer_name: 'Reliance HMO',
+    plan_name: 'Comprehensive Plan',
+    copay_percentage: 10.00,
+    preauth_threshold: 150000,
+    deductible: 0,
+    covered_categories: null,
+    excluded_services: [],
+    is_active: true
+  },
+  {
+    payer_name: 'Reliance HMO',
+    plan_name: 'Standard Benefit Plan',
+    copay_percentage: 15.00,
+    preauth_threshold: 75000,
+    deductible: 0,
+    covered_categories: ['Haematology', 'Chemical Pathology', 'Medical Microbiology', 'Immunology & Serology', 'Diagnostic Ultrasound', 'Diagnostic Radiology', 'Cardiology (Non-Invasive)'],
+    excluded_services: ['Pre-Employment Medical Examination Panel'],
+    is_active: true
+  },
+
+  // 2. AXA Mansard
+  {
+    payer_name: 'AXA Mansard',
+    plan_name: 'Gold Plan',
+    copay_percentage: 10.00,
+    preauth_threshold: 25000,
+    deductible: 0,
+    covered_categories: null,
+    excluded_services: [],
+    is_active: true
+  },
+  {
+    payer_name: 'AXA Mansard',
+    plan_name: 'Comprehensive Plan',
+    copay_percentage: 10.00,
+    preauth_threshold: 120000,
+    deductible: 0,
+    covered_categories: null,
+    excluded_services: [],
+    is_active: true
+  },
+  {
+    payer_name: 'AXA Mansard',
+    plan_name: 'Standard Benefit Plan',
+    copay_percentage: 20.00,
+    preauth_threshold: 50000,
+    deductible: 0,
+    covered_categories: ['Haematology', 'Chemical Pathology', 'Medical Microbiology', 'Immunology & Serology', 'Diagnostic Ultrasound', 'Diagnostic Radiology'],
+    excluded_services: [],
+    is_active: true
+  },
+
+  // 3. Hygeia HMO
+  {
+    payer_name: 'Hygeia HMO',
+    plan_name: 'Corporate Standard',
+    copay_percentage: 10.00,
+    preauth_threshold: 80000,
+    deductible: 0,
+    covered_categories: null,
+    excluded_services: [],
+    is_active: true
+  },
+  {
+    payer_name: 'Hygeia HMO',
+    plan_name: 'Comprehensive Plan',
+    copay_percentage: 15.00,
+    preauth_threshold: 100000,
+    deductible: 0,
+    covered_categories: null,
+    excluded_services: [],
+    is_active: true
+  },
+  {
+    payer_name: 'Hygeia HMO',
+    plan_name: 'Standard Benefit Plan',
+    copay_percentage: 20.00,
+    preauth_threshold: 60000,
+    deductible: 0,
+    covered_categories: null,
+    excluded_services: [],
+    is_active: true
+  },
+
+  // 4. Leadway Health
+  {
+    payer_name: 'Leadway Health',
+    plan_name: 'Comprehensive Plan',
+    copay_percentage: 10.00,
+    preauth_threshold: 120000,
+    deductible: 0,
+    covered_categories: null,
+    excluded_services: [],
+    is_active: true
+  },
+  {
+    payer_name: 'Leadway Health',
+    plan_name: 'Standard Benefit Plan',
+    copay_percentage: 15.00,
+    preauth_threshold: 75000,
+    deductible: 0,
+    covered_categories: null,
+    excluded_services: [],
+    is_active: true
+  }
+];

@@ -9,7 +9,7 @@ import PDFDocument from 'pdfkit';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { pool, checkDatabaseHealth, initializeDatabase, query, SCALED_SEED_DATA } from './server/db.js';
-import { SEED_PROVIDERS, MASTER_DIAGNOSTIC_SERVICES, INITIAL_PROVIDER_TARIFFS } from './server/directoryData.js';
+import { SEED_PROVIDERS, MASTER_DIAGNOSTIC_SERVICES, INITIAL_PROVIDER_TARIFFS, SEED_PAYER_PLAN_RULES } from './server/directoryData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -2303,6 +2303,7 @@ let MOCK_PROVIDER_CATALOGUE_STATE = INITIAL_PROVIDER_TARIFFS.map((t, idx) => {
     created_at: new Date().toISOString()
   };
 });
+let MOCK_PAYER_PLAN_RULES_STATE = [...SEED_PAYER_PLAN_RULES];
 
 // 1. Get Master Service Directory (Public / Authenticated)
 app.get('/api/directory/master', async (req, res) => {
@@ -2779,6 +2780,270 @@ app.get('/api/cost-estimate', requireAuth, async (req, res) => {
       serviceName: master ? master.service_name : 'Diagnostic Service',
       department: master ? master.department : 'Laboratory',
       serviceCode: master ? master.service_code : 'LAB'
+    }
+  });
+});
+
+// 9. Payer Plans Directory (List active HMO coverage plans)
+app.get('/api/payer-plans', async (req, res) => {
+  const { payer } = req.query;
+
+  if (pool) {
+    try {
+      let queryStr = `
+        SELECT id, payer_name as "payerName", plan_name as "planName",
+               copay_percentage::float as "copayPercentage",
+               preauth_threshold::float as "preauthThreshold",
+               deductible::float as deductible,
+               covered_categories as "coveredCategories",
+               excluded_services as "excludedServices",
+               is_active as "isActive"
+        FROM payer_plan_rules
+        WHERE is_active = true
+      `;
+      const params = [];
+      if (payer) {
+        queryStr += ' AND payer_name = $1';
+        params.push(payer);
+      }
+      queryStr += ' ORDER BY payer_name ASC, plan_name ASC';
+
+      const result = await query(queryStr, params);
+      return res.json({ success: true, plans: result.rows });
+    } catch (err) {
+      console.error('[API /api/payer-plans] error:', err.message);
+      return res.status(500).json({ error: 'Failed to retrieve payer plans.' });
+    }
+  }
+
+  // In-Memory Fallback
+  let filtered = MOCK_PAYER_PLAN_RULES_STATE.filter(r => r.is_active);
+  if (payer) {
+    filtered = filtered.filter(r => r.payer_name.toLowerCase() === payer.toLowerCase());
+  }
+
+  return res.json({
+    success: true,
+    plans: filtered.map((r, idx) => ({
+      id: idx + 1,
+      payerName: r.payer_name,
+      planName: r.plan_name,
+      copayPercentage: Number(r.copay_percentage),
+      preauthThreshold: r.preauth_threshold ? Number(r.preauth_threshold) : null,
+      deductible: Number(r.deductible || 0),
+      coveredCategories: r.covered_categories,
+      excludedServices: r.excluded_services || [],
+      isActive: r.is_active
+    }))
+  });
+});
+
+// 10. HMO Benefit Check & Copay Calculation Engine (Reuses Phase 1 Price Lookup)
+app.get('/api/benefit-check', requireAuth, async (req, res) => {
+  const { providerId, masterServiceId, payerName, planName, patientId } = req.query;
+
+  if (!providerId || !masterServiceId || !payerName || !planName) {
+    return res.status(400).json({
+      error: 'providerId, masterServiceId, payerName, and planName are required.'
+    });
+  }
+
+  let tariffItem = null;
+  let planRule = null;
+  let providerName = providerId;
+
+  if (pool) {
+    try {
+      // 1. Fetch provider tariff and service details
+      const tariffRes = await query(`
+        SELECT
+          pc.price::float as price, pc.turnaround_time as "turnaroundTime", pc.hmo_accepted as "hmoAccepted",
+          pc.is_published as "isPublished",
+          msd.service_name as "serviceName", msd.department, msd.service_code as "serviceCode",
+          p.name as "providerName"
+        FROM provider_catalogue pc
+        JOIN master_service_directory msd ON msd.id = pc.master_service_id
+        JOIN providers p ON p.id = pc.provider_id
+        WHERE pc.provider_id = $1 AND pc.master_service_id = $2
+      `, [providerId, masterServiceId]);
+
+      if (tariffRes.rows.length === 0) {
+        return res.status(404).json({ error: 'This provider does not offer that service, or has not priced it yet.' });
+      }
+      if (!tariffRes.rows[0].isPublished) {
+        return res.status(409).json({ error: 'This service is not yet published live by the provider.' });
+      }
+      tariffItem = tariffRes.rows[0];
+      providerName = tariffItem.providerName;
+
+      // 2. Fetch payer plan rule
+      const ruleRes = await query(`
+        SELECT
+          id, payer_name as "payerName", plan_name as "planName",
+          copay_percentage::float as "copayPercentage",
+          preauth_threshold::float as "preauthThreshold",
+          deductible::float as deductible,
+          covered_categories as "coveredCategories",
+          excluded_services as "excludedServices",
+          is_active as "isActive"
+        FROM payer_plan_rules
+        WHERE payer_name = $1 AND plan_name = $2 AND is_active = true
+      `, [payerName, planName]);
+
+      if (ruleRes.rows.length === 0) {
+        return res.status(404).json({ error: `Plan rule not found for ${payerName} - ${planName}.` });
+      }
+      planRule = ruleRes.rows[0];
+    } catch (err) {
+      console.error('[API /api/benefit-check] error:', err.message);
+      return res.status(500).json({ error: 'Failed to process benefit check.' });
+    }
+  } else {
+    // In-Memory Fallback
+    const catItem = MOCK_PROVIDER_CATALOGUE_STATE.find(
+      c => c.provider_id === providerId && c.master_service_id === Number(masterServiceId)
+    );
+    if (!catItem) {
+      return res.status(404).json({ error: 'This provider does not offer that service, or has not priced it yet.' });
+    }
+    if (!catItem.is_published) {
+      return res.status(409).json({ error: 'This service is not yet published live by the provider.' });
+    }
+
+    const master = MOCK_MASTER_DIRECTORY_STATE.find(m => m.id === Number(masterServiceId));
+    const prv = MOCK_PROVIDERS_STATE.find(p => p.id === providerId);
+    providerName = prv?.name || providerId;
+
+    tariffItem = {
+      price: Number(catItem.price),
+      turnaroundTime: catItem.turnaround_time,
+      hmoAccepted: catItem.hmo_accepted || [],
+      isPublished: catItem.is_published,
+      serviceName: master ? master.service_name : 'Diagnostic Service',
+      department: master ? master.department : 'Laboratory',
+      serviceCode: master ? master.service_code : 'LAB',
+      providerName
+    };
+
+    const rule = MOCK_PAYER_PLAN_RULES_STATE.find(
+      r => r.payer_name.toLowerCase() === payerName.toLowerCase() && r.plan_name.toLowerCase() === planName.toLowerCase() && r.is_active
+    );
+    if (!rule) {
+      return res.status(404).json({ error: `Plan rule not found for ${payerName} - ${planName}.` });
+    }
+
+    planRule = {
+      payerName: rule.payer_name,
+      planName: rule.plan_name,
+      copayPercentage: Number(rule.copay_percentage),
+      preauthThreshold: rule.preauth_threshold ? Number(rule.preauth_threshold) : null,
+      deductible: Number(rule.deductible || 0),
+      coveredCategories: rule.covered_categories,
+      excludedServices: rule.excluded_services || []
+    };
+  }
+
+  const price = tariffItem.price;
+  const isNetworkAccepted = Array.isArray(tariffItem.hmoAccepted) && tariffItem.hmoAccepted.some(
+    h => h.toLowerCase() === payerName.toLowerCase()
+  );
+
+  // Check Excluded Services
+  const isExplicitlyExcluded = Array.isArray(planRule.excludedServices) && planRule.excludedServices.some(
+    s => s.toLowerCase() === tariffItem.serviceName.toLowerCase() || tariffItem.serviceName.toLowerCase().includes(s.toLowerCase())
+  );
+
+  // Check Covered Categories
+  const isDepartmentCovered = !planRule.coveredCategories || (
+    Array.isArray(planRule.coveredCategories) && planRule.coveredCategories.some(
+      c => c.toLowerCase() === tariffItem.department.toLowerCase()
+    )
+  );
+
+  // Scenario 1: Out of Network Provider
+  if (!isNetworkAccepted) {
+    return res.json({
+      benefitCheck: {
+        status: 'out_of_network',
+        isCovered: false,
+        isNetworkAccepted: false,
+        price,
+        copayPercentage: 100,
+        patientCopayAmount: price,
+        hmoCoverageAmount: 0,
+        preAuthRequired: false,
+        preAuthThreshold: planRule.preauthThreshold,
+        serviceName: tariffItem.serviceName,
+        serviceCode: tariffItem.serviceCode,
+        department: tariffItem.department,
+        turnaroundTime: tariffItem.turnaroundTime,
+        providerId,
+        providerName,
+        payerName,
+        planName,
+        patientId: patientId || null,
+        note: `${payerName} is not accepted by ${providerName}. 100% direct patient self-pay tariff applies unless out-of-network emergency authorization is pre-cleared.`
+      }
+    });
+  }
+
+  // Scenario 2: Service Excluded from Plan
+  if (isExplicitlyExcluded || !isDepartmentCovered) {
+    return res.json({
+      benefitCheck: {
+        status: 'excluded',
+        isCovered: false,
+        isNetworkAccepted: true,
+        price,
+        copayPercentage: 100,
+        patientCopayAmount: price,
+        hmoCoverageAmount: 0,
+        preAuthRequired: false,
+        preAuthThreshold: planRule.preauthThreshold,
+        serviceName: tariffItem.serviceName,
+        serviceCode: tariffItem.serviceCode,
+        department: tariffItem.department,
+        turnaroundTime: tariffItem.turnaroundTime,
+        providerId,
+        providerName,
+        payerName,
+        planName,
+        patientId: patientId || null,
+        note: `${tariffItem.serviceName} is excluded under ${payerName} ${planName} policy terms. Patient is responsible for 100% of tariff.`
+      }
+    });
+  }
+
+  // Scenario 3: Covered Service (Standard Copay Math)
+  const copayPercentage = Number(planRule.copayPercentage);
+  const patientCopayAmount = Math.round(price * (copayPercentage / 100));
+  const hmoCoverageAmount = price - patientCopayAmount;
+  const preAuthRequired = Boolean(planRule.preauthThreshold !== null && price >= Number(planRule.preauthThreshold));
+  const note = preAuthRequired
+    ? `Pre-authorization required: procedure tariff of ₦${price.toLocaleString()} meets or exceeds the plan threshold of ₦${Number(planRule.preauthThreshold).toLocaleString()}. Obtain pre-auth code prior to order.`
+    : `Standard pre-cleared benefit: Enrollee copay of ₦${patientCopayAmount.toLocaleString()} (${copayPercentage}%) payable at cashier desk. Remainder (₦${hmoCoverageAmount.toLocaleString()}) submitted as HMO receivable.`;
+
+  return res.json({
+    benefitCheck: {
+      status: 'covered',
+      isCovered: true,
+      isNetworkAccepted: true,
+      price,
+      copayPercentage,
+      patientCopayAmount,
+      hmoCoverageAmount,
+      preAuthRequired,
+      preAuthThreshold: planRule.preauthThreshold,
+      serviceName: tariffItem.serviceName,
+      serviceCode: tariffItem.serviceCode,
+      department: tariffItem.department,
+      turnaroundTime: tariffItem.turnaroundTime,
+      providerId,
+      providerName,
+      payerName,
+      planName,
+      patientId: patientId || null,
+      note
     }
   });
 });
