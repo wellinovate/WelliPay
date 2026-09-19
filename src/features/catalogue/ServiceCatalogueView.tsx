@@ -255,7 +255,7 @@ export const ServiceCatalogueView: React.FC = () => {
   const handleAddServiceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMasterService) {
-      addNotification('Please select a standardized service from the master directory', 'error');
+      addNotification('Please select a standardised service from the master directory', 'error');
       return;
     }
 
@@ -364,14 +364,14 @@ export const ServiceCatalogueView: React.FC = () => {
                 Tier 3 Provider Tariffs · Laboratory & Diagnostic
               </span>
               <span className="text-xs text-slate-500 font-medium">
-                Standardized master directory
+                Standardised master directory
               </span>
             </div>
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
               Service Catalogue & Tariffs
             </h1>
             <p className="text-sm text-slate-500 mt-0.5">
-              Select standardized clinical investigations from the master directory, configure provider fee schedules, turnaround times, and publish live to payers.
+              Select standardised clinical investigations from the master directory, configure provider fee schedules, turnaround times, and publish live to payers.
             </p>
           </div>
 
@@ -420,11 +420,11 @@ export const ServiceCatalogueView: React.FC = () => {
 
             <button
               onClick={() => setActiveTab('estimation')}
-              title="Open real-time cost estimation and tariff lookup"
+              title="Open tariff estimation and HMO copay calculator"
               className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-white border border-slate-300 hover:border-slate-400 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
             >
               <Calculator className="w-3.5 h-3.5 text-brand-navy" />
-              <span>Cost Estimator</span>
+              <span>Estimator</span>
             </button>
           </div>
         </div>
@@ -759,10 +759,10 @@ export const ServiceCatalogueView: React.FC = () => {
                   Master Service Directory
                 </span>
                 <h2 className="text-lg font-bold text-slate-900 mt-0.5">
-                  Add Standardized Diagnostic Service
+                  Add Standardised Diagnostic Service
                 </h2>
                 <p className="text-xs text-slate-500">
-                  Select a test from the 10 standardized departments to configure {currentProvider?.name}'s tariff.
+                  Select a test from the 10 standardised departments to configure {currentProvider?.name}'s tariff.
                 </p>
               </div>
               <button
@@ -870,7 +870,7 @@ export const ServiceCatalogueView: React.FC = () => {
                     </div>
                   ) : (
                     <div className="p-6 border border-dashed border-slate-300 rounded-lg text-center text-slate-400 text-xs">
-                      ← Select a standardized test from the master directory on the left
+                      ← Select a standardised test from the master directory on the left
                     </div>
                   )}
 

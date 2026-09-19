@@ -1,94 +1,91 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Building2, 
   Search, 
   Clock, 
-  ShieldCheck, 
   CheckCircle2, 
-  AlertCircle, 
-  AlertTriangle,
+  AlertTriangle, 
   Layers, 
-  ExternalLink, 
   FileText, 
-  Sparkles, 
   X, 
-  Filter, 
   Check, 
   Share2, 
-  Copy,
-  ChevronRight,
-  FlaskConical,
-  UserCheck,
-  Calculator,
-  Shield,
-  CreditCard,
-  Ban,
-  ArrowRight
+  Copy, 
+  FlaskConical, 
+  UserCheck, 
+  Calculator, 
+  Trash2, 
+  Plus
 } from 'lucide-react';
 import { useWelliPay } from '../../context/WelliPayContext';
-import { MasterService, ProviderAccount, CostEstimate, PayerPlanRule, BenefitCheckResult, Patient } from '../../types';
-import { getCostEstimate, getPayerPlans, checkBenefitCoverage, EstimateError } from '../../services/estimationService';
+import { auth } from '../../firebase';
+import { MasterService, PayerPlanRule, Patient } from '../../types';
+import { getPayerPlans } from '../../services/estimationService';
+
+interface ServiceWithTariff extends MasterService {
+  price?: number;
+  turnaroundTime?: string;
+  isPublished?: boolean;
+  hmoAccepted?: string[];
+  catalogueId?: number;
+}
+
+interface BasketItem {
+  serviceId: number;
+  serviceCode: string;
+  serviceName: string;
+  department: string;
+  quantity: number;
+  unitPrice: number;
+  turnaroundTime?: string;
+  specimenType?: string;
+}
 
 export const CostEstimationView: React.FC = () => {
   const { addNotification, setActiveTab } = useWelliPay();
 
-  // Mode: Phase 1 (Standard Estimation) vs Phase 2 (HMO Benefit Check)
-  const [activeMode, setActiveMode] = useState<'estimate' | 'benefit_check'>('benefit_check');
-
-  const [providers, setProviders] = useState<ProviderAccount[]>([]);
-  const [selectedProviderId, setSelectedProviderId] = useState<string>('PRV-LAG-01');
+  // Data states
   const [masterServices, setMasterServices] = useState<MasterService[]>([]);
+  const [catalogueItems, setCatalogueItems] = useState<any[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
-  
+  const [payerPlans, setPayerPlans] = useState<PayerPlanRule[]>([]);
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [initialLoading, setInitialLoading] = useState<boolean>(true);
+
+  // Search & Filter state
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
-  const [selectedService, setSelectedService] = useState<MasterService | null>(null);
 
-  // Phase 1: Estimate state
-  const [estimate, setEstimate] = useState<CostEstimate | null>(null);
-  const [estimateLoading, setEstimateLoading] = useState<boolean>(false);
-  const [estimateError, setEstimateError] = useState<{ message: string; statusCode: number } | null>(null);
+  // Running Basket
+  const [basket, setBasket] = useState<BasketItem[]>([]);
 
-  // Phase 2: Benefit Check state
-  const [payerPlans, setPayerPlans] = useState<PayerPlanRule[]>([]);
-  const [selectedPayer, setSelectedPayer] = useState<string>('Reliance HMO');
-  const [selectedPlan, setSelectedPlan] = useState<string>('Silver Plan');
-  const [patients, setPatients] = useState<Patient[]>([]);
+  // Payer & Patient Selection (defaults to Self-pay)
+  const [selectedPayer, setSelectedPayer] = useState<string>('Self-pay');
+  const [selectedPlan, setSelectedPlan] = useState<string>('');
   const [selectedPatientId, setSelectedPatientId] = useState<string>('');
-  const [benefitResult, setBenefitResult] = useState<BenefitCheckResult | null>(null);
-  const [benefitLoading, setBenefitLoading] = useState<boolean>(false);
-  const [benefitError, setBenefitError] = useState<string | null>(null);
 
+  // UI state
   const [copied, setCopied] = useState<boolean>(false);
+  const [creatingInvoice, setCreatingInvoice] = useState<boolean>(false);
 
-  // 1. Initial Load of Providers, Master Directory, Payer Plans & Patients
+  // 1. Initial Data Load
   useEffect(() => {
     async function loadData() {
       setInitialLoading(true);
       try {
-        const [provRes, masterRes, plansData, patientsRes] = await Promise.all([
-          fetch('/api/directory/providers').then(r => r.json()),
+        const [masterRes, catRes, plansData, patientsRes] = await Promise.all([
           fetch('/api/directory/master?provider_type=laboratory').then(r => r.json()),
+          fetch('/api/directory/catalogue/PRV-LAG-01').then(r => r.json()).catch(() => ({ catalogue: [] })),
           getPayerPlans().catch(() => []),
           fetch('/api/patients').then(r => r.json()).catch(() => ({ patients: [] }))
         ]);
 
-        if (provRes.success && provRes.providers) {
-          setProviders(provRes.providers);
-          if (provRes.providers.length > 0 && !selectedProviderId) {
-            setSelectedProviderId(provRes.providers[0].id);
-          }
-        }
-
         if (masterRes.success && masterRes.services) {
           setMasterServices(masterRes.services);
           setDepartments(masterRes.departments || []);
-          // Auto-select Full Blood Count if available
-          const fbc = masterRes.services.find((s: MasterService) => s.serviceCode === 'LAB-HEM-FBC');
-          if (fbc) {
-            setSelectedService(fbc);
-          }
+        }
+
+        if (catRes.success && Array.isArray(catRes.catalogue)) {
+          setCatalogueItems(catRes.catalogue);
         }
 
         if (Array.isArray(plansData) && plansData.length > 0) {
@@ -99,7 +96,7 @@ export const CostEstimationView: React.FC = () => {
           setPatients(patientsRes.patients);
         }
       } catch (err) {
-        console.error('Failed to load estimation initial data:', err);
+        console.error('Failed to load estimator data:', err);
         addNotification('Failed to load diagnostic directory', 'error');
       } finally {
         setInitialLoading(false);
@@ -109,130 +106,82 @@ export const CostEstimationView: React.FC = () => {
     loadData();
   }, []);
 
-  // 2. Fetch Phase 1 Estimate whenever Provider or Selected Service changes
+  // Map master services with live published tariffs from provider catalogue
+  const directoryServices: ServiceWithTariff[] = useMemo(() => {
+    const catMap = new Map<number, any>();
+    catalogueItems.forEach(item => {
+      if (item.masterServiceId) catMap.set(item.masterServiceId, item);
+    });
+
+    return masterServices.map(ms => {
+      const cat = catMap.get(ms.id);
+      return {
+        ...ms,
+        price: cat ? Number(cat.price) : undefined,
+        turnaroundTime: cat ? cat.turnaroundTime : ms.benchmarkTurnaround,
+        isPublished: cat ? cat.isPublished : false,
+        hmoAccepted: cat ? cat.hmoAccepted : [],
+        catalogueId: cat ? cat.id : undefined
+      };
+    });
+  }, [masterServices, catalogueItems]);
+
+  // Distinct Payers
+  const distinctPayers = useMemo(() => {
+    const fromPlans = [...new Set(payerPlans.map(p => p.payerName))];
+    return fromPlans.length > 0 ? fromPlans : ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Leadway Health'];
+  }, [payerPlans]);
+
+  // Available plans for selected payer
+  const availablePlansForPayer = useMemo(() => {
+    if (selectedPayer === 'Self-pay') return [];
+    return payerPlans.filter(p => p.payerName.toLowerCase() === selectedPayer.toLowerCase());
+  }, [payerPlans, selectedPayer]);
+
+  // When payer changes, default to first available plan if current plan is not in list
   useEffect(() => {
-    if (!selectedProviderId || !selectedService) {
-      setEstimate(null);
-      setEstimateError(null);
-      return;
-    }
-
-    let isMounted = true;
-    async function fetchEstimate() {
-      setEstimateLoading(true);
-      setEstimateError(null);
-      setEstimate(null);
-
-      try {
-        const result = await getCostEstimate(selectedProviderId, selectedService!.id);
-        if (isMounted) {
-          setEstimate(result);
-        }
-      } catch (err: any) {
-        if (isMounted) {
-          if (err instanceof EstimateError) {
-            setEstimateError({ message: err.message, statusCode: err.statusCode });
-          } else {
-            setEstimateError({ message: err.message || 'Failed to retrieve cost estimate', statusCode: 500 });
-          }
-        }
-      } finally {
-        if (isMounted) {
-          setEstimateLoading(false);
-        }
+    if (selectedPayer !== 'Self-pay' && availablePlansForPayer.length > 0) {
+      const currentValid = availablePlansForPayer.some(p => p.planName === selectedPlan);
+      if (!currentValid) {
+        setSelectedPlan(availablePlansForPayer[0].planName);
       }
     }
+  }, [selectedPayer, availablePlansForPayer, selectedPlan]);
 
-    fetchEstimate();
+  // Selected Patient
+  const selectedPatient = useMemo(() => {
+    return patients.find(p => p.id === selectedPatientId) || null;
+  }, [patients, selectedPatientId]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [selectedProviderId, selectedService]);
-
-  // 3. Fetch Phase 2 Benefit Check whenever inputs change
-  useEffect(() => {
-    if (activeMode !== 'benefit_check' || !selectedProviderId || !selectedService || !selectedPayer || !selectedPlan) {
-      setBenefitResult(null);
-      setBenefitError(null);
-      return;
-    }
-
-    let isMounted = true;
-    async function runBenefitCheck() {
-      setBenefitLoading(true);
-      setBenefitError(null);
-      setBenefitResult(null);
-
-      try {
-        const result = await checkBenefitCoverage({
-          providerId: selectedProviderId,
-          masterServiceId: selectedService!.id,
-          payerName: selectedPayer,
-          planName: selectedPlan,
-          patientId: selectedPatientId || undefined
-        });
-
-        if (isMounted) {
-          setBenefitResult(result);
-        }
-      } catch (err: any) {
-        if (isMounted) {
-          setBenefitError(err.message || 'Benefit check failed');
-        }
-      } finally {
-        if (isMounted) {
-          setBenefitLoading(false);
-        }
-      }
-    }
-
-    runBenefitCheck();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [activeMode, selectedProviderId, selectedService, selectedPayer, selectedPlan, selectedPatientId]);
-
-  // Handle patient selection (auto-populate HMO & Plan)
+  // Patient selection handler
   const handleSelectPatient = (patientId: string) => {
     setSelectedPatientId(patientId);
-    if (!patientId) return;
+    if (!patientId) {
+      setSelectedPayer('Self-pay');
+      return;
+    }
 
     const patient = patients.find(p => p.id === patientId);
-    if (patient && patient.hmoName) {
-      setSelectedPayer(patient.hmoName);
-      // Derive plan name from coverage string e.g. "Reliance HMO (Silver Plan)"
-      const match = patient.primaryCoverage.match(/\((.*?)\)/);
-      if (match && match[1]) {
-        setSelectedPlan(match[1]);
+    if (patient) {
+      if (patient.hmoName) {
+        setSelectedPayer(patient.hmoName);
+        // Extract plan from coverage description if available
+        const match = patient.primaryCoverage.match(/\((.*?)\)/);
+        if (match && match[1]) {
+          setSelectedPlan(match[1]);
+        } else {
+          const firstPlan = payerPlans.find(p => p.payerName.toLowerCase() === patient.hmoName?.toLowerCase());
+          if (firstPlan) setSelectedPlan(firstPlan.planName);
+        }
       } else {
-        // Fallback to first available plan for that payer
-        const firstPlan = payerPlans.find(p => p.payerName.toLowerCase() === patient.hmoName?.toLowerCase());
-        if (firstPlan) setSelectedPlan(firstPlan.planName);
+        setSelectedPayer('Self-pay');
       }
     }
   };
 
-  // Available plans for currently selected payer
-  const availablePlansForPayer = useMemo(() => {
-    return payerPlans.filter(p => p.payerName.toLowerCase() === selectedPayer.toLowerCase());
-  }, [payerPlans, selectedPayer]);
-
-  // List of distinct payers
-  const distinctPayers = useMemo(() => {
-    const list = [...new Set(payerPlans.map(p => p.payerName))];
-    return list.length > 0 ? list : ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Leadway Health'];
-  }, [payerPlans]);
-
-  // Current Provider Object
-  const currentProvider = useMemo(() => {
-    return providers.find(p => p.id === selectedProviderId) || null;
-  }, [providers, selectedProviderId]);
-
-  // Filtered Services List in picker
+  // Filtered Services List
   const filteredServices = useMemo(() => {
-    return masterServices.filter(s => {
+    return directoryServices.filter(s => {
       if (selectedDepartment !== 'all' && s.department !== selectedDepartment) {
         return false;
       }
@@ -245,120 +194,291 @@ export const CostEstimationView: React.FC = () => {
       }
       return true;
     });
-  }, [masterServices, selectedDepartment, searchQuery]);
+  }, [directoryServices, selectedDepartment, searchQuery]);
 
-  const handleCopyQuote = () => {
-    if (activeMode === 'benefit_check' && benefitResult && currentProvider) {
-      const text = `WelliPay HMO Benefit Verification\nProvider: ${currentProvider.name}\nPayer: ${benefitResult.payerName} (${benefitResult.planName})\nService: ${benefitResult.serviceName} (${benefitResult.serviceCode})\nTariff: ₦${benefitResult.price.toLocaleString()}\nHMO Coverage (${100 - benefitResult.copayPercentage}%): ₦${benefitResult.hmoCoverageAmount.toLocaleString()}\nEnrollee Copay (${benefitResult.copayPercentage}%): ₦${benefitResult.patientCopayAmount.toLocaleString()}\nPre-Auth: ${benefitResult.preAuthRequired ? 'MANDATORY (threshold exceeded)' : 'Pre-cleared'}\nNote: ${benefitResult.note}`;
-      navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      addNotification('Benefit verification quote copied to clipboard', 'success');
-      return;
+  // Basket Handlers
+  const addToBasket = (service: ServiceWithTariff) => {
+    if (!service.price) return;
+    setBasket(prev => {
+      const existing = prev.find(item => item.serviceId === service.id);
+      if (existing) {
+        return prev.map(item => 
+          item.serviceId === service.id 
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [
+        ...prev,
+        {
+          serviceId: service.id,
+          serviceCode: service.serviceCode,
+          serviceName: service.serviceName,
+          department: service.department,
+          quantity: 1,
+          unitPrice: service.price!,
+          turnaroundTime: service.turnaroundTime,
+          specimenType: service.specimenType
+        }
+      ];
+    });
+  };
+
+  const updateQuantity = (serviceId: number, delta: number) => {
+    setBasket(prev => {
+      return prev
+        .map(item => {
+          if (item.serviceId === serviceId) {
+            const newQty = item.quantity + delta;
+            return newQty > 0 ? { ...item, quantity: newQty } : null;
+          }
+          return item;
+        })
+        .filter(Boolean) as BasketItem[];
+    });
+  };
+
+  const removeFromBasket = (serviceId: number) => {
+    setBasket(prev => prev.filter(item => item.serviceId !== serviceId));
+  };
+
+  const clearBasket = () => {
+    setBasket([]);
+  };
+
+  // Active Policy Rule resolution for current Payer & Plan
+  const activePlanRule = useMemo(() => {
+    if (selectedPayer === 'Self-pay') return null;
+    return payerPlans.find(
+      p => p.payerName.toLowerCase() === selectedPayer.toLowerCase() &&
+           p.planName.toLowerCase() === selectedPlan.toLowerCase()
+    ) || null;
+  }, [payerPlans, selectedPayer, selectedPlan]);
+
+  // Calculations for each basket item
+  const basketCalculations = useMemo(() => {
+    return basket.map(item => {
+      const lineTariff = item.unitPrice * item.quantity;
+
+      if (selectedPayer === 'Self-pay') {
+        return {
+          ...item,
+          status: 'covered' as const,
+          copayPercentage: 100,
+          patientCopay: lineTariff,
+          hmoCoverage: 0,
+          requiresPreAuth: false
+        };
+      }
+
+      // HMO plan evaluation
+      let isExcluded = false;
+      if (activePlanRule) {
+        if (activePlanRule.excludedServices && activePlanRule.excludedServices.includes(item.serviceName)) {
+          isExcluded = true;
+        } else if (
+          activePlanRule.coveredCategories && 
+          activePlanRule.coveredCategories.length > 0 && 
+          !activePlanRule.coveredCategories.includes(item.department)
+        ) {
+          isExcluded = true;
+        }
+      }
+
+      if (isExcluded) {
+        return {
+          ...item,
+          status: 'excluded' as const,
+          copayPercentage: 100,
+          patientCopay: lineTariff,
+          hmoCoverage: 0,
+          requiresPreAuth: false
+        };
+      }
+
+      const copayRate = activePlanRule ? Number(activePlanRule.copayPercentage) : 20;
+      const patientCopay = Math.round(lineTariff * (copayRate / 100));
+      const hmoCoverage = lineTariff - patientCopay;
+
+      // Item pre-auth threshold check
+      const threshold = activePlanRule?.preauthThreshold ? Number(activePlanRule.preauthThreshold) : null;
+      const requiresPreAuth = threshold !== null && lineTariff >= threshold;
+
+      return {
+        ...item,
+        status: 'covered' as const,
+        copayPercentage: copayRate,
+        patientCopay,
+        hmoCoverage,
+        requiresPreAuth
+      };
+    });
+  }, [basket, selectedPayer, activePlanRule]);
+
+  // Aggregate financial metrics
+  const grossTotal = useMemo(() => {
+    return basketCalculations.reduce((sum, it) => sum + (it.unitPrice * it.quantity), 0);
+  }, [basketCalculations]);
+
+  const hmoTotal = useMemo(() => {
+    return basketCalculations.reduce((sum, it) => sum + it.hmoCoverage, 0);
+  }, [basketCalculations]);
+
+  const patientTotal = useMemo(() => {
+    return basketCalculations.reduce((sum, it) => sum + it.patientCopay, 0);
+  }, [basketCalculations]);
+
+  const overallCopayPercentage = useMemo(() => {
+    if (grossTotal === 0) return 0;
+    return Math.round((patientTotal / grossTotal) * 100);
+  }, [grossTotal, patientTotal]);
+
+  // Pre-authorisation trigger:
+  // Required if HMO plan AND (total gross exceeds ₦100,000 threshold or item exceeds policy limit)
+  const hasPreAuthRequired = useMemo(() => {
+    if (selectedPayer === 'Self-pay') return false;
+    if (grossTotal > 100000) return true;
+    return basketCalculations.some(it => it.requiresPreAuth);
+  }, [selectedPayer, grossTotal, basketCalculations]);
+
+  // Formatted summary text for WhatsApp and Clipboard
+  const generateEstimateSummary = () => {
+    const facilityName = 'Lagoon Specialist Hospital';
+    const patientName = selectedPatient ? selectedPatient.fullName : 'Walk-in patient';
+    const payerDisplay = selectedPayer === 'Self-pay' 
+      ? 'Self-pay (Direct settlement)' 
+      : `${selectedPayer}${selectedPlan ? ` · ${selectedPlan}` : ''}`;
+
+    let msg = `*WelliPay Investigation Estimate*\n`;
+    msg += `Facility: ${facilityName}\n`;
+    msg += `Patient: ${patientName}${selectedPatient?.mrn ? ` (${selectedPatient.mrn})` : ''}\n`;
+    msg += `Payment route: ${payerDisplay}\n\n`;
+    msg += `*Requested Investigations:*\n`;
+    
+    basketCalculations.forEach((item, idx) => {
+      const lineTotal = item.unitPrice * item.quantity;
+      msg += `${idx + 1}. ${item.serviceName} (${item.serviceCode}) x${item.quantity} — ₦${lineTotal.toLocaleString()}\n`;
+    });
+
+    msg += `\n*Financial Summary:*\n`;
+    msg += `• Gross tariff: ₦${grossTotal.toLocaleString()}\n`;
+    if (selectedPayer !== 'Self-pay') {
+      msg += `• HMO coverage: ₦${hmoTotal.toLocaleString()}\n`;
+      msg += `• *Patient copay due: ₦${patientTotal.toLocaleString()}*\n`;
+    } else {
+      msg += `• *Total payable at desk: ₦${patientTotal.toLocaleString()}*\n`;
     }
 
-    if (!estimate || !currentProvider) return;
-    const text = `WelliPay Cost Estimate\nProvider: ${currentProvider.name}\nService: ${estimate.serviceName} (${estimate.serviceCode})\nPrice: ₦${estimate.price.toLocaleString()}\nTurnaround Time: ${estimate.turnaroundTime}\nAccepted Payers: ${estimate.hmoAccepted.join(', ')}`;
-    navigator.clipboard.writeText(text);
+    if (hasPreAuthRequired) {
+      msg += `\n⚠️ *Note:* Pre-authorisation code is required before investigation dispensation.\n`;
+    }
+
+    msg += `\n_Generated via WelliPay Estimator_`;
+    return msg;
+  };
+
+  // 1. Send on WhatsApp
+  const handleSendWhatsApp = () => {
+    if (basket.length === 0) return;
+    const msg = generateEstimateSummary();
+    let url = 'https://wa.me/';
+    if (selectedPatient && selectedPatient.phone) {
+      const cleanPhone = selectedPatient.phone.replace(/[^0-9]/g, '');
+      url += `${cleanPhone}`;
+    }
+    url += `?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+    addNotification('WhatsApp estimate link opened', 'success');
+  };
+
+  // 2. Copy Estimate
+  const handleCopyEstimate = () => {
+    if (basket.length === 0) return;
+    const msg = generateEstimateSummary();
+    navigator.clipboard.writeText(msg);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    addNotification('Cost estimate quotation copied to clipboard', 'success');
+    addNotification('Estimate summary copied to clipboard', 'success');
+  };
+
+  // 3. Create Invoice
+  const handleCreateInvoice = async () => {
+    if (basket.length === 0) return;
+    setCreatingInvoice(true);
+    try {
+      const patientName = selectedPatient ? selectedPatient.fullName : 'Walk-in Patient';
+      const patientMrn = selectedPatient ? selectedPatient.mrn : `MRN-LSH-${Math.floor(10060 + Math.random() * 30)}`;
+
+      const token = await auth.currentUser?.getIdToken().catch(() => null);
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      else headers['Authorization'] = 'Bearer dev-token';
+
+      const payload = {
+        patient_id: selectedPatient?.id,
+        patient_name: patientName,
+        patient_mrn: patientMrn,
+        service_description: basket.map(i => i.serviceName).join(', '),
+        total_amount: grossTotal,
+        due_date: new Date().toISOString().split('T')[0],
+        payer_type: selectedPayer === 'Self-pay' ? 'self-pay' : 'hmo',
+        payer_name: selectedPayer === 'Self-pay' ? 'Patient Self-Pay' : selectedPayer,
+        policy_number: selectedPatient?.hmoPolicyNumber || (selectedPayer !== 'Self-pay' ? 'POL-UNVERIFIED' : undefined),
+        copay_amount: patientTotal,
+        claim_amount: hmoTotal,
+        pre_auth_code: hasPreAuthRequired ? 'PENDING-AUTH' : undefined,
+        line_items: basket.map((it, idx) => ({
+          id: `ITEM-${idx + 1}`,
+          description: `${it.serviceName} (${it.serviceCode})`,
+          quantity: it.quantity,
+          unitPrice: it.unitPrice,
+          totalAmount: it.unitPrice * it.quantity
+        }))
+      };
+
+      const res = await fetch('/api/invoices', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        addNotification(data.error, 'error');
+      } else {
+        addNotification(`Invoice ${data.invoice?.invoice_number || ''} created from estimate`, 'success');
+        setActiveTab('invoices');
+      }
+    } catch (err) {
+      console.error('Failed to create invoice from estimate:', err);
+      addNotification('Failed to create invoice from estimate', 'error');
+    } finally {
+      setCreatingInvoice(false);
+    }
   };
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
-      {/* 1. Executive Header & Mode Selector */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-6">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1.5">
-              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wide bg-teal-50 text-[#0B6B69] border border-teal-200 uppercase flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-[#0B6B69]" />
-                Two-Clean-Systems Architecture
-              </span>
-              <span className="text-xs text-slate-500 font-medium">
-                Standardized master tariffs + Payer policy terms
-              </span>
-            </div>
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-              Tariff Estimation & HMO Benefit Check
-            </h1>
-            <p className="text-sm text-slate-500 mt-0.5 max-w-3xl">
-              Authoritative real-time tariff estimation combined with automated enrollee policy verification, copay calculations, and pre-authorization validation.
-            </p>
-          </div>
-
-          {/* Provider Selector Switcher */}
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2.5 bg-slate-50 border border-slate-300 rounded-lg px-3.5 py-2 shadow-2xs">
-              <Building2 className="w-4 h-4 text-slate-500 flex-shrink-0" />
-              <div className="flex flex-col">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400 leading-none">
-                  Facility
-                </span>
-                <select
-                  value={selectedProviderId}
-                  onChange={(e) => setSelectedProviderId(e.target.value)}
-                  className="bg-transparent text-sm font-bold text-slate-800 focus:outline-none cursor-pointer pr-4 mt-0.5"
-                >
-                  {providers.map(p => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} ({p.providerType === 'hospital' ? 'Hospital' : 'Laboratory'})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setActiveTab('catalogue')}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white border border-slate-300 hover:border-slate-400 text-slate-700 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
-              title="Open full catalogue to edit tariffs"
-            >
-              <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
-              <span className="hidden sm:inline">Catalogue</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Feature Mode Toggle Bar */}
-        <div className="flex items-center gap-2 mt-6 pt-5 border-t border-slate-100">
-          <button
-            onClick={() => setActiveMode('benefit_check')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeMode === 'benefit_check'
-                ? 'bg-[#12244D] text-white shadow-xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>HMO Benefit Check & Copay (Phase 2)</span>
-          </button>
-
-          <button
-            onClick={() => setActiveMode('estimate')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeMode === 'estimate'
-                ? 'bg-[#12244D] text-white shadow-xs'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            <Calculator className="w-4 h-4 text-teal-400" />
-            <span>Standard Tariff Estimation (Phase 1)</span>
-          </button>
-        </div>
+      {/* 1. Header */}
+      <div className="bg-white rounded-xl border border-slate-200 shadow-xs p-5">
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+          Estimator
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+          Check service tariffs, calculate HMO copay and generate patient estimates.
+        </p>
       </div>
 
       {/* 2. Main Two-Column Workflow */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
-        {/* Left Column: Standard Service Directory Picker (5 Cols) */}
-        <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col h-[700px] overflow-hidden">
+        {/* Left Column: Standardised Service Directory (5 Cols) */}
+        <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col h-[740px] overflow-hidden">
           <div className="p-4 border-b border-slate-200 bg-slate-50/70">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-700">
                 <Layers className="w-3.5 h-3.5 text-slate-500" />
-                <span>Standardized Services</span>
+                <span>Standardised services</span>
               </div>
               <span className="text-[11px] font-mono text-slate-400">
                 {filteredServices.length} available
@@ -370,7 +490,7 @@ export const CostEstimationView: React.FC = () => {
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
               <input
                 type="text"
-                placeholder="Search investigation, code, or panel..."
+                placeholder="Search service name, code, or department..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-white border border-slate-300 rounded-lg pl-9 pr-8 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-brand-navy"
@@ -378,7 +498,7 @@ export const CostEstimationView: React.FC = () => {
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -414,10 +534,10 @@ export const CostEstimationView: React.FC = () => {
           </div>
 
           {/* Service List */}
-          <div className="flex-1 overflow-y-auto divide-y divide-slate-100 p-2">
+          <div className="flex-1 overflow-y-auto divide-y divide-slate-100 p-2 space-y-1">
             {initialLoading ? (
               <div className="p-8 text-center text-xs text-slate-400">
-                Loading standardized diagnostic directory...
+                Loading standardised diagnostic directory...
               </div>
             ) : filteredServices.length === 0 ? (
               <div className="p-8 text-center text-xs text-slate-400">
@@ -425,16 +545,11 @@ export const CostEstimationView: React.FC = () => {
               </div>
             ) : (
               filteredServices.map(service => {
-                const isSelected = selectedService?.id === service.id;
+                const inBasket = basket.find(b => b.serviceId === service.id);
                 return (
                   <div
                     key={service.id}
-                    onClick={() => setSelectedService(service)}
-                    className={`p-3 rounded-lg cursor-pointer transition-all ${
-                      isSelected
-                        ? 'bg-blue-50/70 border border-blue-200 shadow-2xs'
-                        : 'hover:bg-slate-50 border border-transparent'
-                    }`}
+                    className="p-3 rounded-lg border border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-2xs transition-all"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
@@ -442,18 +557,75 @@ export const CostEstimationView: React.FC = () => {
                           <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 border border-slate-200">
                             {service.serviceCode}
                           </span>
-                          <span className="text-[10px] text-slate-400 font-medium truncate">
+                          <span className="text-[10px] font-medium text-slate-500">
                             {service.department}
                           </span>
                         </div>
-                        <h4 className="text-xs font-bold text-slate-900 leading-snug truncate">
+                        <h4 className="text-xs font-bold text-slate-900 leading-snug">
                           {service.serviceName}
                         </h4>
-                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
-                          {service.description}
-                        </p>
+                        <div className="flex items-center gap-3 text-[11px] text-slate-400 mt-1">
+                          {service.turnaroundTime && (
+                            <span className="flex items-center gap-1">
+                              <Clock className="w-3 h-3 text-slate-400" />
+                              <span>{service.turnaroundTime}</span>
+                            </span>
+                          )}
+                          {service.specimenType && (
+                            <span className="flex items-center gap-1 truncate" title={service.specimenType}>
+                              <FlaskConical className="w-3 h-3 text-slate-400" />
+                              <span>{service.specimenType}</span>
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <ChevronRight className={`w-4 h-4 flex-shrink-0 mt-2 ${isSelected ? 'text-brand-navy' : 'text-slate-300'}`} />
+
+                      <div className="flex flex-col items-end justify-between self-stretch gap-2 flex-shrink-0">
+                        {service.price ? (
+                          <span className="text-xs font-extrabold font-mono text-[#12244D]">
+                            ₦{service.price.toLocaleString()}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 italic">
+                            Unpriced
+                          </span>
+                        )}
+
+                        {inBasket ? (
+                          <div className="flex items-center gap-1 bg-slate-100 rounded-md p-0.5 border border-slate-200">
+                            <button
+                              onClick={() => updateQuantity(service.id, -1)}
+                              className="w-5 h-5 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white rounded transition-colors text-xs font-bold cursor-pointer"
+                              title="Decrease quantity"
+                            >
+                              -
+                            </button>
+                            <span className="px-1.5 text-xs font-bold text-slate-800 font-mono">
+                              {inBasket.quantity}
+                            </span>
+                            <button
+                              onClick={() => updateQuantity(service.id, 1)}
+                              className="w-5 h-5 flex items-center justify-center text-slate-600 hover:text-slate-900 hover:bg-white rounded transition-colors text-xs font-bold cursor-pointer"
+                              title="Increase quantity"
+                            >
+                              +
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            disabled={!service.price}
+                            onClick={() => addToBasket(service)}
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
+                              service.price
+                                ? 'bg-[#12244D] hover:bg-[#0B6B69] text-white shadow-2xs'
+                                : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                            }`}
+                          >
+                            <Plus className="w-3 h-3" />
+                            <span>Add</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -462,494 +634,325 @@ export const CostEstimationView: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Column: Display Area (7 Cols) */}
-        <div className="lg:col-span-7 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col p-6 min-h-[700px]">
+        {/* Right Column: Running Basket & Cost Estimate (7 Cols) */}
+        <div className="lg:col-span-7 bg-white rounded-xl border border-slate-200 shadow-xs flex flex-col p-5 min-h-[740px]">
           
-          {/* ============================================================== */}
-          {/* PHASE 2: HMO BENEFIT CHECK & COPAY VIEW                        */}
-          {/* ============================================================== */}
-          {activeMode === 'benefit_check' ? (
-            <div className="flex-1 flex flex-col justify-between space-y-5">
-              <div>
-                {/* Enrollee & Payer Configuration Box */}
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-200/70">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                      <Shield className="w-4 h-4 text-brand-navy" />
-                      <span>Enrollee Coverage & Policy Terms</span>
-                    </div>
-                    <span className="text-[11px] text-slate-400 font-mono">
-                      payer_plan_rules
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {/* Patient Quick Selector */}
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                        Select Patient (Optional)
-                      </label>
-                      <select
-                        value={selectedPatientId}
-                        onChange={(e) => handleSelectPatient(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-navy cursor-pointer"
-                      >
-                        <option value="">-- Manual Enrollee --</option>
-                        {patients.filter(p => p.hmoName).map(p => (
-                          <option key={p.id} value={p.id}>
-                            {p.fullName} ({p.hmoName})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* HMO Payer Selector */}
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                        HMO Payer
-                      </label>
-                      <select
-                        value={selectedPayer}
-                        onChange={(e) => {
-                          const newPayer = e.target.value;
-                          setSelectedPayer(newPayer);
-                          const firstPlan = payerPlans.find(p => p.payerName.toLowerCase() === newPayer.toLowerCase());
-                          if (firstPlan) setSelectedPlan(firstPlan.planName);
-                        }}
-                        className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-navy cursor-pointer"
-                      >
-                        {distinctPayers.map(p => (
-                          <option key={p} value={p}>{p}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Policy Plan Selector */}
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                        Policy Tier / Plan
-                      </label>
-                      <select
-                        value={selectedPlan}
-                        onChange={(e) => setSelectedPlan(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-navy cursor-pointer"
-                      >
-                        {availablePlansForPayer.map(plan => (
-                          <option key={plan.id} value={plan.planName}>
-                            {plan.planName} ({plan.copayPercentage}% copay)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Live Benefit Result Presentation */}
-                {benefitLoading ? (
-                  <div className="py-20 flex flex-col items-center justify-center text-center">
-                    <div className="w-8 h-8 border-2 border-brand-navy border-t-transparent rounded-full animate-spin mb-3" />
-                    <p className="text-sm font-semibold text-slate-700">Verifying enrollee benefits & policy terms...</p>
-                    <p className="text-xs text-slate-400 mt-1">Cross-referencing {selectedService?.serviceCode} against {selectedPayer} {selectedPlan}</p>
-                  </div>
-                ) : benefitError ? (
-                  <div className="py-16 flex flex-col items-center justify-center text-center p-6">
-                    <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mb-3">
-                      <AlertTriangle className="w-6 h-6" />
-                    </div>
-                    <h3 className="text-base font-bold text-slate-900">Benefit Verification Error</h3>
-                    <p className="text-xs text-slate-500 mt-2 max-w-md">{benefitError}</p>
-                  </div>
-                ) : benefitResult ? (
-                  <div className="mt-5 space-y-5">
-                    {/* Status Strip & Copy Action */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
-                        {benefitResult.status === 'covered' && (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                            Covered In-Network Benefit
-                          </span>
-                        )}
-                        {benefitResult.status === 'out_of_network' && (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-slate-100 text-slate-800 border border-slate-300 flex items-center gap-1.5">
-                            <Ban className="w-3.5 h-3.5 text-slate-500" />
-                            Out of Network Provider
-                          </span>
-                        )}
-                        {benefitResult.status === 'excluded' && (
-                          <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-rose-50 text-rose-800 border border-rose-300 flex items-center gap-1.5">
-                            <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
-                            Policy Exclusion (Not Covered)
-                          </span>
-                        )}
-
-                        <span className="text-xs text-slate-400 font-mono">
-                          {benefitResult.payerName} · {benefitResult.planName}
-                        </span>
-                      </div>
-
-                      <button
-                        onClick={handleCopyQuote}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
-                      >
-                        {copied ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            <span className="text-emerald-700">Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Copy Billing Note</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Main Financial Split Card */}
-                    <div className="p-5 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/40 border border-slate-200/90">
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                        {/* Enrollee Copay */}
-                        <div>
-                          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
-                            Enrollee Copay Due Today
-                          </div>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-4xl font-extrabold font-mono text-[#12244D] tracking-tight">
-                              ₦{benefitResult.patientCopayAmount.toLocaleString()}
-                            </span>
-                            <span className="text-xs font-bold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-200">
-                              {benefitResult.copayPercentage}% Out-of-Pocket
-                            </span>
-                          </div>
-                          <div className="text-xs text-slate-500 mt-1 font-medium">
-                            Collect at cashier desk before service dispensation.
-                          </div>
-                        </div>
-
-                        {/* HMO Covered Receivable */}
-                        <div className="sm:text-right border-t sm:border-t-0 sm:border-l border-slate-200 pt-3 sm:pt-0 sm:pl-6">
-                          <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
-                            HMO Coverage Receivable
-                          </div>
-                          <div className="text-2xl font-bold font-mono text-emerald-700">
-                            ₦{benefitResult.hmoCoverageAmount.toLocaleString()}
-                          </div>
-                          <div className="text-xs text-slate-500 mt-0.5">
-                            Gross Tariff: ₦{benefitResult.price.toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Visual Copay vs HMO Split Progress Bar */}
-                      <div className="mt-4 pt-3 border-t border-slate-200/80">
-                        <div className="flex justify-between text-[11px] font-bold mb-1.5">
-                          <span className="text-emerald-800">
-                            HMO Pays: ₦{benefitResult.hmoCoverageAmount.toLocaleString()} ({100 - benefitResult.copayPercentage}%)
-                          </span>
-                          <span className="text-brand-navy">
-                            Patient Pays: ₦{benefitResult.patientCopayAmount.toLocaleString()} ({benefitResult.copayPercentage}%)
-                          </span>
-                        </div>
-                        <div className="w-full h-2.5 rounded-full bg-slate-200 flex overflow-hidden">
-                          <div 
-                            className="bg-emerald-600 h-full transition-all duration-500" 
-                            style={{ width: `${100 - benefitResult.copayPercentage}%` }} 
-                            title={`HMO Covered: ${100 - benefitResult.copayPercentage}%`}
-                          />
-                          <div 
-                            className="bg-[#12244D] h-full transition-all duration-500" 
-                            style={{ width: `${benefitResult.copayPercentage}%` }} 
-                            title={`Patient Copay: ${benefitResult.copayPercentage}%`}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Pre-Authorization Alert Box — only relevant for covered/in-network services */}
-                    {benefitResult.status !== 'excluded' && benefitResult.status !== 'out_of_network' && (
-                      benefitResult.preAuthRequired ? (
-                        <div className="p-3.5 rounded-xl bg-amber-50 border border-amber-300 flex items-start gap-3">
-                          <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                          <div className="text-xs">
-                            <span className="font-bold text-amber-900">Pre-Authorization Code Mandatory:</span>{' '}
-                            <span className="text-amber-800 leading-relaxed">
-                              {benefitResult.note}
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 flex items-start gap-3">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                          <div className="text-xs">
-                            <span className="font-bold text-emerald-900">Pre-Authorization Not Required:</span>{' '}
-                            <span className="text-emerald-800 leading-relaxed">
-                              {benefitResult.note}
-                            </span>
-                          </div>
-                        </div>
-                      )
-                    )}
-
-                    {/* Diagnostic Investigation Details */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-                      <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/80">
-                        <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-semibold uppercase mb-0.5">
-                          <Clock className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Turnaround</span>
-                        </div>
-                        <div className="text-xs font-bold text-slate-900">
-                          {benefitResult.turnaroundTime || 'Same day'}
-                        </div>
-                      </div>
-
-                      <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/80">
-                        <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-semibold uppercase mb-0.5">
-                          <FlaskConical className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Specimen</span>
-                        </div>
-                        <div className="text-xs font-bold text-slate-900 truncate">
-                          {selectedService?.specimenType || 'Clinical Sample'}
-                        </div>
-                      </div>
-
-                      <div className="p-3 rounded-lg bg-slate-50 border border-slate-200/80">
-                        <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-semibold uppercase mb-0.5">
-                          <ShieldCheck className="w-3.5 h-3.5 text-slate-500" />
-                          <span>Pre-Auth Threshold</span>
-                        </div>
-                        <div className="text-xs font-bold text-slate-900">
-                          {benefitResult.preAuthThreshold ? `₦${benefitResult.preAuthThreshold.toLocaleString()}` : 'No threshold'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
+          {/* Patient and Payer Controls */}
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 mb-4">
+            <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-200/70">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                <UserCheck className="w-4 h-4 text-brand-navy" />
+                <span>Patient and payer coverage</span>
               </div>
 
-              {/* Bottom Assurance Strip */}
-              <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs text-slate-500">
-                <span className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                  <span>Two-Clean-Systems architecture verified: zero duplicated pricing logic.</span>
+              {/* Policy Status Badge */}
+              {selectedPayer === 'Self-pay' ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-200 text-slate-700">
+                  Direct settlement
                 </span>
-                <span className="font-mono text-[11px] text-slate-400">
-                  {selectedService?.serviceCode} · {currentProvider?.id}
+              ) : selectedPatient && selectedPatient.hmoName?.toLowerCase() === selectedPayer.toLowerCase() ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  Active policy {selectedPatient.hmoPolicyNumber ? `· ${selectedPatient.hmoPolicyNumber}` : ''}
                 </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                  <AlertTriangle className="w-3 h-3 text-amber-600" />
+                  Unverified plan
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Patient Selector */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  Patient (optional)
+                </label>
+                <select
+                  value={selectedPatientId}
+                  onChange={(e) => handleSelectPatient(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-navy cursor-pointer"
+                >
+                  <option value="">Walk-in patient</option>
+                  {patients.map(p => (
+                    <option key={p.id} value={p.id}>
+                      {p.fullName} {p.hmoName ? `(${p.hmoName})` : '(Self-pay)'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Payer Selector */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  Payer
+                </label>
+                <select
+                  value={selectedPayer}
+                  onChange={(e) => {
+                    const newPayer = e.target.value;
+                    setSelectedPayer(newPayer);
+                    if (newPayer !== 'Self-pay') {
+                      const firstPlan = payerPlans.find(p => p.payerName.toLowerCase() === newPayer.toLowerCase());
+                      if (firstPlan) setSelectedPlan(firstPlan.planName);
+                    }
+                  }}
+                  className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-navy cursor-pointer"
+                >
+                  <option value="Self-pay">Self-pay (Direct)</option>
+                  {distinctPayers.map(p => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Plan Selector */}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                  Policy plan
+                </label>
+                {selectedPayer === 'Self-pay' ? (
+                  <div className="bg-slate-100 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-400 italic">
+                    Not applicable (cash)
+                  </div>
+                ) : (
+                  <select
+                    value={selectedPlan}
+                    onChange={(e) => setSelectedPlan(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-brand-navy cursor-pointer"
+                  >
+                    {availablePlansForPayer.map(plan => (
+                      <option key={plan.id} value={plan.planName}>
+                        {plan.planName} ({plan.copayPercentage}% copay)
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             </div>
+          </div>
+
+          {/* Running Basket View */}
+          {basket.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-12 text-slate-400">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                <Calculator className="w-6 h-6 text-slate-400" />
+              </div>
+              <h3 className="text-sm font-bold text-slate-700">No services added to estimate</h3>
+              <p className="text-xs text-slate-400 mt-1 max-w-xs leading-relaxed">
+                Select laboratory investigations or diagnostic procedures from the directory on the left to build a patient quote.
+              </p>
+            </div>
           ) : (
-            /* ============================================================== */
-            /* PHASE 1: STANDARD TARIFF ESTIMATION VIEW                       */
-            /* ============================================================== */
-            <div className="flex-1 flex flex-col justify-between space-y-6">
-              {estimateLoading ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
-                  <div className="w-8 h-8 border-2 border-brand-navy border-t-transparent rounded-full animate-spin mb-3" />
-                  <p className="text-sm font-semibold text-slate-700">
-                    Querying provider tariff schedule...
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    Matching {selectedService?.serviceCode} against {currentProvider?.name}
-                  </p>
+            <div className="flex-1 flex flex-col justify-between space-y-4">
+              <div>
+                {/* Basket Items List */}
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    Selected items ({basket.length})
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    Lagoon Specialist Hospital
+                  </span>
                 </div>
-              ) : estimateError ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-8 max-w-md mx-auto">
-                  {estimateError.statusCode === 409 ? (
-                    <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mb-3">
-                      <AlertTriangle className="w-6 h-6" />
+
+                <div className="overflow-y-auto max-h-[300px] divide-y divide-slate-100 border border-slate-200 rounded-xl">
+                  {basketCalculations.map((item) => (
+                    <div key={item.serviceId} className="p-3 flex items-center justify-between gap-3 bg-white">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-[10px] font-bold text-slate-500">{item.serviceCode}</span>
+                          <h5 className="text-xs font-bold text-slate-900 truncate">{item.serviceName}</h5>
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          ₦{item.unitPrice.toLocaleString()} each · {item.department}
+                        </div>
+                        {selectedPayer !== 'Self-pay' && (
+                          <div className="text-[10px] mt-1">
+                            {item.status === 'excluded' ? (
+                              <span className="text-rose-700 font-semibold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                                Policy exclusion (100% patient copay)
+                              </span>
+                            ) : (
+                              <span className="text-slate-600">
+                                HMO share: ₦{item.hmoCoverage.toLocaleString()} · Copay ({item.copayPercentage}%): ₦{item.patientCopay.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        {/* Quantity controls */}
+                        <div className="flex items-center gap-1 bg-slate-50 rounded border border-slate-200 p-0.5">
+                          <button
+                            onClick={() => updateQuantity(item.serviceId, -1)}
+                            className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-slate-900 rounded font-bold text-xs cursor-pointer"
+                          >
+                            -
+                          </button>
+                          <span className="px-1.5 text-xs font-mono font-bold text-slate-800">
+                            {item.quantity}
+                          </span>
+                          <button
+                            onClick={() => updateQuantity(item.serviceId, 1)}
+                            className="w-5 h-5 flex items-center justify-center text-slate-500 hover:text-slate-900 rounded font-bold text-xs cursor-pointer"
+                          >
+                            +
+                          </button>
+                        </div>
+
+                        {/* Line total */}
+                        <div className="text-right min-w-[70px]">
+                          <div className="text-xs font-mono font-extrabold text-[#12244D]">
+                            ₦{(item.unitPrice * item.quantity).toLocaleString()}
+                          </div>
+                        </div>
+
+                        {/* Remove */}
+                        <button
+                          onClick={() => removeFromBasket(item.serviceId)}
+                          className="text-slate-400 hover:text-rose-600 p-1 transition-colors cursor-pointer"
+                          title="Remove from estimate"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-500 border border-slate-200 flex items-center justify-center mb-3">
-                      <AlertCircle className="w-6 h-6" />
+                  ))}
+                </div>
+
+                {/* Cumulative Financial Summary Box */}
+                <div className="mt-4 p-4 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/40 border border-slate-200/90">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    {/* Patient share */}
+                    <div>
+                      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
+                        {selectedPayer === 'Self-pay' ? 'Total payable at desk' : 'Patient copay due today'}
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-extrabold font-mono text-[#12244D] tracking-tight">
+                          ₦{patientTotal.toLocaleString()}
+                        </span>
+                        {selectedPayer !== 'Self-pay' && (
+                          <span className="text-xs font-bold text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-200">
+                            {overallCopayPercentage}% patient share
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-slate-500 mt-1 font-medium">
+                        {selectedPayer === 'Self-pay' 
+                          ? 'Collect direct settlement before sample collection.'
+                          : 'Collect out-of-pocket copay before investigation dispensation.'}
+                      </div>
+                    </div>
+
+                    {/* HMO share (if HMO) */}
+                    {selectedPayer !== 'Self-pay' && (
+                      <div className="sm:text-right border-t sm:border-t-0 sm:border-l border-slate-200 pt-3 sm:pt-0 sm:pl-6">
+                        <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-0.5">
+                          HMO liability claim
+                        </div>
+                        <div className="text-xl font-bold font-mono text-emerald-700">
+                          ₦{hmoTotal.toLocaleString()}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-0.5">
+                          Gross tariff: ₦{grossTotal.toLocaleString()}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Split bar when HMO */}
+                  {selectedPayer !== 'Self-pay' && grossTotal > 0 && (
+                    <div className="mt-3 pt-3 border-t border-slate-200/80">
+                      <div className="flex justify-between text-[11px] font-bold mb-1.5">
+                        <span className="text-emerald-800">
+                          HMO share: ₦{hmoTotal.toLocaleString()} ({100 - overallCopayPercentage}%)
+                        </span>
+                        <span className="text-brand-navy">
+                          Patient copay: ₦{patientTotal.toLocaleString()} ({overallCopayPercentage}%)
+                        </span>
+                      </div>
+                      <div className="w-full h-2 rounded-full bg-slate-200 flex overflow-hidden">
+                        <div 
+                          className="bg-emerald-600 h-full transition-all duration-300" 
+                          style={{ width: `${100 - overallCopayPercentage}%` }} 
+                        />
+                        <div 
+                          className="bg-[#12244D] h-full transition-all duration-300" 
+                          style={{ width: `${overallCopayPercentage}%` }} 
+                        />
+                      </div>
                     </div>
                   )}
-
-                  <h3 className="text-base font-bold text-slate-900">
-                    {estimateError.statusCode === 409
-                      ? 'Draft Tariff (Unpublished)'
-                      : 'Service Not Priced by Provider'}
-                  </h3>
-                  
-                  <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-                    {estimateError.message}
-                  </p>
-
-                  <div className="mt-6 flex items-center gap-3">
-                    <button
-                      onClick={() => setActiveTab('catalogue')}
-                      className="px-4 py-2 rounded-lg bg-[#12244D] text-white text-xs font-semibold hover:bg-[#0A152E] transition-colors cursor-pointer"
-                    >
-                      Configure in Catalogue
-                    </button>
-                    <button
-                      onClick={() => {
-                        const fallback = masterServices.find(s => s.serviceCode === 'LAB-HEM-FBC');
-                        if (fallback) setSelectedService(fallback);
-                      }}
-                      className="px-3.5 py-2 rounded-lg bg-white border border-slate-300 text-slate-700 text-xs font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
-                    >
-                      Pick standard test
-                    </button>
-                  </div>
                 </div>
-              ) : estimate && selectedService ? (
-                <div className="flex-1 flex flex-col justify-between space-y-6">
-                  <div>
-                    {/* Result Top Badge Strip */}
-                    <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-slate-100">
-                      <div className="flex items-center gap-2">
-                        <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 flex items-center gap-1.5">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          Live Published Tariff
-                        </span>
-                        <span className="text-xs text-slate-400 font-mono">
-                          {currentProvider?.id} · {estimate.serviceCode}
-                        </span>
-                      </div>
 
-                      <button
-                        onClick={handleCopyQuote}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 hover:border-slate-300 bg-white text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
-                      >
-                        {copied ? (
-                          <>
-                            <Check className="w-3.5 h-3.5 text-emerald-600" />
-                            <span className="text-emerald-700">Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Copy Quote</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Main Tariff Highlight Box */}
-                    <div className="mt-5 p-5 rounded-xl bg-gradient-to-br from-slate-50 to-blue-50/40 border border-slate-200/80">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                        Standard Tariff Rate
-                      </div>
-                      <div className="flex items-baseline gap-3">
-                        <span className="text-4xl font-extrabold font-mono text-[#12244D] tracking-tight">
-                          ₦{estimate.price.toLocaleString()}
-                        </span>
-                        <span className="text-xs text-slate-500">
-                          per investigation
-                        </span>
-                      </div>
-                      <div className="text-xs text-slate-600 mt-2 font-medium">
-                        Standard base tariff before enrollee plan rules or copay percentages are applied.
-                      </div>
-                    </div>
-
-                    {/* Service Metadata Details */}
-                    <div className="mt-6 space-y-4">
-                      <div>
-                        <h3 className="text-lg font-bold text-slate-900 leading-tight">
-                          {estimate.serviceName}
-                        </h3>
-                        <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                          {selectedService.description}
-                        </p>
-                      </div>
-
-                      {/* Grid attributes */}
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                        <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200/80">
-                          <div className="flex items-center gap-1.5 text-slate-400 text-[11px] font-semibold uppercase mb-1">
-                            <Clock className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Turnaround</span>
-                          </div>
-                          <div className="text-xs font-bold text-slate-900">
-                            {estimate.turnaroundTime || 'Same day'}
-                          </div>
-                        </div>
-
-                        <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200/80">
-                          <div className="flex items-center gap-1.5 text-slate-400 text-[11px] font-semibold uppercase mb-1">
-                            <FlaskConical className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Specimen</span>
-                          </div>
-                          <div className="text-xs font-bold text-slate-900 truncate" title={selectedService.specimenType}>
-                            {selectedService.specimenType || 'Clinical Sample'}
-                          </div>
-                        </div>
-
-                        <div className="p-3.5 rounded-lg bg-slate-50 border border-slate-200/80">
-                          <div className="flex items-center gap-1.5 text-slate-400 text-[11px] font-semibold uppercase mb-1">
-                            <Layers className="w-3.5 h-3.5 text-slate-500" />
-                            <span>Department</span>
-                          </div>
-                          <div className="text-xs font-bold text-slate-900 truncate">
-                            {estimate.department}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Accepted HMO Coverage Section */}
-                      <div className="pt-3 border-t border-slate-100">
-                        <div className="flex items-center justify-between mb-2.5">
-                          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                            <span>Accepted Payer Coverage ({estimate.hmoAccepted.length})</span>
-                          </div>
-                          <span className="text-[11px] text-slate-400">
-                            Pre-cleared provider network
-                          </span>
-                        </div>
-
-                        {estimate.hmoAccepted.length > 0 ? (
-                          <div className="flex flex-wrap gap-2">
-                            {estimate.hmoAccepted.map(hmo => (
-                              <div
-                                key={hmo}
-                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200/70"
-                              >
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                <span>{hmo}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-xs text-slate-500 italic">
-                            No HMO networks linked. This tariff is self-pay only.
-                          </div>
-                        )}
-                      </div>
+                {/* Pre-authorisation Alert Banner */}
+                {hasPreAuthRequired && (
+                  <div className="mt-3 p-3.5 rounded-xl bg-amber-50 border border-amber-300 flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <span className="font-bold text-amber-900">Pre-authorisation code mandatory:</span>{' '}
+                      <span className="text-amber-800 leading-relaxed">
+                        {grossTotal > 100000 
+                          ? `Total estimate of ₦${grossTotal.toLocaleString()} exceeds the ₦100,000 threshold. Authorisation code required prior to service delivery.`
+                          : 'One or more selected investigations exceed the plan pre-authorisation threshold. Authorisation code required.'}
+                      </span>
                     </div>
                   </div>
+                )}
+              </div>
 
-                  {/* Switch to Benefit Check Banner */}
-                  <div className="p-4 rounded-xl bg-blue-50/60 border border-blue-200/70 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <ShieldCheck className="w-5 h-5 text-brand-navy flex-shrink-0" />
-                      <div className="text-xs">
-                        <span className="font-bold text-slate-900">Need enrollee copay math?</span>{' '}
-                        <span className="text-slate-600">
-                          Switch to HMO Benefit Check to calculate patient out-of-pocket copay and pre-auth requirements.
-                        </span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setActiveMode('benefit_check')}
-                      className="px-3 py-1.5 rounded-lg bg-[#12244D] text-white text-xs font-bold hover:bg-[#0A152E] flex items-center gap-1 cursor-pointer flex-shrink-0"
-                    >
-                      <span>Check Benefits</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
+              {/* Action Toolbar */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-100">
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCreateInvoice}
+                    disabled={creatingInvoice}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#12244D] hover:bg-[#0A152E] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>{creatingInvoice ? 'Creating...' : 'Create invoice'}</span>
+                  </button>
+
+                  <button
+                    onClick={handleSendWhatsApp}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Share2 className="w-3.5 h-3.5" />
+                    <span>Send estimate on WhatsApp</span>
+                  </button>
                 </div>
-              ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-12 text-slate-400">
-                  <Layers className="w-10 h-10 mb-2 opacity-40 text-slate-500" />
-                  <p className="text-sm font-semibold text-slate-600">Select an investigation to view cost estimate</p>
-                  <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                    Choose any standardized laboratory or diagnostic procedure on the left to see published tariffs, turnaround times, and accepted HMO networks.
-                  </p>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleCopyEstimate}
+                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 hover:border-slate-300 bg-white text-slate-700 text-xs font-semibold transition-colors cursor-pointer"
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-600" />
+                        <span className="text-emerald-700">Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Copy estimate</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={clearBasket}
+                    className="px-2.5 py-2 rounded-lg border border-slate-200 hover:border-rose-300 hover:bg-rose-50 text-slate-500 hover:text-rose-600 text-xs font-semibold transition-colors cursor-pointer"
+                    title="Clear estimate"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
                 </div>
-              )}
+              </div>
             </div>
           )}
         </div>

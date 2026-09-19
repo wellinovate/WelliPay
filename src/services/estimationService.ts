@@ -34,7 +34,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 /**
  * Reusable price-lookup function
- * Fetches the tariff and publication state for a specific provider and standardized master diagnostic test.
+ * Fetches the tariff and publication state for a specific provider and standardised master diagnostic test.
  * Used directly by Cost Estimation (Phase 1) and Benefit Check (Phase 2).
  */
 export async function getCostEstimate(

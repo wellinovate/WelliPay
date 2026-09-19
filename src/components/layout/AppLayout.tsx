@@ -40,7 +40,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     { id: 'invoices', label: 'Invoices' },
     { id: 'patients', label: 'Patients' },
     { id: 'catalogue', label: 'Catalogue' },
-    { id: 'estimation', label: 'Cost Estimator' },
+    { id: 'estimation', label: 'Estimator' },
     { id: 'settings', label: 'Settings' },
   ];
 
@@ -94,7 +94,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               onClick={() => setActiveTab('reconciliation')}
             >
               <Logo size="md" variant="horizontal" />
-              <span className="hidden xl:inline-block text-[11px] font-sans font-medium text-[#64748b] pl-3 border-l border-[#e2e8f0]">
+              <span className="hidden xl:inline-block text-[11px] font-sans font-medium text-[#64748b] pl-3 border-l border-[#e2e8f0] whitespace-nowrap">
                 One bill, every payer.
               </span>
             </div>
@@ -106,7 +106,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`h-full px-3.5 font-semibold text-xs transition-colors duration-150 flex items-center gap-1.5 border-b-2 cursor-pointer outline-none focus:outline-none focus-visible:ring-2 focus-visible:ring-[#12244D] focus-visible:ring-offset-2 ${
+                    className={`h-full px-3.5 font-semibold text-xs transition-colors duration-150 flex items-center gap-1.5 border-b-2 cursor-pointer whitespace-nowrap outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#12244D] ${
                       isActive
                         ? 'text-[#12244D] border-[#12244D]'
                         : 'text-[#64748b] border-transparent hover:text-[#12244D] hover:border-slate-300'
