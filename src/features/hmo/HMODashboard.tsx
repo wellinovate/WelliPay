@@ -69,13 +69,13 @@ export const HMODashboard: React.FC = () => {
     }
   };
 
-  // 4 Mutually Exclusive Status Buckets
+  // Status Buckets
   const submittedClaims = useMemo(() => {
-    return hmoClaims.filter(c => c.status === 'submitted' && !c.isDisputed);
+    return hmoClaims.filter(c => c.status === 'submitted');
   }, [hmoClaims]);
 
   const approvedClaims = useMemo(() => {
-    return hmoClaims.filter(c => c.status === 'approved' && !c.isDisputed);
+    return hmoClaims.filter(c => c.status === 'approved');
   }, [hmoClaims]);
 
   const paidClaims = useMemo(() => {
