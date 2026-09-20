@@ -22,20 +22,19 @@ interface RecordPaymentModalProps {
   onClose: () => void;
 }
 
-const CLINICAL_SERVICE_CATALOG = [
-  { name: 'General Outpatient Consultation', tariff: 10000 },
-  { name: 'Specialist Cardiology Consultation', tariff: 25000 },
-  { name: 'Full Blood Count (FBC)', tariff: 8500 },
-  { name: 'Comprehensive Metabolic Panel (CMP)', tariff: 18000 },
-  { name: 'Lipid Profile Panels', tariff: 12000 },
-  { name: 'Renal Function Tests (RFT)', tariff: 15000 },
-  { name: 'Emergency Room Triage & Observation', tariff: 20000 },
-  { name: 'Chest X-Ray (AP/Lateral)', tariff: 18000 },
-  { name: 'Abdomino-Pelvic Ultrasound', tariff: 25000 },
-  { name: 'Inpatient Ward Bed (Per Night)', tariff: 35000 },
-  { name: 'Pharmacy: Prescribed Antibiotics & Analgesics', tariff: 14500 },
-  { name: 'Custom procedure / other clinical service...', tariff: 0 }
-];
+// Lagoon Specialist Hospital's own provider id in the directory — the only
+// provider this front desk transacts against. Same id used by
+// CostEstimationView and ServiceCatalogueView.
+const HOSPITAL_PROVIDER_ID = 'PRV-LAG-01';
+
+const CUSTOM_SERVICE_LABEL = 'Custom procedure / other clinical service...';
+
+interface CatalogueServiceOption {
+  name: string;
+  tariff: number;
+  turnaroundTime?: string;
+  department?: string;
+}
 
 export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ isOpen, onClose }) => {
   const { addProviderTransaction, voidProviderTransaction, providerTransactions, addNotification } = useWelliPay();
@@ -43,7 +42,9 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ isOpen, 
   // Registry data
   const [patients, setPatients] = useState<Patient[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [serviceCatalog, setServiceCatalog] = useState<CatalogueServiceOption[]>([]);
   const [loadingData, setLoadingData] = useState(false);
+  const [catalogueError, setCatalogueError] = useState(false);
 
   // Patient Search & Selection
   const [patientSearch, setPatientSearch] = useState('');
@@ -101,13 +102,16 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ isOpen, 
     setIsVoided(false);
     setReceiptCopied(false);
 
+    setCatalogueError(false);
+
     const loadData = async () => {
       try {
         setLoadingData(true);
         const headers = await getAuthHeaders();
-        const [patientsRes, invoicesRes] = await Promise.all([
+        const [patientsRes, invoicesRes, catalogueRes] = await Promise.all([
           fetch('/api/patients', { headers }),
-          fetch('/api/invoices', { headers })
+          fetch('/api/invoices', { headers }),
+          fetch(`/api/directory/catalogue/${HOSPITAL_PROVIDER_ID}`)
         ]);
 
         if (patientsRes.ok) {
@@ -118,8 +122,29 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ isOpen, 
           const invData = await invoicesRes.json();
           if (invData.invoices) setInvoices(invData.invoices);
         }
+        if (catalogueRes.ok) {
+          const catData = await catalogueRes.json();
+          if (catData.success && Array.isArray(catData.catalogue)) {
+            // Only live, published tariffs — a draft tariff isn't chargeable yet
+            // (matches the 409 the cost-estimate endpoint returns for drafts).
+            const published = catData.catalogue
+              .filter((c: any) => c.isPublished)
+              .map((c: any) => ({
+                name: c.serviceName,
+                tariff: Number(c.price) || 0,
+                turnaroundTime: c.turnaroundTime,
+                department: c.department
+              }));
+            setServiceCatalog(published);
+          } else {
+            setCatalogueError(true);
+          }
+        } else {
+          setCatalogueError(true);
+        }
       } catch (err) {
-        console.error('Error loading patient/invoice data for payment modal:', err);
+        console.error('Error loading patient/invoice/catalogue data for payment modal:', err);
+        setCatalogueError(true);
       } finally {
         setLoadingData(false);
       }
@@ -206,10 +231,16 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ isOpen, 
     setAmountRaw(num.toLocaleString());
   };
 
+  // Live, published tariffs from the hospital's own service directory, plus
+  // a manual fallback for anything not yet in the catalogue.
+  const serviceOptions = useMemo<CatalogueServiceOption[]>(() => {
+    return [...serviceCatalog, { name: CUSTOM_SERVICE_LABEL, tariff: 0 }];
+  }, [serviceCatalog]);
+
   // Clinical service change handler
   const handleServiceChange = (serviceName: string) => {
     setSelectedService(serviceName);
-    const found = CLINICAL_SERVICE_CATALOG.find(c => c.name === serviceName);
+    const found = serviceOptions.find(c => c.name === serviceName);
     if (found && found.tariff > 0 && (!amountRaw || selectedInvoiceNumber === 'none')) {
       setAmountRaw(found.tariff.toLocaleString());
     }
@@ -232,7 +263,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ isOpen, 
   // Validation
   const isFormValid = useMemo(() => {
     if (!selectedPatient) return false;
-    if (!selectedService || (selectedService.includes('Custom') && !customServiceName.trim())) return false;
+    if (!selectedService || (selectedService === CUSTOM_SERVICE_LABEL && !customServiceName.trim())) return false;
     if (numericAmount <= 0) return false;
     if (!channel) return false;
     if (isElectronicChannel && (!reference.trim() || isDuplicateReference)) return false;
@@ -244,7 +275,7 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ isOpen, 
     e.preventDefault();
     if (!isFormValid || !selectedPatient) return;
 
-    const finalService = selectedService.includes('Custom') 
+    const finalService = selectedService === CUSTOM_SERVICE_LABEL 
       ? customServiceName.trim() 
       : selectedService;
 
@@ -564,16 +595,26 @@ export const RecordPaymentModal: React.FC<RecordPaymentModalProps> = ({ isOpen, 
               onChange={(e) => handleServiceChange(e.target.value)}
               className="w-full px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white text-[#0f172a] focus:outline-none focus:border-[#12244D]"
               required
+              disabled={loadingData}
             >
-              <option value="">Select clinical service from catalog...</option>
-              {CLINICAL_SERVICE_CATALOG.map(s => (
+              <option value="">
+                {loadingData ? 'Loading published tariffs...' : 'Select clinical service from catalog...'}
+              </option>
+              {serviceOptions.map(s => (
                 <option key={s.name} value={s.name}>
-                  {s.name} {s.tariff > 0 ? `(Tariff: ₦${s.tariff.toLocaleString()})` : ''}
+                  {s.name}
+                  {s.tariff > 0 ? ` (Tariff: ₦${s.tariff.toLocaleString()}${s.turnaroundTime ? `, ${s.turnaroundTime}` : ''})` : ''}
                 </option>
               ))}
             </select>
 
-            {selectedService.includes('Custom') && (
+            {catalogueError && (
+              <p className="text-[10px] text-rose-600 mt-0.5">
+                Could not load the live tariff catalogue — only the custom entry is available. Refresh and try again.
+              </p>
+            )}
+
+            {selectedService === CUSTOM_SERVICE_LABEL && (
               <input
                 type="text"
                 placeholder="Enter custom clinical procedure name..."
