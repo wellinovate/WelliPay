@@ -438,6 +438,16 @@ export function generateScaledSeedData() {
     'Babatunde Fashola': 32000
   };
 
+  // Real plan names per payer, sourced from SEED_PAYER_PLAN_RULES (the same table
+  // the benefit-check/copay engine reads from) so a patient's primary_coverage
+  // never names a plan that doesn't exist for that payer. Previously this used a
+  // hardcoded, payer-agnostic list that included 'Executive' and 'Premium', which
+  // are not real plans anywhere in payer_plan_rules.
+  const plansByPayer = SEED_PAYER_PLAN_RULES.reduce((acc, rule) => {
+    (acc[rule.payer_name] = acc[rule.payer_name] || []).push(rule.plan_name);
+    return acc;
+  }, {});
+
   const patients = allPatientNames.map((name, i) => {
     const isUnsettled = UNSETTLED_COPAY_MAP[name] !== undefined;
     // Unsettled copay patients must have HMO
@@ -476,7 +486,7 @@ export function generateScaledSeedData() {
       email: `${cleanName}@${emailDomain}`,
       gender,
       date_of_birth: `${birthYear}-${birthMonth}-${birthDay}`,
-      primary_coverage: hasHmo ? `${hmoName} (${pick(['Silver Plan', 'Gold Plan', 'Executive', 'Premium'])})` : 'Self-Pay / Direct',
+      primary_coverage: hasHmo ? `${hmoName} (${pick(plansByPayer[hmoName])})` : 'Self-Pay / Direct',
       hmo_name: hmoName,
       hmo_policy_number: hasHmo ? `POL-${randInt(100000, 999999)}` : null,
       hmo_enrollee_id: hasHmo ? `ENR-${randInt(10000, 99999)}` : null,
