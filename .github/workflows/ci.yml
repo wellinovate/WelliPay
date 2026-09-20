@@ -3,6 +3,32 @@ on: [push, pull_request]
 jobs:
   verify:
     runs-on: ubuntu-latest
+
+    # A real Postgres instance, not the no-DATABASE_URL fallback/static mode.
+    # Without this, server.js runs with `pool` unset and every DB-backed
+    # feature (invoice persistence, the multi-vendor ingestion API, the
+    # seeded-patient plan-tag fix, all four verify/test scripts' actual
+    # assertions) is silently skipped rather than exercised — a green run
+    # would prove almost nothing.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: wellipay
+          POSTGRES_PASSWORD: wellipay
+          POSTGRES_DB: wellipay_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql://wellipay:wellipay@localhost:5432/wellipay_ci
+      PORT: 5174
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -11,4 +37,47 @@ jobs:
       - run: npm install
       - run: npx tsc --noEmit
       - run: npm run build
+
+      # Boot the real server against the real database, in the background,
+      # for the four suites below. NODE_ENV is deliberately left unset (not
+      # "production") so the dev-token auth bypass the suites rely on stays
+      # active — see requireAuth in server.js.
+      - name: Start server
+        run: nohup node server.js > server.log 2>&1 &
+
+      # server.js calls app.listen() without awaiting initializeDatabase(),
+      # so it accepts requests before seeding finishes. Poll /api/health for
+      # seedComplete rather than assuming "the port answers" means "the data
+      # exists" — this is the exact race verify_cross_system_invariants.js
+      # used to have internally; the same contract now guards CI itself.
+      - name: Wait for server to finish seeding
+        run: |
+          for i in $(seq 1 60); do
+            RESPONSE=$(curl -s http://localhost:5174/api/health || echo '{}')
+            if echo "$RESPONSE" | grep -q '"seedError":"'; then
+              echo "Server reported a seed error:"
+              echo "$RESPONSE"
+              cat server.log
+              exit 1
+            fi
+            if echo "$RESPONSE" | grep -q '"seedComplete":true'; then
+              echo "Server is up and fully seeded."
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Timed out waiting for the server to finish seeding."
+          cat server.log
+          exit 1
+
+      # All four suites the project reports on. verify_cross_system_invariants.js
+      # detects the already-running server above and uses it rather than
+      # spawning a second instance on the same port.
       - run: node scripts/verify_cross_system_invariants.js
+      - run: node scripts/test_directory_catalogue.js
+      - run: node scripts/test_cost_estimation.js
+      - run: node scripts/test_benefit_check.js
+
+      - name: Server log (on failure)
+        if: failure()
+        run: cat server.log

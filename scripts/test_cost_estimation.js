@@ -21,10 +21,28 @@ async function runTests() {
     }
   }
 
+  // Not a passed assertion — recorded and printed separately so a skip never
+  // silently reads as a pass in the final tally.
+  function skip(message, reason) {
+    console.log(`⚠️  [SKIP] ${message} (${reason})`);
+  }
+
   try {
-    // 1. Unauthenticated request should be rejected (401)
-    const unauthRes = await fetch(`${BASE_URL}/api/cost-estimate?providerId=PRV-LAG-01&masterServiceId=1`);
-    assert(unauthRes.status === 401, 'Unauthenticated request rejected with HTTP 401');
+    // requireAuth bypasses authentication entirely (no Bearer token required
+    // at all) whenever Firebase Admin isn't configured — the case in local
+    // dev and CI. The "unauthenticated rejected" check below can only hold
+    // when Firebase Admin is actually active.
+    const healthRes = await fetch(`${BASE_URL}/api/health`);
+    const healthData = await healthRes.json().catch(() => ({}));
+    const firebaseActive = healthData?.auth?.firebaseAdminActive === true;
+
+    // 1. Unauthenticated request should be rejected (401) — only when Firebase Admin is active.
+    if (firebaseActive) {
+      const unauthRes = await fetch(`${BASE_URL}/api/cost-estimate?providerId=PRV-LAG-01&masterServiceId=1`);
+      assert(unauthRes.status === 401, 'Unauthenticated request rejected with HTTP 401');
+    } else {
+      skip('Unauthenticated request rejected with HTTP 401', 'Firebase Admin not configured — requireAuth bypasses all auth in this mode');
+    }
 
     // 2. Missing providerId (400)
     const missingProvRes = await fetch(`${BASE_URL}/api/cost-estimate?masterServiceId=1`, {

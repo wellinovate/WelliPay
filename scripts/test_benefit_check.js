@@ -21,7 +21,21 @@ async function runTests() {
     }
   }
 
+  // Not a passed assertion — recorded and printed separately so a skip never
+  // silently reads as a pass in the final tally.
+  function skip(message, reason) {
+    console.log(`⚠️  [SKIP] ${message} (${reason})`);
+  }
+
   try {
+    // requireAuth bypasses authentication entirely (no Bearer token required
+    // at all) whenever Firebase Admin isn't configured — the case in local
+    // dev and CI. The "unauthenticated rejected" check below can only hold
+    // when Firebase Admin is actually active.
+    const healthRes = await fetch(`${BASE_URL}/api/health`);
+    const healthData = await healthRes.json().catch(() => ({}));
+    const firebaseActive = healthData?.auth?.firebaseAdminActive === true;
+
     // 1. Payer Plans Directory Endpoint
     const plansRes = await fetch(`${BASE_URL}/api/payer-plans`);
     assert(plansRes.status === 200, 'GET /api/payer-plans returned HTTP 200');
@@ -41,9 +55,13 @@ async function runTests() {
     const relianceData = await relianceRes.json();
     assert(relianceData.plans.every(p => p.payerName === 'Reliance HMO'), 'Payer filter returns only Reliance HMO plans');
 
-    // 2. Authentication Protection
-    const unauthRes = await fetch(`${BASE_URL}/api/benefit-check?providerId=PRV-LAG-01&masterServiceId=1&payerName=Reliance%20HMO&planName=Silver%20Plan`);
-    assert(unauthRes.status === 401, 'Unauthenticated benefit check rejected with HTTP 401');
+    // 2. Authentication Protection — only meaningful when Firebase Admin is active.
+    if (firebaseActive) {
+      const unauthRes = await fetch(`${BASE_URL}/api/benefit-check?providerId=PRV-LAG-01&masterServiceId=1&payerName=Reliance%20HMO&planName=Silver%20Plan`);
+      assert(unauthRes.status === 401, 'Unauthenticated benefit check rejected with HTTP 401');
+    } else {
+      skip('Unauthenticated benefit check rejected with HTTP 401', 'Firebase Admin not configured — requireAuth bypasses all auth in this mode');
+    }
 
     // 3. Missing Parameters (400)
     const missingRes = await fetch(`${BASE_URL}/api/benefit-check?providerId=PRV-LAG-01&masterServiceId=1`, {
