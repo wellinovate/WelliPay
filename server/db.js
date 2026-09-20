@@ -1083,6 +1083,38 @@ export async function initializeDatabase() {
       UPDATE clinical_service_orders SET master_service_id = (SELECT id FROM master_service_directory WHERE service_code = 'LAB-CHM-LIP') WHERE service_type = 'Lipid Profile Panels' AND master_service_id IS NULL;
     `);
 
+    // HMO remittance matching (see docs/hmo-remittance-reconciliation.md).
+    // One remittance (a single incoming payment from a payer) can settle many
+    // claims at once, often at less than the claimed amount per claim — the
+    // existing reconciliation_entries table is one-payment-to-one-invoice and
+    // can't represent that shape. expected_amount is captured on the line at
+    // match time (not read live off hmo_claims.amount) so a later edit to the
+    // claim can never silently rewrite historical variance.
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS hmo_remittances (
+        id VARCHAR(50) PRIMARY KEY,
+        payer VARCHAR(100) NOT NULL,
+        amount_received NUMERIC(15, 2) NOT NULL,
+        reference VARCHAR(150),
+        received_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        status VARCHAR(50) NOT NULL DEFAULT 'unmatched',
+        notes TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS hmo_remittance_lines (
+        id VARCHAR(50) PRIMARY KEY,
+        remittance_id VARCHAR(50) NOT NULL REFERENCES hmo_remittances(id),
+        claim_id VARCHAR(50) NOT NULL REFERENCES hmo_claims(id),
+        expected_amount NUMERIC(15, 2) NOT NULL,
+        paid_amount NUMERIC(15, 2) NOT NULL,
+        variance NUMERIC(15, 2) NOT NULL,
+        variance_reason TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(claim_id)
+      );
+    `);
+
     return { initialized: true };
   } catch (err) {
     console.error('[DB] Error initializing database tables:', err);

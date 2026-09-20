@@ -1045,6 +1045,174 @@ app.get('/api/claims/remittance-export', requireAuth, async (req, res) => {
   }
 });
 
+// ==========================================
+// HMO Remittance Matching (Phase 1 — manual entry)
+// See docs/hmo-remittance-reconciliation.md. Records an incoming payment
+// from a payer and matches it against the individual claims it covers.
+// Deliberately not part of the claim-approval endpoints above: the paid
+// amount and any variance only make sense captured together with the
+// remittance they came from, never as a standalone status change.
+// ==========================================
+
+// Create a remittance header (the incoming payment itself, before any
+// claims are matched against it).
+app.post('/api/hmo-remittances', requireAuth, async (req, res) => {
+  const { payer, amount_received, reference, received_at, notes } = req.body;
+
+  if (!payer || amount_received == null) {
+    return res.status(400).json({ error: 'payer and amount_received are required.' });
+  }
+
+  if (!pool) {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ error: 'Database service unavailable in production.' });
+    }
+    return res.json({ success: true, remittance: { id: `REM-${Date.now()}`, payer, amount_received, reference, received_at, notes, status: 'unmatched' }, mode: 'demo' });
+  }
+
+  try {
+    const id = `REM-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const result = await pool.query(`
+      INSERT INTO hmo_remittances (id, payer, amount_received, reference, received_at, notes)
+      VALUES ($1, $2, $3, $4, COALESCE($5, NOW()), $6)
+      RETURNING *
+    `, [id, payer, amount_received, reference || null, received_at || null, notes || null]);
+
+    return res.status(201).json({ success: true, remittance: result.rows[0] });
+  } catch (err) {
+    console.error('[API POST /api/hmo-remittances] error:', err.message);
+    return res.status(500).json({ error: 'Failed to create remittance.' });
+  }
+});
+
+// List remittances with their matched lines.
+app.get('/api/hmo-remittances', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.json({ source: 'fallback', remittances: [] });
+  }
+
+  try {
+    const remRes = await query(`SELECT * FROM hmo_remittances ORDER BY received_at DESC`);
+    const linesRes = await query(`
+      SELECT l.*, c.patient_name, c.provider, c.payer AS claim_payer
+      FROM hmo_remittance_lines l
+      JOIN hmo_claims c ON c.id = l.claim_id
+      ORDER BY l.created_at ASC
+    `);
+
+    const linesByRemittance = {};
+    for (const line of linesRes.rows) {
+      (linesByRemittance[line.remittance_id] = linesByRemittance[line.remittance_id] || []).push(line);
+    }
+
+    const remittances = remRes.rows.map(r => ({
+      ...r,
+      lines: linesByRemittance[r.id] || []
+    }));
+
+    return res.json({ source: 'postgresql', remittances });
+  } catch (err) {
+    console.error('[API GET /api/hmo-remittances] error:', err.message);
+    return res.status(500).json({ error: 'Failed to fetch remittances.' });
+  }
+});
+
+// Match a claim against a remittance: records the line, computes variance,
+// and moves the claim to 'remitted' (paid in full) or 'adjusted' (paid less
+// than claimed). A claim can only be matched once — enforced by a UNIQUE
+// constraint on hmo_remittance_lines.claim_id, not just checked here, so a
+// race between two concurrent matches can't double-settle the same claim.
+app.post('/api/hmo-remittances/:id/lines', requireAuth, async (req, res) => {
+  const { id: remittanceId } = req.params;
+  const { claim_id, paid_amount, variance_reason } = req.body;
+
+  if (!claim_id || paid_amount == null) {
+    return res.status(400).json({ error: 'claim_id and paid_amount are required.' });
+  }
+
+  if (!pool) {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ error: 'Database service unavailable in production.' });
+    }
+    return res.json({ success: true, mode: 'demo' });
+  }
+
+  try {
+    const remRes = await pool.query(`SELECT * FROM hmo_remittances WHERE id = $1`, [remittanceId]);
+    if (remRes.rows.length === 0) {
+      return res.status(404).json({ error: `Remittance ${remittanceId} not found.` });
+    }
+
+    const claimRes = await pool.query(`SELECT * FROM hmo_claims WHERE id = $1`, [claim_id]);
+    if (claimRes.rows.length === 0) {
+      return res.status(404).json({ error: `Claim ${claim_id} not found.` });
+    }
+    const claim = claimRes.rows[0];
+
+    // Only an approved claim can be settled against a remittance — a claim
+    // still 'submitted' hasn't been adjudicated yet, and one already
+    // 'rejected', 'remitted' or 'adjusted' has already left this stage.
+    if (claim.status !== 'approved') {
+      return res.status(409).json({
+        error: `Claim ${claim_id} is '${claim.status}', not 'approved'. Only approved claims can be matched to a remittance.`
+      });
+    }
+
+    const expectedAmount = Number(claim.amount);
+    const paidAmount = Number(paid_amount);
+    const variance = Number((expectedAmount - paidAmount).toFixed(2));
+    const newStatus = variance === 0 ? 'remitted' : 'adjusted';
+    const newStatusLabel = variance === 0 ? 'Paid Remittance' : 'Adjusted (Short-Paid)';
+
+    if (variance !== 0 && !variance_reason) {
+      return res.status(400).json({ error: 'variance_reason is required when paid_amount does not equal the claim amount.' });
+    }
+
+    const lineId = `RL-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    let lineResult;
+    try {
+      lineResult = await pool.query(`
+        INSERT INTO hmo_remittance_lines (id, remittance_id, claim_id, expected_amount, paid_amount, variance, variance_reason)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        RETURNING *
+      `, [lineId, remittanceId, claim_id, expectedAmount, paidAmount, variance, variance !== 0 ? variance_reason : null]);
+    } catch (insertErr) {
+      if (insertErr.code === '23505') {
+        // unique_violation on claim_id — already matched to some remittance.
+        return res.status(409).json({ error: `Claim ${claim_id} has already been matched to a remittance.` });
+      }
+      throw insertErr;
+    }
+
+    await pool.query(`
+      UPDATE hmo_claims SET status = $1, status_label = $2, denial_reason = CASE WHEN $3::text IS NOT NULL THEN $3 ELSE denial_reason END
+      WHERE id = $4
+    `, [newStatus, newStatusLabel, variance !== 0 ? variance_reason : null, claim_id]);
+
+    // Roll the remittance's own status up from its matched lines: fully
+    // matched once the sum of matched lines' expected amounts covers the
+    // amount received, partially matched otherwise.
+    const totalsRes = await pool.query(`
+      SELECT COALESCE(SUM(expected_amount), 0) AS matched_expected
+      FROM hmo_remittance_lines WHERE remittance_id = $1
+    `, [remittanceId]);
+    const matchedExpected = Number(totalsRes.rows[0].matched_expected);
+    const remittanceStatus = matchedExpected >= Number(remRes.rows[0].amount_received) ? 'fully_matched' : 'partially_matched';
+    await pool.query(`UPDATE hmo_remittances SET status = $1 WHERE id = $2`, [remittanceStatus, remittanceId]);
+
+    return res.status(201).json({
+      success: true,
+      line: lineResult.rows[0],
+      claim: { id: claim_id, status: newStatus, statusLabel: newStatusLabel },
+      remittanceStatus
+    });
+  } catch (err) {
+    console.error('[API POST /api/hmo-remittances/:id/lines] error:', err.message);
+    return res.status(500).json({ error: 'Failed to record remittance line.' });
+  }
+});
+
 // Currency formatter helper (e.g. 57000 -> ₦57K, 1900000 -> ₦1.9M)
 function formatNaira(amount) {
   const num = typeof amount === 'number' ? amount : parseFloat(amount) || 0;
