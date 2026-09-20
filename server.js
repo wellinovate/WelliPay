@@ -78,6 +78,11 @@ const DEMO_PROCESSED_PAYSTACK_TXNS = new Set();
 // product (commonly 'wema-bank' or 'titan-paystack').
 const PAYSTACK_DVA_PREFERRED_BANK = process.env.PAYSTACK_DVA_PREFERRED_BANK || 'wema-bank';
 
+// Lagoon Specialist Hospital's own provider id in the directory — the only
+// provider this single-hospital system transacts against. Same id used
+// client-side by ServiceCatalogueView, CostEstimationView, and RecordPaymentModal.
+const HOSPITAL_PROVIDER_ID = 'PRV-LAG-01';
+
 // Provisions a dedicated virtual account for one invoice via the Paystack
 // Customer + Dedicated Account APIs. Best-effort and non-fatal by design:
 // the DVA product requires Paystack merchant approval, so this call can fail
@@ -2723,6 +2728,7 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
     payer_type,
     payer_name,
     policy_number,
+    plan_name,
     copay_amount,
     claim_amount,
     pre_auth_code,
@@ -2750,7 +2756,14 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
         amount: Number(item.totalAmount || (item.quantity * item.unitPrice)),
         formattedAmount: `₦${Number(item.totalAmount || (item.quantity * item.unitPrice)).toLocaleString()}`,
         status: 'invoiced',
-        performedAt: new Date().toISOString()
+        performedAt: new Date().toISOString(),
+        // Populated only when the client sourced this line item from the live
+        // provider catalogue (see ServiceCatalogueView/RecordPaymentModal's
+        // pattern) rather than free-text/custom entry. Nullable — the bill
+        // audit treats a line item without this as "tariff unknown" rather
+        // than failing a price check it has no real catalogue price for.
+        masterServiceId: item.masterServiceId != null ? Number(item.masterServiceId) : null,
+        providerId: item.masterServiceId != null ? (item.providerId || HOSPITAL_PROVIDER_ID) : null,
       }))
     : undefined;
 
@@ -2760,14 +2773,14 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
         INSERT INTO invoices
           (id, invoice_number, patient_id, patient_name, patient_mrn, service_description,
            total_amount, formatted_amount, paid_amount, status, status_label, due_date, is_inpatient, created_at,
-           payer_type, payer_name, policy_number, copay_amount, claim_amount, pre_auth_code)
+           payer_type, payer_name, policy_number, plan_name, copay_amount, claim_amount, pre_auth_code)
         VALUES ($1, $1, $2, $3, $4, $5, $6, $7, 0, 'pending', 'Pending Match', $8, false, NOW(),
-                $9, $10, $11, $12, $13, $14)
+                $9, $10, $11, $12, $13, $14, $15)
         RETURNING *
       `, [
         invoiceNumber, patient_id || null, patient_name, effectiveMrn, finalDescription, total_amount,
         formattedAmount, due_date || null,
-        payer_type || null, payer_name || null, policy_number || null,
+        payer_type || null, payer_name || null, policy_number || null, plan_name || null,
         copay_amount != null ? Number(copay_amount) : null,
         claim_amount != null ? Number(claim_amount) : null,
         pre_auth_code || null,
@@ -2785,10 +2798,11 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
         for (const ord of orders) {
           await pool.query(`
             INSERT INTO clinical_service_orders
-              (id, patient_name, patient_mrn, service_type, category, amount, status, performed_at, invoice_id)
-            VALUES ($1, $2, $3, $4, $5, $6, 'invoiced', NOW(), $7)
+              (id, patient_name, patient_mrn, service_type, category, amount, status, performed_at, invoice_id,
+               master_service_id, provider_id)
+            VALUES ($1, $2, $3, $4, $5, $6, 'invoiced', NOW(), $7, $8, $9)
             ON CONFLICT (id) DO NOTHING
-          `, [ord.id, ord.patientName, ord.patientMrn, ord.serviceType, 'Laboratory', ord.amount, invoiceNumber]);
+          `, [ord.id, ord.patientName, ord.patientMrn, ord.serviceType, 'Laboratory', ord.amount, invoiceNumber, ord.masterServiceId, ord.providerId]);
         }
       }
 
@@ -2856,6 +2870,8 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
           payerName: payer_name,
           policy_number: policy_number,
           policyNumber: policy_number,
+          plan_name: plan_name,
+          planName: plan_name,
           copay_amount: copay_amount ? Number(copay_amount) : undefined,
           copayAmount: copay_amount ? Number(copay_amount) : undefined,
           claim_amount: claim_amount ? Number(claim_amount) : undefined,
@@ -2928,6 +2944,181 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
   };
   FALLBACK_INVOICES.unshift(newInv);
   res.json({ invoice: newInv });
+});
+
+// ==========================================
+// Patient Bill Audit
+// Runs a fixed set of checks against one invoice before it's presented for
+// payment, comparing: the bill itself, the provider catalogue tariff, the
+// payer's plan rule, and any linked pre-authorization. Each check is
+// independent — one being unavailable (e.g. no catalogue link on an older
+// line item) doesn't block the others from running.
+// ==========================================
+app.get('/api/invoices/:invoiceNumber/audit', requireAuth, async (req, res) => {
+  const { invoiceNumber } = req.params;
+
+  if (!pool) {
+    return res.status(503).json({ error: 'Bill audit requires a database connection.' });
+  }
+
+  try {
+    const invRes = await pool.query(`SELECT * FROM invoices WHERE invoice_number = $1`, [invoiceNumber]);
+    if (invRes.rows.length === 0) {
+      return res.status(404).json({ error: `Invoice ${invoiceNumber} not found.` });
+    }
+    const invoice = invRes.rows[0];
+
+    const lineItemsRes = await pool.query(`
+      SELECT cso.id, cso.service_type as "serviceType", cso.amount::float as amount,
+             cso.master_service_id as "masterServiceId", cso.provider_id as "providerId",
+             pc.price::float as "cataloguePrice", msd.service_name as "catalogueServiceName"
+      FROM clinical_service_orders cso
+      LEFT JOIN provider_catalogue pc ON pc.provider_id = cso.provider_id AND pc.master_service_id = cso.master_service_id
+      LEFT JOIN master_service_directory msd ON msd.id = cso.master_service_id
+      WHERE cso.invoice_id = $1
+      ORDER BY cso.performed_at ASC
+    `, [invoiceNumber]);
+    const lineItems = lineItemsRes.rows;
+
+    const flags = [];
+
+    // 1 & 2. Price-vs-catalogue check, per line item — only possible where the
+    // line item carries a real catalogue link (see the POST /api/invoices
+    // comment on masterServiceId/providerId for why many won't).
+    for (const item of lineItems) {
+      if (item.masterServiceId == null || item.providerId == null) {
+        flags.push({
+          code: 'tariff_unknown',
+          severity: 'info',
+          lineItemId: item.id,
+          message: `"${item.serviceType}" isn't linked to a catalogue tariff, so its price can't be checked against the published rate.`,
+        });
+        continue;
+      }
+      if (item.cataloguePrice == null) {
+        flags.push({
+          code: 'tariff_unknown',
+          severity: 'info',
+          lineItemId: item.id,
+          message: `"${item.serviceType}" references a catalogue entry that no longer exists.`,
+        });
+        continue;
+      }
+      const billed = Number(item.amount);
+      const catalogue = Number(item.cataloguePrice);
+      if (Math.abs(billed - catalogue) > 0.01) {
+        flags.push({
+          code: 'price_mismatch',
+          severity: 'warning',
+          lineItemId: item.id,
+          message: `"${item.catalogueServiceName || item.serviceType}" billed at ₦${billed.toLocaleString()}, but the published tariff is ₦${catalogue.toLocaleString()}.`,
+          billedAmount: billed,
+          catalogueAmount: catalogue,
+        });
+      }
+    }
+
+    // 3. Duplicate line items — same catalogue service (or, lacking that, the
+    // same free-text description) billed more than once on this invoice.
+    const seen = new Map();
+    for (const item of lineItems) {
+      const key = item.masterServiceId != null ? `msd:${item.masterServiceId}` : `text:${item.serviceType.toLowerCase()}`;
+      if (!seen.has(key)) { seen.set(key, []); }
+      seen.get(key).push(item);
+    }
+    for (const [, group] of seen) {
+      if (group.length > 1) {
+        flags.push({
+          code: 'duplicate_charge',
+          severity: 'warning',
+          lineItemIds: group.map(g => g.id),
+          message: `"${group[0].catalogueServiceName || group[0].serviceType}" appears ${group.length} times on this invoice.`,
+        });
+      }
+    }
+
+    // 4 & 5. Payer plan rule checks (pre-auth threshold, copay percentage) —
+    // only possible when the invoice recorded which HMO plan applied.
+    let planRule = null;
+    if (invoice.payer_type === 'hmo' && invoice.payer_name && invoice.plan_name) {
+      const ruleRes = await pool.query(
+        `SELECT copay_percentage::float as "copayPercentage", preauth_threshold::float as "preauthThreshold"
+         FROM payer_plan_rules WHERE payer_name = $1 AND plan_name = $2 AND is_active = true`,
+        [invoice.payer_name, invoice.plan_name]
+      );
+      planRule = ruleRes.rows[0] || null;
+    }
+
+    if (planRule) {
+      const totalAmount = Number(invoice.total_amount);
+
+      if (planRule.preauthThreshold != null && totalAmount > Number(planRule.preauthThreshold) && !invoice.pre_auth_code) {
+        flags.push({
+          code: 'missing_preauth',
+          severity: 'critical',
+          message: `This bill (₦${totalAmount.toLocaleString()}) exceeds ${invoice.payer_name}'s pre-authorization threshold of ₦${Number(planRule.preauthThreshold).toLocaleString()} for the ${invoice.plan_name} plan, but no pre-authorization code is on file.`,
+        });
+      }
+
+      if (invoice.copay_amount != null && planRule.copayPercentage != null) {
+        const expectedCopay = Number((totalAmount * (Number(planRule.copayPercentage) / 100)).toFixed(2));
+        const actualCopay = Number(invoice.copay_amount);
+        if (Math.abs(actualCopay - expectedCopay) > 1) {
+          flags.push({
+            code: 'copay_exceeds_plan_rule',
+            severity: actualCopay > expectedCopay ? 'critical' : 'info',
+            message: `Patient copay is ₦${actualCopay.toLocaleString()}, but the ${invoice.plan_name} plan's ${planRule.copayPercentage}% copay rule works out to ₦${expectedCopay.toLocaleString()}.`,
+            billedCopay: actualCopay,
+            expectedCopay,
+          });
+        }
+      }
+    }
+
+    // 6. Patient has known insurance on file, but this bill was billed self-pay.
+    if (invoice.payer_type === 'self-pay' && invoice.patient_id) {
+      const patientRes = await pool.query(
+        `SELECT hmo_name as "hmoName" FROM patients WHERE id = $1`, [invoice.patient_id]
+      );
+      const hmoName = patientRes.rows[0]?.hmoName;
+      if (hmoName) {
+        flags.push({
+          code: 'billed_self_pay_despite_coverage',
+          severity: 'warning',
+          message: `This patient has ${hmoName} on file, but this bill was billed as self-pay.`,
+        });
+      }
+    }
+
+    // 7. Linked pre-authorization's approved amount differs from what was billed.
+    const preAuthRes = await pool.query(
+      `SELECT id, approved_amount::float as "approvedAmount" FROM pre_authorizations WHERE invoice_id = $1`,
+      [invoice.id]
+    );
+    if (preAuthRes.rows.length > 0 && preAuthRes.rows[0].approvedAmount != null) {
+      const approved = Number(preAuthRes.rows[0].approvedAmount);
+      const billed = Number(invoice.total_amount);
+      if (Math.abs(approved - billed) > 0.01) {
+        flags.push({
+          code: 'authorized_amount_mismatch',
+          severity: 'critical',
+          message: `${preAuthRes.rows[0].id} was approved for ₦${approved.toLocaleString()}, but this invoice bills ₦${billed.toLocaleString()}.`,
+          approvedAmount: approved,
+          billedAmount: billed,
+        });
+      }
+    }
+
+    return res.json({
+      invoiceNumber,
+      auditedAt: new Date().toISOString(),
+      flags,
+      clean: flags.every(f => f.severity === 'info'),
+    });
+  } catch (err) {
+    console.error('[API GET /api/invoices/:invoiceNumber/audit] error:', err.message);
+    return res.status(500).json({ error: 'Failed to audit invoice.' });
+  }
 });
 
 // ==========================================

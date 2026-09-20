@@ -673,6 +673,14 @@ export async function initializeDatabase() {
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS claim_amount NUMERIC(15, 2);
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pre_auth_code VARCHAR(50);
 
+      -- Needed for the patient bill audit's copay/pre-auth checks: an HMO
+      -- plan rule (payer_plan_rules) is keyed by (payer_name, plan_name), but
+      -- until now nothing on the invoice recorded which plan applied — only
+      -- payer_name and a free-text policy_number. Without plan_name the audit
+      -- can't look up the copay percentage or pre-auth threshold that should
+      -- have applied to this specific bill.
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS plan_name VARCHAR(100);
+
       -- Per-invoice Paystack Dedicated Virtual Account (DVA). Each invoice
       -- provisions its own bank-transfer account at creation, so an incoming
       -- transfer can be matched by the exact receiving account number instead

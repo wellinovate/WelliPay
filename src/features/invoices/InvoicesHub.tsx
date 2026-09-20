@@ -28,6 +28,11 @@ import {
 
 const PAY_BASE_URL = 'https://wellipay.onrender.com/pay';
 
+// Lagoon Specialist Hospital's own provider id in the directory — the only
+// provider this front desk transacts against. Same id used by
+// RecordPaymentModal, CostEstimationView, and ServiceCatalogueView.
+const HOSPITAL_PROVIDER_ID = 'PRV-LAG-01';
+
 // Fallback patient orders if batch invoice orders were not pre-hydrated
 const DEFAULT_BATCH_ORDERS: Record<string, InvoiceOrder[]> = {
   '5': [
@@ -67,6 +72,7 @@ export default function InvoicesHub() {
   const [copiedInvoice, setCopiedInvoice] = useState<string | null>(null);
   const [expandedInvoice, setExpandedInvoice] = useState<string | null>(null);
   const [receiptInvoice, setReceiptInvoice] = useState<Invoice | null>(null);
+  const [auditInvoice, setAuditInvoice] = useState<Invoice | null>(null);
 
   // Sorting state (default: sorted by urgency)
   const [sortField, setSortField] = useState<SortField>('urgency');
@@ -602,6 +608,13 @@ export default function InvoicesHub() {
                         ) : !reconciled ? (
                           <div className="flex items-center justify-end gap-1.5">
                             <button
+                              onClick={() => setAuditInvoice(inv)}
+                              className="text-xs border border-amber-200 bg-amber-50/60 rounded-md px-2.5 py-1 hover:bg-amber-100 transition-colors text-amber-800 font-semibold cursor-pointer"
+                              title="Check this bill against the catalogue tariff, plan rules, and any pre-authorization before the patient pays"
+                            >
+                              Audit
+                            </button>
+                            <button
                               onClick={() => handleCopyLink(inv.invoice_number)}
                               className="text-xs border border-slate-300 rounded-md px-2.5 py-1 hover:bg-slate-100 transition-colors text-slate-700 cursor-pointer"
                             >
@@ -719,6 +732,11 @@ export default function InvoicesHub() {
       {receiptInvoice && (
         <ReceiptModal invoice={receiptInvoice} onClose={() => setReceiptInvoice(null)} />
       )}
+
+      {/* Patient Bill Audit Modal */}
+      {auditInvoice && (
+        <BillAuditModal invoice={auditInvoice} onClose={() => setAuditInvoice(null)} />
+      )}
     </div>
   );
 }
@@ -744,20 +762,30 @@ const FALLBACK_PATIENT_RECORDS: PatientRecord[] = [
   { id: '9', mrn: 'MRN-LSH-10021', fullName: 'Folake Adeleke', phone: '+234 808 119 4430' },
 ];
 
-const CLINICAL_CATALOG = [
+const CUSTOM_PROCEDURE_LABEL = 'Custom Clinical Procedure...';
+
+// Fallback shown only if the live catalogue fetch fails entirely (e.g. no
+// database connection) — kept intentionally small since it exists purely so
+// the form isn't blank, not as a source of truth for pricing. Previously
+// this whole catalogue was hardcoded and never touched the live
+// provider_catalogue/master_service_directory tables at all: its labels
+// didn't even match the real directory ("Renal Function Tests (RFT)" has no
+// equivalent entry there), and its FBC price (₦8,500) was ABC Diagnostics'
+// price, not Lagoon's own ₦12,000 — the same bug already fixed in
+// RecordPaymentModal. Every line item created here now carries the real
+// masterServiceId, so it can be checked by the bill audit; a line item
+// still has no reliable price/audit link only when this fallback is active
+// or the user explicitly chose the custom-procedure option.
+const FALLBACK_CATALOG: CatalogueServiceOption[] = [
   { name: 'General Outpatient Consultation', price: 10000 },
-  { name: 'Specialist Cardiology Consultation', price: 25000 },
-  { name: 'Full Blood Count (FBC)', price: 8500 },
-  { name: 'Comprehensive Metabolic Panel (CMP)', price: 18000 },
-  { name: 'Lipid Profile Panels', price: 12000 },
-  { name: 'Renal Function Tests (RFT)', price: 15000 },
-  { name: 'Emergency Room Triage & Observation', price: 20000 },
-  { name: 'Chest X-Ray (AP/Lateral)', price: 18000 },
-  { name: 'Abdomino-Pelvic Ultrasound', price: 25000 },
-  { name: 'Inpatient Ward Bed (Per Night)', price: 35000 },
-  { name: 'Pharmacy: Prescribed Antibiotics & Analgesics', price: 14500 },
-  { name: 'Custom Clinical Procedure...', price: 0 }
+  { name: CUSTOM_PROCEDURE_LABEL, price: 0 },
 ];
+
+interface CatalogueServiceOption {
+  name: string;
+  price: number;
+  masterServiceId?: number;
+}
 
 interface FormLineItem {
   id: string;
@@ -765,6 +793,15 @@ interface FormLineItem {
   customDescription: string;
   quantity: number;
   unitPrice: number;
+  masterServiceId?: number;
+}
+
+// A real plan rule from payer_plan_rules for the currently selected HMO
+// underwriter, as returned by GET /api/payer-plans?payer=<name>.
+interface PayerPlanOption {
+  planName: string;
+  copayPercentage: number;
+  preauthThreshold: number | null;
 }
 
 function getNigerianDate(offsetDays: number): { iso: string; formatted: string } {
@@ -803,7 +840,14 @@ function NewInvoiceModal({
   // Payer & insurance state
   const [payerType, setPayerType] = useState<'self-pay' | 'hmo' | 'corporate'>('self-pay');
   const [hmoName, setHmoName] = useState('Reliance HMO');
-  const [hmoPlan, setHmoPlan] = useState<'silver' | 'gold' | 'standard'>('silver');
+  // hmoPlan holds the real plan_name as seeded in payer_plan_rules (e.g.
+  // "Silver Plan", "Corporate Standard") — NOT a fixed 'silver'|'gold'|'standard'
+  // code. Those fixed codes never matched payer_plan_rules.plan_name for any
+  // payer (each payer has its own plan names), which silently broke every
+  // copay/pre-auth-threshold lookup keyed on (payer_name, plan_name). See
+  // planOptions below, fetched live per payer, same pattern as serviceCatalog.
+  const [hmoPlan, setHmoPlan] = useState('');
+  const [planOptions, setPlanOptions] = useState<PayerPlanOption[]>([]);
   const [policyNumber, setPolicyNumber] = useState('');
   const [corporateName, setCorporateName] = useState('Shell Nigeria Retainer');
   const [corporateStaffId, setCorporateStaffId] = useState('');
@@ -816,9 +860,15 @@ function NewInvoiceModal({
       catalogName: 'General Outpatient Consultation',
       customDescription: '',
       quantity: 1,
-      unitPrice: 10000
+      unitPrice: 10000,
+      masterServiceId: undefined,
     }
   ]);
+
+  // Live service catalogue — fetched from the same published-tariff endpoint
+  // RecordPaymentModal uses, rather than a hardcoded list. See FALLBACK_CATALOG
+  // above for why this matters.
+  const [serviceCatalog, setServiceCatalog] = useState<CatalogueServiceOption[]>(FALLBACK_CATALOG);
 
   // Due date scheduling state (defaults to 7 days per hospital standard)
   const [dateChip, setDateChip] = useState<'today' | '7d' | '14d' | '30d' | 'custom'>('7d');
@@ -827,7 +877,7 @@ function NewInvoiceModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Fetch live patient registry on mount
+  // Fetch live patient registry and service catalogue on mount
   useEffect(() => {
     const fetchPatients = async () => {
       try {
@@ -845,8 +895,63 @@ function NewInvoiceModal({
         console.error('Failed to load patient registry', err);
       }
     };
+    const fetchCatalogue = async () => {
+      try {
+        const res = await fetch(`/api/directory/catalogue/${HOSPITAL_PROVIDER_ID}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && Array.isArray(data.catalogue)) {
+            const published: CatalogueServiceOption[] = data.catalogue
+              .filter((c: any) => c.isPublished)
+              .map((c: any) => ({
+                name: c.serviceName,
+                price: Number(c.price) || 0,
+                masterServiceId: c.masterServiceId,
+              }));
+            published.push({ name: CUSTOM_PROCEDURE_LABEL, price: 0 });
+            if (published.length > 1) setServiceCatalog(published);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load service catalogue — falling back to a minimal list', err);
+      }
+    };
     fetchPatients();
+    fetchCatalogue();
   }, []);
+
+  // Fetch the real, payer-scoped plan list whenever the selected HMO
+  // underwriter changes, instead of offering a fixed 'silver'|'gold'|'standard'
+  // choice that never matched a real payer_plan_rules row. Same "fetch the
+  // live data" pattern as fetchCatalogue above.
+  useEffect(() => {
+    let cancelled = false;
+    const fetchPlans = async () => {
+      try {
+        const res = await fetch(`/api/payer-plans?payer=${encodeURIComponent(hmoName)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled && data.success && Array.isArray(data.plans)) {
+            const options: PayerPlanOption[] = data.plans.map((p: any) => ({
+              planName: p.planName,
+              copayPercentage: Number(p.copayPercentage) || 0,
+              preauthThreshold: p.preauthThreshold != null ? Number(p.preauthThreshold) : null,
+            }));
+            setPlanOptions(options);
+            // Default to the first real plan for this payer; clear the
+            // selection if this payer has no plan rules on file (e.g. "Other
+            // Payer") rather than leaving a stale plan name from a different payer.
+            setHmoPlan(options[0]?.planName || '');
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load payer plan rules — plan-based checks will be unavailable', err);
+        if (!cancelled) { setPlanOptions([]); setHmoPlan(''); }
+      }
+    };
+    fetchPlans();
+    return () => { cancelled = true; };
+  }, [hmoName]);
 
   // Filtered patient records
   const filteredPatients = useMemo(() => {
@@ -876,14 +981,19 @@ function NewInvoiceModal({
   };
 
   const handleAddLineItem = () => {
+    // Default to the first real catalogue entry (not the custom-procedure
+    // placeholder) when one is loaded, so a newly added row starts linked to
+    // a real tariff rather than defaulting to a hardcoded guess.
+    const defaultOption = serviceCatalog.find(c => c.name !== CUSTOM_PROCEDURE_LABEL) || serviceCatalog[0];
     setLineItems(prev => [
       ...prev,
       {
         id: `item-${Date.now()}-${Math.random()}`,
-        catalogName: 'Full Blood Count (FBC)',
+        catalogName: defaultOption?.name || CUSTOM_PROCEDURE_LABEL,
         customDescription: '',
         quantity: 1,
-        unitPrice: 8500
+        unitPrice: defaultOption?.price || 0,
+        masterServiceId: defaultOption?.masterServiceId,
       }
     ]);
   };
@@ -897,12 +1007,14 @@ function NewInvoiceModal({
     setLineItems(prev => prev.map(item => {
       if (item.id !== id) return item;
       const updated = { ...item, ...updates };
-      // If catalog selection changed, update unit price from tariff
+      // If catalog selection changed, update unit price and the catalogue
+      // link (masterServiceId) from the live tariff — clearing it for the
+      // custom-procedure option, since that has no catalogue entry to audit
+      // against.
       if (updates.catalogName && updates.catalogName !== item.catalogName) {
-        const found = CLINICAL_CATALOG.find(c => c.name === updates.catalogName);
-        if (found) {
-          updated.unitPrice = found.price;
-        }
+        const found = serviceCatalog.find(c => c.name === updates.catalogName);
+        updated.unitPrice = found?.price ?? updated.unitPrice;
+        updated.masterServiceId = found?.masterServiceId;
       }
       return updated;
     }));
@@ -913,14 +1025,21 @@ function NewInvoiceModal({
     return lineItems.reduce((sum, it) => sum + (Math.max(1, it.quantity) * Math.max(0, it.unitPrice)), 0);
   }, [lineItems]);
 
+  const selectedPlanRule = useMemo(
+    () => planOptions.find(p => p.planName === hmoPlan) || null,
+    [planOptions, hmoPlan]
+  );
+
   const copayRate = useMemo(() => {
     if (payerType === 'self-pay') return 1.0;
     if (payerType === 'corporate') return 0.0;
-    if (hmoPlan === 'silver') return 0.10; // 10% patient copay
-    if (hmoPlan === 'gold') return 0.00; // 0% patient copay
-    if (hmoPlan === 'standard') return 0.20; // 20% patient copay
+    if (payerType === 'hmo') {
+      // Fall back to 10% only when this payer has no plan rule on file
+      // (e.g. "Other Payer") — otherwise use the real seeded copay rate.
+      return selectedPlanRule ? selectedPlanRule.copayPercentage / 100 : 0.10;
+    }
     return 0.10;
-  }, [payerType, hmoPlan]);
+  }, [payerType, selectedPlanRule]);
 
   const patientCopay = useMemo(() => {
     if (payerType === 'self-pay') return totalAmount;
@@ -933,8 +1052,10 @@ function NewInvoiceModal({
     return totalAmount - patientCopay;
   }, [totalAmount, patientCopay, payerType]);
 
-  // Pre-authorization warning for HMO above ₦100,000 (Silver Plan rule)
-  const requiresPreAuth = payerType === 'hmo' && (hmoPlan === 'silver' || true) && totalAmount > 100000;
+  // Pre-authorization warning: use the plan's real preauth_threshold when one
+  // is on file, falling back to ₦100,000 when this payer/plan has no rule.
+  const requiresPreAuth = payerType === 'hmo' &&
+    totalAmount > (selectedPlanRule?.preauthThreshold ?? 100000);
 
   // Due date resolution
   const resolvedDueDate = useMemo(() => {
@@ -959,8 +1080,8 @@ function NewInvoiceModal({
     ? newPatientName.trim().length > 0 && newPatientPhone.trim().length > 0
     : !!selectedPatient;
 
-  const isItemsValid = lineItems.length > 0 && totalAmount > 0 && lineItems.every(it => 
-    it.catalogName !== 'Custom Clinical Procedure...' || it.customDescription.trim().length > 0
+  const isItemsValid = lineItems.length > 0 && totalAmount > 0 && lineItems.every(it =>
+    it.catalogName !== CUSTOM_PROCEDURE_LABEL || it.customDescription.trim().length > 0
   );
 
   const isFormValid = isPatientValid && isItemsValid;
@@ -978,16 +1099,21 @@ function NewInvoiceModal({
     const patientMrn = isAddingNew ? newPatientMrn.trim() : selectedPatient!.mrn;
     const patientId = isAddingNew ? undefined : selectedPatient!.id;
 
-    const serviceDescription = lineItems.map(it => 
-      it.catalogName === 'Custom Clinical Procedure...' ? it.customDescription.trim() : it.catalogName
+    const serviceDescription = lineItems.map(it =>
+      it.catalogName === CUSTOM_PROCEDURE_LABEL ? it.customDescription.trim() : it.catalogName
     ).join(', ');
 
     const formattedLineItems = lineItems.map((it, idx) => ({
       id: `ITEM-${idx + 1}`,
-      description: it.catalogName === 'Custom Clinical Procedure...' ? it.customDescription.trim() : it.catalogName,
+      description: it.catalogName === CUSTOM_PROCEDURE_LABEL ? it.customDescription.trim() : it.catalogName,
       quantity: Math.max(1, it.quantity),
       unitPrice: it.unitPrice,
-      totalAmount: Math.max(1, it.quantity) * it.unitPrice
+      totalAmount: Math.max(1, it.quantity) * it.unitPrice,
+      // Carries the catalogue link through to clinical_service_orders, so
+      // the bill audit can check this line item's price against the
+      // published tariff instead of treating it as unlinked/unauditable.
+      masterServiceId: it.masterServiceId,
+      providerId: it.masterServiceId != null ? HOSPITAL_PROVIDER_ID : undefined,
     }));
 
     const payload = {
@@ -1000,6 +1126,7 @@ function NewInvoiceModal({
       payer_type: payerType,
       payer_name: payerType === 'hmo' ? hmoName : payerType === 'corporate' ? corporateName : 'Patient Self-Pay',
       policy_number: payerType === 'hmo' ? policyNumber : payerType === 'corporate' ? corporateStaffId : undefined,
+      plan_name: payerType === 'hmo' ? hmoPlan : undefined,
       copay_amount: patientCopay,
       claim_amount: claimAmount,
       pre_auth_code: requiresPreAuth ? preAuthCode : undefined,
@@ -1264,12 +1391,19 @@ function NewInvoiceModal({
                   </label>
                   <select
                     value={hmoPlan}
-                    onChange={e => setHmoPlan(e.target.value as any)}
-                    className="w-full bg-white border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#12244D]"
+                    onChange={e => setHmoPlan(e.target.value)}
+                    disabled={planOptions.length === 0}
+                    className="w-full bg-white border border-slate-300 rounded-md px-2 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-[#12244D] disabled:bg-slate-100 disabled:text-slate-400"
                   >
-                    <option value="silver">Silver Plan (10% Copay)</option>
-                    <option value="gold">Gold Comprehensive (0% Copay)</option>
-                    <option value="standard">Standard HMO (20% Copay)</option>
+                    {planOptions.length === 0 ? (
+                      <option value="">No plan rules on file for this payer</option>
+                    ) : (
+                      planOptions.map(p => (
+                        <option key={p.planName} value={p.planName}>
+                          {p.planName} ({p.copayPercentage}% Copay)
+                        </option>
+                      ))
+                    )}
                   </select>
                 </div>
                 <div>
@@ -1401,13 +1535,13 @@ function NewInvoiceModal({
                           onChange={e => handleUpdateLineItem(item.id, { catalogName: e.target.value })}
                           className="w-full border border-slate-300 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#12244D]"
                         >
-                          {CLINICAL_CATALOG.map(cat => (
+                          {serviceCatalog.map(cat => (
                             <option key={cat.name} value={cat.name}>
                               {cat.name} {cat.price > 0 && `(₦${cat.price.toLocaleString()})`}
                             </option>
                           ))}
                         </select>
-                        {item.catalogName === 'Custom Clinical Procedure...' && (
+                        {item.catalogName === CUSTOM_PROCEDURE_LABEL && (
                           <input
                             type="text"
                             placeholder="Specify custom procedure name..."
@@ -1630,6 +1764,125 @@ function ReceiptModal({ invoice, onClose }: { invoice: Invoice; onClose: () => v
           <button
             onClick={onClose}
             className="flex-1 bg-[#12244D] hover:bg-[#0A152E] text-white rounded-lg py-2 text-xs font-bold transition-colors cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface AuditFlag {
+  code: string;
+  severity: 'info' | 'warning' | 'critical';
+  message: string;
+  lineItemId?: string;
+  lineItemIds?: string[];
+  billedAmount?: number;
+  catalogueAmount?: number;
+  billedCopay?: number;
+  expectedCopay?: number;
+  approvedAmount?: number;
+}
+
+const SEVERITY_STYLE: Record<AuditFlag['severity'], string> = {
+  info: 'bg-slate-50 border-slate-200 text-slate-700',
+  warning: 'bg-amber-50 border-amber-200 text-amber-800',
+  critical: 'bg-rose-50 border-rose-200 text-rose-800',
+};
+
+const SEVERITY_LABEL: Record<AuditFlag['severity'], string> = {
+  info: 'Info',
+  warning: 'Review',
+  critical: 'Fix before payment',
+};
+
+function BillAuditModal({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [flags, setFlags] = useState<AuditFlag[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError('');
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch(`/api/invoices/${invoice.invoice_number}/audit`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to audit this invoice.');
+        if (!cancelled) setFlags(Array.isArray(data.flags) ? data.flags : []);
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || 'Failed to audit this invoice.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [invoice.invoice_number]);
+
+  const criticalCount = flags.filter(f => f.severity === 'critical').length;
+  const warningCount = flags.filter(f => f.severity === 'warning').length;
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50 p-4 font-sans">
+      <div className="bg-white rounded-xl p-6 w-full max-w-lg shadow-xl border border-slate-200 space-y-4">
+        <div className="border-b border-slate-200 pb-3 flex items-start justify-between">
+          <div>
+            <div className="text-[11px] font-bold uppercase tracking-wider text-[#0B6B69]">
+              Patient Bill Audit
+            </div>
+            <h2 className="text-base font-bold text-[#12244D] mt-0.5">{invoice.invoice_number}</h2>
+            <p className="text-[11px] text-slate-500">
+              {invoice.patient_name} · {invoice.formatted_amount}
+            </p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-1">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {loading ? (
+          <p className="text-xs text-slate-500 text-center py-6">Checking this bill against the catalogue tariff, plan rules, and pre-authorization...</p>
+        ) : error ? (
+          <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-3">{error}</p>
+        ) : flags.length === 0 ? (
+          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+            <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+            <p className="text-xs text-emerald-800 font-medium">
+              No issues found. This bill matches the catalogue tariff, the plan rule, and any linked pre-authorization.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {(criticalCount > 0 || warningCount > 0) && (
+              <p className="text-xs text-slate-600">
+                {criticalCount > 0 && <span className="font-bold text-rose-700">{criticalCount} to fix before payment</span>}
+                {criticalCount > 0 && warningCount > 0 && ' · '}
+                {warningCount > 0 && <span className="font-bold text-amber-700">{warningCount} to review</span>}
+              </p>
+            )}
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {flags.map((flag, idx) => (
+                <div key={idx} className={`border rounded-lg p-3 text-xs ${SEVERITY_STYLE[flag.severity]}`}>
+                  <div className="flex items-center justify-between gap-2 mb-1">
+                    <span className="font-bold uppercase tracking-wide text-[10px]">{SEVERITY_LABEL[flag.severity]}</span>
+                  </div>
+                  <p>{flag.message}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="flex justify-end pt-1">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-xs font-bold bg-[#12244D] hover:bg-[#0A152E] text-white transition-colors cursor-pointer"
           >
             Close
           </button>
