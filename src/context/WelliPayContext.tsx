@@ -65,6 +65,7 @@ interface WelliPayContextType {
   rejectClaim: (id: string, reason?: string) => void;
   resolveClaimDispute: (id: string, resolution: 'approve' | 'reject') => void;
   appealClaim: (id: string, preAuthCode?: string, notes?: string) => void;
+  refreshClaims: () => Promise<void>;
 
   // Notifications
   notifications: NotificationToast[];
@@ -499,6 +500,25 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
+  // Re-fetches the claims list from the server. Used after an action that
+  // changes claim state on the server in a way the optimistic local update
+  // functions above don't model themselves (e.g. matching a claim against
+  // an HMO remittance, which moves it to 'remitted' or 'adjusted').
+  const refreshClaims = async () => {
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/claims', { headers });
+      if (res.ok) {
+        const claimData = await res.json();
+        if (claimData && Array.isArray(claimData.claims)) {
+          setHmoClaims(claimData.claims);
+        }
+      }
+    } catch {
+      // Best-effort refresh; the caller's own UI state carries on regardless.
+    }
+  };
+
   const appealClaim = (id: string, preAuthCode?: string, notes?: string) => {
     setHmoClaims(prev => prev.map(c => {
       if (c.id === id) {
@@ -570,6 +590,7 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         rejectClaim,
         resolveClaimDispute,
         appealClaim,
+        refreshClaims,
         notifications,
         addNotification,
         removeNotification,

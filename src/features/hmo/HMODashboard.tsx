@@ -17,16 +17,20 @@ import {
 } from 'lucide-react';
 import { auth } from '../../firebase';
 import { HMOClaim } from '../../types';
+import { RemittanceMatchingModal } from './RemittanceMatchingModal';
 
 export const HMODashboard: React.FC = () => {
-  const { 
-    hmoClaims, 
-    approveClaim, 
-    rejectClaim, 
-    resolveClaimDispute, 
-    appealClaim, 
-    addNotification 
+  const {
+    hmoClaims,
+    approveClaim,
+    rejectClaim,
+    resolveClaimDispute,
+    appealClaim,
+    refreshClaims,
+    addNotification
   } = useWelliPay();
+
+  const [showRemittanceModal, setShowRemittanceModal] = useState(false);
 
   const [selectedClaim, setSelectedClaim] = useState<HMOClaim | null>(null);
   const [payerFilter, setPayerFilter] = useState<string>('All');
@@ -236,6 +240,16 @@ export const HMODashboard: React.FC = () => {
           >
             {exportingPdf ? <Loader2 className="w-3.5 h-3.5 animate-spin text-[#0B6B69]" /> : <FileText className="w-3.5 h-3.5 text-[#0B6B69]" />}
             {exportingPdf ? 'Generating PDF...' : 'Export Remittance Schedule'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowRemittanceModal(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg bg-[#12244D] hover:bg-[#0A152E] text-white transition-all shadow-xs cursor-pointer"
+            title="Record an HMO remittance and match it against approved claims"
+          >
+            <FileCheck className="w-3.5 h-3.5" />
+            Record Remittance
           </button>
         </div>
       </div>
@@ -771,6 +785,16 @@ export const HMODashboard: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      {/* HMO Remittance Recording & Matching */}
+      <RemittanceMatchingModal
+        isOpen={showRemittanceModal}
+        onClose={() => setShowRemittanceModal(false)}
+        approvedClaims={approvedClaims}
+        availablePayers={availablePayers}
+        addNotification={addNotification}
+        refreshClaims={refreshClaims}
+      />
     </div>
   );
 };
