@@ -648,6 +648,7 @@ export const SEED_PAYER_PLAN_RULES = [
     copay_percentage: 20.00,
     preauth_threshold: 100000,
     deductible: 0,
+    annual_benefit_limit: 500000,
     covered_categories: ['Haematology', 'Chemical Pathology', 'Medical Microbiology', 'Immunology & Serology', 'Diagnostic Ultrasound', 'Diagnostic Radiology'],
     excluded_services: ['Comprehensive Executive Health Check'],
     is_active: true
@@ -658,6 +659,7 @@ export const SEED_PAYER_PLAN_RULES = [
     copay_percentage: 10.00,
     preauth_threshold: 150000,
     deductible: 0,
+    annual_benefit_limit: 2000000,
     covered_categories: null,
     excluded_services: [],
     is_active: true
@@ -668,6 +670,7 @@ export const SEED_PAYER_PLAN_RULES = [
     copay_percentage: 15.00,
     preauth_threshold: 75000,
     deductible: 0,
+    annual_benefit_limit: 750000,
     covered_categories: ['Haematology', 'Chemical Pathology', 'Medical Microbiology', 'Immunology & Serology', 'Diagnostic Ultrasound', 'Diagnostic Radiology', 'Cardiology (Non-Invasive)'],
     excluded_services: ['Pre-Employment Medical Examination Panel'],
     is_active: true
@@ -680,6 +683,7 @@ export const SEED_PAYER_PLAN_RULES = [
     copay_percentage: 10.00,
     preauth_threshold: 25000,
     deductible: 0,
+    annual_benefit_limit: 3000000,
     covered_categories: null,
     excluded_services: [],
     is_active: true
@@ -690,6 +694,7 @@ export const SEED_PAYER_PLAN_RULES = [
     copay_percentage: 10.00,
     preauth_threshold: 120000,
     deductible: 0,
+    annual_benefit_limit: 2000000,
     covered_categories: null,
     excluded_services: [],
     is_active: true
@@ -700,6 +705,7 @@ export const SEED_PAYER_PLAN_RULES = [
     copay_percentage: 20.00,
     preauth_threshold: 50000,
     deductible: 0,
+    annual_benefit_limit: 750000,
     covered_categories: ['Haematology', 'Chemical Pathology', 'Medical Microbiology', 'Immunology & Serology', 'Diagnostic Ultrasound', 'Diagnostic Radiology'],
     excluded_services: [],
     is_active: true
@@ -712,6 +718,7 @@ export const SEED_PAYER_PLAN_RULES = [
     copay_percentage: 10.00,
     preauth_threshold: 80000,
     deductible: 0,
+    annual_benefit_limit: 2500000,
     covered_categories: null,
     excluded_services: [],
     is_active: true
@@ -722,6 +729,7 @@ export const SEED_PAYER_PLAN_RULES = [
     copay_percentage: 15.00,
     preauth_threshold: 100000,
     deductible: 0,
+    annual_benefit_limit: 1800000,
     covered_categories: null,
     excluded_services: [],
     is_active: true
@@ -732,6 +740,7 @@ export const SEED_PAYER_PLAN_RULES = [
     copay_percentage: 20.00,
     preauth_threshold: 60000,
     deductible: 0,
+    annual_benefit_limit: 700000,
     covered_categories: null,
     excluded_services: [],
     is_active: true
@@ -744,6 +753,7 @@ export const SEED_PAYER_PLAN_RULES = [
     copay_percentage: 10.00,
     preauth_threshold: 120000,
     deductible: 0,
+    annual_benefit_limit: 2000000,
     covered_categories: null,
     excluded_services: [],
     is_active: true
@@ -754,6 +764,7 @@ export const SEED_PAYER_PLAN_RULES = [
     copay_percentage: 15.00,
     preauth_threshold: 75000,
     deductible: 0,
+    annual_benefit_limit: 800000,
     covered_categories: null,
     excluded_services: [],
     is_active: true
@@ -766,6 +777,7 @@ export const SEED_PAYER_PLAN_RULES = [
     copay_percentage: 10.00,
     preauth_threshold: 50000,
     deductible: 0,
+    annual_benefit_limit: 600000,
     covered_categories: null,
     excluded_services: [],
     is_active: true
@@ -776,8 +788,10 @@ export const SEED_PAYER_PLAN_RULES = [
     copay_percentage: 0.00,
     preauth_threshold: 100000,
     deductible: 0,
+    annual_benefit_limit: 3500000,
     covered_categories: null,
     excluded_services: [],
     is_active: true
   }
 ];
+

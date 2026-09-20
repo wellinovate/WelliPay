@@ -1,5 +1,5 @@
 import { auth } from '../firebase';
-import { CostEstimate, PayerPlanRule, BenefitCheckRequest, BenefitCheckResult } from '../types';
+import { CostEstimate, PayerPlanRule, BenefitCheckRequest, BenefitCheckResult, BenefitUsage } from '../types';
 
 export class EstimateError extends Error {
   statusCode: number;
@@ -107,4 +107,27 @@ export async function checkBenefitCoverage(
   }
 
   return data.benefitCheck as BenefitCheckResult;
+}
+
+/**
+ * How much of a patient's annual HMO benefit cap is left, based on
+ * WelliPay's own claim records for this payer/plan this year (see the
+ * endpoint's own note on why this is a lower bound, not a live payer balance).
+ */
+export async function getBenefitUsage(
+  patientId: string,
+  payerName: string,
+  planName: string
+): Promise<BenefitUsage> {
+  const headers = await getAuthHeaders();
+  const url = `/api/patients/${encodeURIComponent(patientId)}/benefit-usage?payerName=${encodeURIComponent(payerName)}&planName=${encodeURIComponent(planName)}`;
+
+  const res = await fetch(url, { headers });
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok) {
+    throw new EstimateError(data.error || 'Failed to fetch benefit usage.', res.status);
+  }
+
+  return data as BenefitUsage;
 }

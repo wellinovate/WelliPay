@@ -2191,7 +2191,9 @@ app.get('/api/patients', requireAuth, async (req, res) => {
           date_of_birth as "dateOfBirth", primary_coverage as "primaryCoverage",
           hmo_name as "hmoName", hmo_policy_number as "hmoPolicyNumber",
           hmo_enrollee_id as "hmoEnrolleeId", outstanding_copay as "outstandingCopay",
-          status, created_at as "createdAt"
+          status, created_at as "createdAt",
+          policy_verification_status as "policyVerificationStatus",
+          policy_verification_label as "policyVerificationLabel"
         FROM patients
         ${whereClause}
         ORDER BY id ASC
@@ -2286,7 +2288,9 @@ app.get('/api/patients/:id', requireAuth, async (req, res) => {
           date_of_birth as "dateOfBirth", primary_coverage as "primaryCoverage",
           hmo_name as "hmoName", hmo_policy_number as "hmoPolicyNumber",
           hmo_enrollee_id as "hmoEnrolleeId", outstanding_copay as "outstandingCopay",
-          status, created_at as "createdAt"
+          status, created_at as "createdAt",
+          policy_verification_status as "policyVerificationStatus",
+          policy_verification_label as "policyVerificationLabel"
         FROM patients
         WHERE id = $1 OR mrn = $1
       `, [id]);
@@ -3086,6 +3090,30 @@ app.get('/api/invoices/:invoiceNumber/audit', requireAuth, async (req, res) => {
           code: 'billed_self_pay_despite_coverage',
           severity: 'warning',
           message: `This patient has ${hmoName} on file, but this bill was billed as self-pay.`,
+        });
+      }
+    }
+
+    // 6b. Billed as HMO-covered, but the patient's HMO membership wasn't on
+    // record as verified at audit time (policy_verification_status). Doesn't
+    // re-check eligibility with the payer — there's no live feed for that —
+    // just surfaces WelliPay's own recorded status so a claim isn't submitted
+    // for cover the front desk never actually confirmed was current.
+    if (invoice.payer_type === 'hmo' && invoice.patient_id) {
+      const membershipRes = await pool.query(
+        `SELECT policy_verification_status as "policyVerificationStatus",
+                policy_verification_label as "policyVerificationLabel"
+         FROM patients WHERE id = $1`,
+        [invoice.patient_id]
+      );
+      const membership = membershipRes.rows[0];
+      if (membership && membership.policyVerificationStatus && membership.policyVerificationStatus !== 'verified') {
+        flags.push({
+          code: 'membership_not_verified',
+          severity: membership.policyVerificationStatus === 'expired' ? 'critical' : 'warning',
+          message: membership.policyVerificationStatus === 'expired'
+            ? `This patient's ${invoice.payer_name} membership is on file as expired${membership.policyVerificationLabel ? ` (${membership.policyVerificationLabel})` : ''}, but this bill was billed as HMO-covered.`
+            : `This patient's ${invoice.payer_name} membership was never verified before this bill was billed as HMO-covered.`,
         });
       }
     }
@@ -4056,6 +4084,7 @@ app.get('/api/payer-plans', async (req, res) => {
                copay_percentage::float as "copayPercentage",
                preauth_threshold::float as "preauthThreshold",
                deductible::float as deductible,
+               annual_benefit_limit::float as "annualBenefitLimit",
                covered_categories as "coveredCategories",
                excluded_services as "excludedServices",
                is_active as "isActive"
@@ -4092,11 +4121,61 @@ app.get('/api/payer-plans', async (req, res) => {
       copayPercentage: Number(r.copay_percentage),
       preauthThreshold: r.preauth_threshold ? Number(r.preauth_threshold) : null,
       deductible: Number(r.deductible || 0),
+      annualBenefitLimit: r.annual_benefit_limit ? Number(r.annual_benefit_limit) : null,
       coveredCategories: r.covered_categories,
       excludedServices: r.excluded_services || [],
       isActive: r.is_active
     }))
   });
+});
+
+// Remaining Benefit Ledger — how much of a patient's annual HMO benefit cap
+// is left. There's no live per-claim usage feed from any payer here, so
+// "used this year" is computed from WelliPay's own record: the claim_amount
+// recorded on this patient's invoices under this payer/plan, dated this
+// calendar year. That undercounts anything the patient claimed through this
+// same HMO at a different provider (WelliPay has no visibility into that),
+// so this is a lower bound on usage, not a guaranteed-accurate balance.
+app.get('/api/patients/:patientId/benefit-usage', requireAuth, async (req, res) => {
+  const { patientId } = req.params;
+  const { payerName, planName } = req.query;
+
+  if (!payerName || !planName) {
+    return res.status(400).json({ error: 'payerName and planName are required.' });
+  }
+  if (!pool) {
+    return res.status(503).json({ error: 'Benefit usage requires a database connection.' });
+  }
+
+  try {
+    const ruleRes = await pool.query(
+      `SELECT annual_benefit_limit::float as "annualBenefitLimit"
+       FROM payer_plan_rules WHERE payer_name = $1 AND plan_name = $2 AND is_active = true`,
+      [payerName, planName]
+    );
+    const annualLimit = ruleRes.rows[0]?.annualBenefitLimit ?? null;
+
+    const usageRes = await pool.query(
+      `SELECT COALESCE(SUM(claim_amount), 0)::float as "usedThisYear"
+       FROM invoices
+       WHERE patient_id = $1 AND payer_name = $2 AND plan_name = $3
+         AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW())`,
+      [patientId, payerName, planName]
+    );
+    const usedThisYear = Number(usageRes.rows[0]?.usedThisYear || 0);
+    const remaining = annualLimit != null ? Math.max(0, annualLimit - usedThisYear) : null;
+
+    return res.json({
+      patientId, payerName, planName,
+      annualLimit, usedThisYear, remaining,
+      note: annualLimit == null
+        ? `No annual benefit limit on file for ${payerName} ${planName}.`
+        : `Reflects only claims WelliPay has recorded for this patient this year — not a live balance from ${payerName}.`
+    });
+  } catch (err) {
+    console.error('[API GET /api/patients/:patientId/benefit-usage] error:', err.message);
+    return res.status(500).json({ error: 'Failed to compute benefit usage.' });
+  }
 });
 
 // 10. HMO Benefit Check & Copay Calculation Engine (Reuses Phase 1 Price Lookup)

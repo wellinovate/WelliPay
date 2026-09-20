@@ -18,8 +18,8 @@ import {
 } from 'lucide-react';
 import { useWelliPay } from '../../context/WelliPayContext';
 import { auth } from '../../firebase';
-import { MasterService, PayerPlanRule, Patient } from '../../types';
-import { getPayerPlans } from '../../services/estimationService';
+import { MasterService, PayerPlanRule, Patient, BenefitUsage } from '../../types';
+import { getPayerPlans, getBenefitUsage } from '../../services/estimationService';
 
 interface ServiceWithTariff extends MasterService {
   price?: number;
@@ -66,6 +66,12 @@ export const CostEstimationView: React.FC = () => {
   // UI state
   const [copied, setCopied] = useState<boolean>(false);
   const [creatingInvoice, setCreatingInvoice] = useState<boolean>(false);
+
+  // Remaining-benefit ledger for the currently selected patient+payer+plan.
+  // See getBenefitUsage's own note — this is WelliPay's own claim history,
+  // not a live balance read from the payer.
+  const [benefitUsage, setBenefitUsage] = useState<BenefitUsage | null>(null);
+  const [benefitUsageLoading, setBenefitUsageLoading] = useState<boolean>(false);
 
   // 1. Initial Data Load
   useEffect(() => {
@@ -259,6 +265,37 @@ export const CostEstimationView: React.FC = () => {
     ) || null;
   }, [payerPlans, selectedPayer, selectedPlan]);
 
+  // Whether the selected patient's HMO membership is actually on record as
+  // current. There's no live eligibility feed to any payer here — this is
+  // whatever WelliPay has recorded (policyVerificationStatus), which the
+  // Patients directory already shows as a badge but which nothing used to
+  // act on: an "expired" or "not checked" patient was still copay-calculated
+  // exactly like a verified one.
+  const isSelectedPatientOnThisPayer = !!(
+    selectedPatient && selectedPatient.hmoName?.toLowerCase() === selectedPayer.toLowerCase()
+  );
+  const membershipStatus = isSelectedPatientOnThisPayer
+    ? (selectedPatient!.policyVerificationStatus || 'not_checked')
+    : null;
+  const membershipNotVerified = selectedPayer !== 'Self-pay' &&
+    isSelectedPatientOnThisPayer &&
+    membershipStatus !== 'verified';
+
+  // Fetch the remaining-benefit ledger whenever a patient's own plan is active.
+  useEffect(() => {
+    if (!isSelectedPatientOnThisPayer || !selectedPatient || selectedPayer === 'Self-pay' || !selectedPlan) {
+      setBenefitUsage(null);
+      return;
+    }
+    let cancelled = false;
+    setBenefitUsageLoading(true);
+    getBenefitUsage(selectedPatient.id, selectedPayer, selectedPlan)
+      .then(usage => { if (!cancelled) setBenefitUsage(usage); })
+      .catch(() => { if (!cancelled) setBenefitUsage(null); })
+      .finally(() => { if (!cancelled) setBenefitUsageLoading(false); });
+    return () => { cancelled = true; };
+  }, [isSelectedPatientOnThisPayer, selectedPatient, selectedPayer, selectedPlan]);
+
   // Calculations for each basket item
   const basketCalculations = useMemo(() => {
     return basket.map(item => {
@@ -276,6 +313,21 @@ export const CostEstimationView: React.FC = () => {
       }
 
       // HMO plan evaluation
+
+      // Membership not on record as current — treat as full patient liability
+      // rather than assuming the payer will honor a claim for a lapsed or
+      // never-checked enrollee.
+      if (membershipNotVerified) {
+        return {
+          ...item,
+          status: 'membership_unverified' as const,
+          copayPercentage: 100,
+          patientCopay: lineTariff,
+          hmoCoverage: 0,
+          requiresPreAuth: false
+        };
+      }
+
       let isExcluded = false;
       if (activePlanRule) {
         if (activePlanRule.excludedServices && activePlanRule.excludedServices.includes(item.serviceName)) {
@@ -317,7 +369,7 @@ export const CostEstimationView: React.FC = () => {
         requiresPreAuth
       };
     });
-  }, [basket, selectedPayer, activePlanRule]);
+  }, [basket, selectedPayer, activePlanRule, membershipNotVerified]);
 
   // Aggregate financial metrics
   const grossTotal = useMemo(() => {
@@ -653,20 +705,32 @@ export const CostEstimationView: React.FC = () => {
                 <span>Patient and payer coverage</span>
               </div>
 
-              {/* Policy Status Badge */}
+              {/* Policy Status Badge — reflects the patient's actual recorded
+                  membership status (policyVerificationStatus), not just
+                  whether the selected payer name matches their HMO on file. */}
               {selectedPayer === 'Self-pay' ? (
                 <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-slate-200 text-slate-700">
                   Direct settlement
                 </span>
-              ) : selectedPatient && selectedPatient.hmoName?.toLowerCase() === selectedPayer.toLowerCase() ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                  Active policy {selectedPatient.hmoPolicyNumber ? `· ${selectedPatient.hmoPolicyNumber}` : ''}
-                </span>
-              ) : (
+              ) : !isSelectedPatientOnThisPayer ? (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
                   <AlertTriangle className="w-3 h-3 text-amber-600" />
                   Unverified plan
+                </span>
+              ) : membershipStatus === 'expired' ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-800 border border-rose-300">
+                  <AlertTriangle className="w-3 h-3 text-rose-600" />
+                  Policy expired {selectedPatient?.policyVerificationLabel ? `· ${selectedPatient.policyVerificationLabel}` : ''}
+                </span>
+              ) : membershipStatus === 'not_checked' ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                  <AlertTriangle className="w-3 h-3 text-amber-600" />
+                  Not yet verified
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  Active policy {selectedPatient?.hmoPolicyNumber ? `· ${selectedPatient.hmoPolicyNumber}` : ''}
                 </span>
               )}
             </div>
@@ -782,6 +846,10 @@ export const CostEstimationView: React.FC = () => {
                               <span className="text-rose-700 font-semibold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
                                 Policy exclusion (100% patient copay)
                               </span>
+                            ) : item.status === 'membership_unverified' ? (
+                              <span className="text-rose-700 font-semibold bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">
+                                Membership {membershipStatus === 'expired' ? 'expired' : 'not verified'} (100% patient copay)
+                              </span>
                             ) : (
                               <span className="text-slate-600">
                                 HMO share: ₦{item.hmoCoverage.toLocaleString()} · Copay ({item.copayPercentage}%): ₦{item.patientCopay.toLocaleString()}
@@ -896,6 +964,61 @@ export const CostEstimationView: React.FC = () => {
                     </div>
                   )}
                 </div>
+
+                {/* Membership Not Verified Banner */}
+                {membershipNotVerified && (
+                  <div className="mt-3 p-3.5 rounded-xl bg-rose-50 border border-rose-300 flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-rose-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-xs">
+                      <span className="font-bold text-rose-900">
+                        {membershipStatus === 'expired' ? 'HMO membership expired:' : 'HMO membership not verified:'}
+                      </span>{' '}
+                      <span className="text-rose-800 leading-relaxed">
+                        {selectedPatient?.fullName}'s {selectedPayer} enrollment is on file as
+                        {membershipStatus === 'expired' ? ' expired' : ' not yet checked'} — this estimate has been
+                        computed as 100% patient liability rather than assumed HMO cover. Verify eligibility with
+                        {' '}{selectedPayer} before submitting a claim for this visit.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Remaining Benefit Ledger — WelliPay's own claim history for this
+                    patient/payer/plan this year, not a live balance from the payer. */}
+                {!membershipNotVerified && isSelectedPatientOnThisPayer && selectedPayer !== 'Self-pay' && (
+                  <div className="mt-3 p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+                    {benefitUsageLoading ? (
+                      <div className="text-[11px] text-slate-400">Checking remaining benefit…</div>
+                    ) : !benefitUsage || benefitUsage.annualLimit == null ? (
+                      <div className="text-[11px] text-slate-400">
+                        No annual benefit limit on file for {selectedPayer} {selectedPlan}.
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex items-center justify-between text-[11px] font-bold mb-1.5">
+                          <span className="text-slate-700">
+                            Remaining benefit this year: ₦{benefitUsage.remaining!.toLocaleString()} of ₦{benefitUsage.annualLimit.toLocaleString()}
+                          </span>
+                          <span className="text-slate-500 font-medium">
+                            ₦{benefitUsage.usedThisYear.toLocaleString()} used
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-300 ${benefitUsage.remaining! < hmoTotal ? 'bg-rose-500' : 'bg-emerald-600'}`}
+                            style={{ width: `${Math.min(100, Math.round((benefitUsage.usedThisYear / benefitUsage.annualLimit) * 100))}%` }}
+                          />
+                        </div>
+                        {benefitUsage.remaining! < hmoTotal && (
+                          <div className="text-[11px] text-rose-700 font-semibold mt-1.5">
+                            This claim's HMO share (₦{hmoTotal.toLocaleString()}) exceeds the remaining benefit — expect a partial denial or patient balance-bill.
+                          </div>
+                        )}
+                        <div className="text-[10px] text-slate-400 mt-1.5">{benefitUsage.note}</div>
+                      </>
+                    )}
+                  </div>
+                )}
 
                 {/* Pre-authorisation Alert Banner */}
                 {hasPreAuthRequired && (

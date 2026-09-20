@@ -637,6 +637,17 @@ export async function initializeDatabase() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      -- policy_verification_status/label were already generated per-patient by
+      -- the seed generator above (verified/expired/not_checked/self_pay) and
+      -- already rendered by PatientsDirectory — but never persisted here or
+      -- selected by GET /api/patients, so in real Postgres mode every patient
+      -- silently fell back to a hardcoded 'verified'/'self_pay' default and no
+      -- patient could ever show as expired or unchecked. This closes that gap:
+      -- the badge the UI already draws now reflects a real, storable status
+      -- instead of always guessing from hmo_name alone.
+      ALTER TABLE patients ADD COLUMN IF NOT EXISTS policy_verification_status VARCHAR(20) DEFAULT 'self_pay';
+      ALTER TABLE patients ADD COLUMN IF NOT EXISTS policy_verification_label VARCHAR(100);
+
       CREATE TABLE IF NOT EXISTS invoices (
         id VARCHAR(50) PRIMARY KEY,
         invoice_number VARCHAR(50) UNIQUE NOT NULL,
@@ -769,6 +780,13 @@ export async function initializeDatabase() {
         created_at TIMESTAMPTZ DEFAULT NOW(),
         UNIQUE(payer_name, plan_name)
       );
+
+      -- Annual benefit limit per plan (the enrollee's total HMO-payable cap
+      -- for the year). "deductible" above has sat unused and always 0 in seed
+      -- data — this is the field the Cost Estimator's remaining-benefit
+      -- display actually needs, paired with a running total of claim_amount
+      -- already used this year (computed in GET /api/patients/:id/benefit-usage).
+      ALTER TABLE payer_plan_rules ADD COLUMN IF NOT EXISTS annual_benefit_limit NUMERIC(15, 2);
 
       ALTER TABLE hmo_claims ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
@@ -968,8 +986,8 @@ export async function initializeDatabase() {
       console.log(`[DB] Seeding ${SCALED_SEED_DATA.patients.length} scaled patient records...`);
       for (const p of SCALED_SEED_DATA.patients) {
         await pool.query(`
-          INSERT INTO patients (id, mrn, full_name, phone, email, gender, date_of_birth, primary_coverage, hmo_name, hmo_policy_number, hmo_enrollee_id, outstanding_copay, status)
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          INSERT INTO patients (id, mrn, full_name, phone, email, gender, date_of_birth, primary_coverage, hmo_name, hmo_policy_number, hmo_enrollee_id, outstanding_copay, status, policy_verification_status, policy_verification_label)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
           ON CONFLICT (id) DO UPDATE SET
             mrn = EXCLUDED.mrn,
             full_name = EXCLUDED.full_name,
@@ -982,8 +1000,10 @@ export async function initializeDatabase() {
             hmo_policy_number = EXCLUDED.hmo_policy_number,
             hmo_enrollee_id = EXCLUDED.hmo_enrollee_id,
             outstanding_copay = EXCLUDED.outstanding_copay,
-            status = EXCLUDED.status;
-        `, [p.id, p.mrn, p.full_name, p.phone, p.email, p.gender, p.date_of_birth, p.primary_coverage, p.hmo_name, p.hmo_policy_number, p.hmo_enrollee_id, p.outstanding_copay, p.status]);
+            status = EXCLUDED.status,
+            policy_verification_status = EXCLUDED.policy_verification_status,
+            policy_verification_label = EXCLUDED.policy_verification_label;
+        `, [p.id, p.mrn, p.full_name, p.phone, p.email, p.gender, p.date_of_birth, p.primary_coverage, p.hmo_name, p.hmo_policy_number, p.hmo_enrollee_id, p.outstanding_copay, p.status, p.policy_verification_status, p.policy_verification_label]);
       }
     }
 
@@ -1083,13 +1103,14 @@ export async function initializeDatabase() {
       for (const r of SEED_PAYER_PLAN_RULES) {
         await pool.query(`
           INSERT INTO payer_plan_rules (
-            payer_name, plan_name, copay_percentage, preauth_threshold, deductible, covered_categories, excluded_services, is_active
+            payer_name, plan_name, copay_percentage, preauth_threshold, deductible, annual_benefit_limit, covered_categories, excluded_services, is_active
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
           ON CONFLICT (payer_name, plan_name) DO UPDATE SET
             copay_percentage = EXCLUDED.copay_percentage,
             preauth_threshold = EXCLUDED.preauth_threshold,
             deductible = EXCLUDED.deductible,
+            annual_benefit_limit = EXCLUDED.annual_benefit_limit,
             covered_categories = EXCLUDED.covered_categories,
             excluded_services = EXCLUDED.excluded_services,
             is_active = EXCLUDED.is_active;
@@ -1099,6 +1120,7 @@ export async function initializeDatabase() {
           r.copay_percentage,
           r.preauth_threshold,
           r.deductible || 0,
+          r.annual_benefit_limit || null,
           r.covered_categories,
           r.excluded_services || [],
           r.is_active ?? true
@@ -1117,6 +1139,27 @@ export async function initializeDatabase() {
       UPDATE clinical_service_orders SET master_service_id = (SELECT id FROM master_service_directory WHERE service_code = 'LAB-CHM-EUCR') WHERE service_type = 'Electrolytes, Urea & Creatinine' AND master_service_id IS NULL;
       UPDATE clinical_service_orders SET master_service_id = (SELECT id FROM master_service_directory WHERE service_code = 'LAB-CHM-LIP') WHERE service_type = 'Lipid Profile Panels' AND master_service_id IS NULL;
     `);
+
+    // Backfill annual_benefit_limit and policy_verification_status/label for a
+    // database seeded before these columns existed. The `COUNT(*) === 0` seed
+    // blocks above only insert on a completely empty table, so a database that
+    // was already seeded (e.g. the live one on Render) would otherwise carry
+    // these columns as NULL forever rather than picking up the seed values.
+    // Guarded on the column actually being NULL, so this is a no-op once run.
+    for (const r of SEED_PAYER_PLAN_RULES) {
+      await pool.query(
+        `UPDATE payer_plan_rules SET annual_benefit_limit = $1
+         WHERE payer_name = $2 AND plan_name = $3 AND annual_benefit_limit IS NULL`,
+        [r.annual_benefit_limit, r.payer_name, r.plan_name]
+      );
+    }
+    for (const p of SCALED_SEED_DATA.patients) {
+      await pool.query(
+        `UPDATE patients SET policy_verification_status = $1, policy_verification_label = $2
+         WHERE id = $3 AND policy_verification_label IS NULL`,
+        [p.policy_verification_status, p.policy_verification_label, p.id]
+      );
+    }
 
     // HMO remittance matching (see docs/hmo-remittance-reconciliation.md).
     // One remittance (a single incoming payment from a payer) can settle many

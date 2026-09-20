@@ -151,9 +151,20 @@ export interface PayerPlanRule {
   copayPercentage: number;
   preauthThreshold: number | null;
   deductible: number;
+  annualBenefitLimit: number | null;
   coveredCategories: string[] | null;
   excludedServices: string[];
   isActive: boolean;
+}
+
+export interface BenefitUsage {
+  patientId: string;
+  payerName: string;
+  planName: string;
+  annualLimit: number | null;
+  usedThisYear: number;
+  remaining: number | null;
+  note: string;
 }
 
 export interface BenefitCheckRequest {
