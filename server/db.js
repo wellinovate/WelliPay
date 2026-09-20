@@ -549,6 +549,17 @@ export async function initializeDatabase() {
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
 
+      -- Referenced by the Paystack webhook's INSERT INTO payments since that
+      -- handler was written, but never added here — on any database created
+      -- from this schema alone (a fresh install, not one that inherited them
+      -- some other way), every charge.success webhook fails on this insert
+      -- and the whole reconciliation transaction rolls back silently. Fixed
+      -- here rather than left as a known gap because it blocks all payment
+      -- reconciliation, not just the per-invoice DVA matching added alongside it.
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS paystack_transaction_id BIGINT;
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS paystack_reference TEXT;
+      ALTER TABLE payments ADD COLUMN IF NOT EXISTS raw_customer_email TEXT;
+
       CREATE TABLE IF NOT EXISTS hmo_claims (
         id VARCHAR(50) PRIMARY KEY,
         provider VARCHAR(255) NOT NULL,
@@ -661,6 +672,22 @@ export async function initializeDatabase() {
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS copay_amount NUMERIC(15, 2);
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS claim_amount NUMERIC(15, 2);
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pre_auth_code VARCHAR(50);
+
+      -- Per-invoice Paystack Dedicated Virtual Account (DVA). Each invoice
+      -- provisions its own bank-transfer account at creation, so an incoming
+      -- transfer can be matched by the exact receiving account number instead
+      -- of relying on the patient having typed the invoice number correctly
+      -- into their banking app's narration field. Nullable: provisioning is
+      -- best-effort against the Paystack API and never blocks invoice
+      -- creation, so an invoice can legitimately have no dedicated account
+      -- (Paystack unreachable, DVA product not yet approved for the merchant,
+      -- etc.) — the shared/legacy narration-matching path in the webhook
+      -- handler is the fallback for exactly that case.
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS dedicated_account_number VARCHAR(20);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS dedicated_account_bank VARCHAR(100);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS dedicated_account_name VARCHAR(255);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS paystack_customer_code VARCHAR(100);
+      CREATE INDEX IF NOT EXISTS idx_invoices_dedicated_account_number ON invoices(dedicated_account_number);
 
       CREATE TABLE IF NOT EXISTS reconciliation_entries (
         id SERIAL PRIMARY KEY,

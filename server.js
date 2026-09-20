@@ -72,6 +72,124 @@ app.get('/api/webhooks/paystack', (req, res) => {
 
 const DEMO_PROCESSED_PAYSTACK_TXNS = new Set();
 
+// Preferred bank for newly provisioned per-invoice DVAs. Paystack's test mode
+// only ever returns "test-bank" regardless of what's requested here; in live
+// mode this must be a bank Paystack has approved for this merchant's DVA
+// product (commonly 'wema-bank' or 'titan-paystack').
+const PAYSTACK_DVA_PREFERRED_BANK = process.env.PAYSTACK_DVA_PREFERRED_BANK || 'wema-bank';
+
+// Provisions a dedicated virtual account for one invoice via the Paystack
+// Customer + Dedicated Account APIs. Best-effort and non-fatal by design:
+// the DVA product requires Paystack merchant approval, so this call can fail
+// on a perfectly healthy invoice (unapproved merchant, no secret key
+// configured in this environment, Paystack unreachable). Callers must treat
+// a null return as "no dedicated account yet" rather than an error.
+async function provisionInvoiceDedicatedAccount({ invoiceNumber, patientName, patientEmail }) {
+  const secretKey = process.env.PAYSTACK_SECRET_KEY;
+  if (!secretKey) {
+    console.warn(`[DVA] Skipping provisioning for ${invoiceNumber}: PAYSTACK_SECRET_KEY not configured.`);
+    return null;
+  }
+
+  // Paystack requires a unique customer email. Real patient email is used
+  // when known; otherwise a per-invoice synthetic address keeps each
+  // provisioning call independent (never reused across invoices).
+  const email = patientEmail || `${invoiceNumber.toLowerCase()}@patients.wellipay.ng`;
+  const nameParts = (patientName || 'Patient').trim().split(/\s+/);
+  const firstName = nameParts[0] || 'Patient';
+  const lastName = nameParts.slice(1).join(' ') || 'Patient';
+
+  try {
+    const customerRes = await axios.post('https://api.paystack.co/customer', {
+      email, first_name: firstName, last_name: lastName,
+    }, { headers: { Authorization: `Bearer ${secretKey}` }, timeout: 8000 });
+
+    const customerCode = customerRes.data?.data?.customer_code;
+    if (!customerCode) throw new Error('Paystack did not return a customer_code.');
+
+    const dvaRes = await axios.post('https://api.paystack.co/dedicated_account', {
+      customer: customerCode,
+      preferred_bank: PAYSTACK_DVA_PREFERRED_BANK,
+    }, { headers: { Authorization: `Bearer ${secretKey}` }, timeout: 8000 });
+
+    const dva = dvaRes.data?.data;
+    if (!dva?.account_number) throw new Error('Paystack did not return a dedicated account number.');
+
+    return {
+      accountNumber: dva.account_number,
+      bank: dva.bank?.name || PAYSTACK_DVA_PREFERRED_BANK,
+      accountName: dva.account_name || null,
+      customerCode,
+    };
+  } catch (err) {
+    console.error(`[DVA] Failed to provision dedicated account for ${invoiceNumber}:`, err.response?.data?.message || err.message);
+    return null;
+  }
+}
+
+// Resolves an incoming Paystack payment to an invoice number, or null if
+// nothing matches (left for manual cashier reconciliation). Two independent
+// paths:
+//  - Card/checkout payments (isDVA=false): matched by the INV-##### prefix
+//    the app itself put in the transaction reference at initialize-time.
+//  - Bank transfers to a dedicated account (isDVA=true): matched first by
+//    the exact receiving account number against the invoice it was
+//    provisioned for (confidence 100 — this is the "DVA for all" primary
+//    path). If that lookup misses — a transfer landed on a shared/legacy
+//    DVA, or the account lookup failed for any reason — falls back to
+//    parsing an INV-##### invoice number out of the transfer narration text
+//    (confidence 90, since not every banking app preserves narration).
+async function findMatchingInvoiceForPayment({ isDVA, reference, narration, receivingAccountNumber, dbClient }) {
+  if (!isDVA) {
+    const m = reference && reference.match(/^(INV-\d+)/);
+    return m
+      ? { invoiceNumber: m[1], matchMethod: 'reference', confidence: 100, explanation: 'Exact match by invoice reference' }
+      : null;
+  }
+
+  if (receivingAccountNumber) {
+    if (pool) {
+      const runner = dbClient || pool;
+      const r = await runner.query(
+        'SELECT invoice_number FROM invoices WHERE dedicated_account_number = $1',
+        [receivingAccountNumber]
+      );
+      if (r.rows.length > 0) {
+        return {
+          invoiceNumber: r.rows[0].invoice_number,
+          matchMethod: 'dedicated_account',
+          confidence: 100,
+          explanation: 'Matched by dedicated virtual account number',
+        };
+      }
+    } else {
+      const inv = FALLBACK_INVOICES.find(i => i.dedicatedAccountNumber === receivingAccountNumber);
+      if (inv) {
+        return {
+          invoiceNumber: inv.invoiceNumber,
+          matchMethod: 'dedicated_account',
+          confidence: 100,
+          explanation: 'Matched by dedicated virtual account number',
+        };
+      }
+    }
+  }
+
+  if (narration) {
+    const m = narration.match(/INV-\d+/i);
+    if (m) {
+      return {
+        invoiceNumber: m[0].toUpperCase(),
+        matchMethod: 'narration',
+        confidence: 90,
+        explanation: 'Matched via transfer narration text',
+      };
+    }
+  }
+
+  return null;
+}
+
 async function processPaystackEvent(event) {
   if (event.event === 'charge.success') {
     return handleChargeSuccess(event.data);
@@ -93,8 +211,8 @@ async function handleChargeSuccess(data) {
     : reference;
   const paymentChannel = isDVA ? 'Bank transfer' : 'Paystack';
 
-  let matchedInvoiceId = null, matchedStatus = 'unmatched', confidence = null;
-  const invoiceMatch = !isDVA && reference && reference.match(/^(INV-\d+)/);
+  let matchedInvoiceId = null, matchedStatus = 'unmatched', confidence = null, matchExplanation = null;
+  const receivingAccountNumber = isDVA ? (authorization?.receiver_bank_account_number || null) : null;
 
   if (!pool) {
     if (DEMO_PROCESSED_PAYSTACK_TXNS.has(paystackTransactionId)) {
@@ -103,12 +221,17 @@ async function handleChargeSuccess(data) {
     }
     DEMO_PROCESSED_PAYSTACK_TXNS.add(paystackTransactionId);
 
-    if (invoiceMatch) {
-      const inv = FALLBACK_INVOICES.find(i => i.invoiceNumber === invoiceMatch[1]);
+    const match = await findMatchingInvoiceForPayment({
+      isDVA, reference, narration: data.narration, receivingAccountNumber,
+    });
+
+    if (match) {
+      const inv = FALLBACK_INVOICES.find(i => i.invoiceNumber === match.invoiceNumber);
       if (inv) {
         matchedInvoiceId = inv.id;
         matchedStatus = 'confirmed';
-        confidence = 100;
+        confidence = match.confidence;
+        matchExplanation = match.explanation;
         inv.status = 'paid';
         inv.statusLabel = 'Reconciled';
         inv.paidAmount = amountNaira;
@@ -134,10 +257,10 @@ async function handleChargeSuccess(data) {
           confidence: confidence || (isDVA ? 40 : 0),
           isHighConfidence: confidence === 100,
           targetName: customer?.email || (isDVA ? 'Bank Transfer Patient' : 'Direct Patient'),
-          invoiceNumber: invoiceMatch ? invoiceMatch[1] : 'N/A',
-          explanation: isDVA 
+          invoiceNumber: match ? match.invoiceNumber : 'N/A',
+          explanation: matchExplanation || (isDVA
             ? 'Incoming NIP bank transfer to hospital DVA awaiting cashier review'
-            : (confidence === 100 ? 'Exact match by invoice reference' : 'Unmatched online payment')
+            : 'Unmatched online payment')
         }
       });
     }
@@ -160,15 +283,20 @@ async function handleChargeSuccess(data) {
       return;
     }
 
-    if (invoiceMatch) {
+    const match = await findMatchingInvoiceForPayment({
+      isDVA, reference, narration: data.narration, receivingAccountNumber, dbClient: client,
+    });
+
+    if (match) {
       const inv = await client.query(
         'SELECT id, invoice_number FROM invoices WHERE invoice_number = $1',
-        [invoiceMatch[1]]
+        [match.invoiceNumber]
       );
       if (inv.rows.length > 0) {
         matchedInvoiceId = inv.rows[0].id;
         matchedStatus = 'confirmed';
-        confidence = 100;
+        confidence = match.confidence;
+        matchExplanation = match.explanation;
       }
     }
 
@@ -202,10 +330,10 @@ async function handleChargeSuccess(data) {
       paymentId, paymentChannel, amountNaira, `₦${amountNaira.toLocaleString()}`, reference,
       isDVA ? `DVA Bank Transfer: ${description}` : `Paystack Online Payment (${reference})`,
       matchedStatus, todayStr, customer?.email || 'Bank Transfer Patient',
-      invoiceMatch ? invoiceMatch[1] : null, confidence || (isDVA ? 40 : 0), confidence === 100,
-      isDVA 
+      match ? match.invoiceNumber : null, confidence || (isDVA ? 40 : 0), confidence === 100,
+      matchExplanation || (isDVA
         ? 'Incoming NIP bank transfer to hospital DVA awaiting cashier review'
-        : (confidence === 100 ? 'Exact match by invoice reference' : 'Unmatched online payment'),
+        : 'Unmatched online payment'),
       paystackTransactionId, reference, customer?.email || null
     ]);
 
@@ -412,7 +540,8 @@ app.get('/api/public/invoice/:invoiceNumber', async (req, res) => {
       const result = await pool.query(
         `SELECT invoice_number, patient_name, service_description, total_amount,
                 formatted_amount, paid_amount, status, status_label, due_date,
-                payer_type, payer_name, copay_amount, claim_amount
+                payer_type, payer_name, copay_amount, claim_amount,
+                dedicated_account_number, dedicated_account_bank, dedicated_account_name
          FROM invoices WHERE invoice_number = $1`,
         [invoiceNumber]
       );
@@ -459,7 +588,10 @@ app.get('/api/public/invoice/:invoiceNumber', async (req, res) => {
       payer_type: found.payerType || null,
       payer_name: found.payerName || null,
       copay_amount: found.copayAmount ?? null,
-      claim_amount: found.claimAmount ?? null
+      claim_amount: found.claimAmount ?? null,
+      dedicated_account_number: found.dedicatedAccountNumber ?? null,
+      dedicated_account_bank: found.dedicatedAccountBank ?? null,
+      dedicated_account_name: found.dedicatedAccountName ?? null
     },
     orders: []
   });
@@ -2368,12 +2500,47 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
         }
       }
 
+      // Best-effort per-invoice Paystack Dedicated Virtual Account. Runs in
+      // the background (not awaited) so a slow or unreachable Paystack call
+      // never delays invoice creation — the public invoice page and the
+      // provider dashboard pick up the account details on their next fetch
+      // once (if) provisioning succeeds.
+      (async () => {
+        try {
+          let patientEmail = req.body.patient_email || null;
+          if (!patientEmail && patient_id) {
+            const pRes = await pool.query('SELECT email FROM patients WHERE id = $1', [patient_id]);
+            patientEmail = pRes.rows[0]?.email || null;
+          }
+          const dva = await provisionInvoiceDedicatedAccount({
+            invoiceNumber, patientName: patient_name, patientEmail,
+          });
+          if (dva) {
+            await pool.query(
+              `UPDATE invoices SET dedicated_account_number = $1, dedicated_account_bank = $2,
+                                    dedicated_account_name = $3, paystack_customer_code = $4
+               WHERE invoice_number = $5`,
+              [dva.accountNumber, dva.bank, dva.accountName, dva.customerCode, invoiceNumber]
+            );
+            console.log(`[DVA] Provisioned ${dva.bank} ${dva.accountNumber} for ${invoiceNumber}`);
+          }
+        } catch (err) {
+          console.error(`[DVA] Background provisioning error for ${invoiceNumber}:`, err.message);
+        }
+      })();
+
       const row = result.rows[0];
       return res.json({
         invoice: {
           ...row,
           invoice_number: row.invoice_number,
           invoiceNumber: row.invoice_number,
+          dedicated_account_number: row.dedicated_account_number,
+          dedicatedAccountNumber: row.dedicated_account_number,
+          dedicated_account_bank: row.dedicated_account_bank,
+          dedicatedAccountBank: row.dedicated_account_bank,
+          dedicated_account_name: row.dedicated_account_name,
+          dedicatedAccountName: row.dedicated_account_name,
           patient_id: row.patient_id,
           patientId: row.patient_id,
           patient_name: row.patient_name,

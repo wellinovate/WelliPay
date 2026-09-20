@@ -32,6 +32,9 @@ interface InvoiceData {
   payer_name: string | null;
   copay_amount: number | null;
   claim_amount: number | null;
+  dedicated_account_number: string | null;
+  dedicated_account_bank: string | null;
+  dedicated_account_name: string | null;
 }
 
 interface InvoiceOrder {
@@ -274,6 +277,39 @@ export default function PublicInvoicePay() {
             <p className="text-[11px] text-slate-400 text-center mt-3 flex items-center justify-center gap-1.5">
               <span>🔒 256-bit encrypted checkout via Paystack Nigeria</span>
             </p>
+
+            {/* Bank transfer alternative — only shown once a dedicated virtual
+                account has been provisioned for this specific invoice.
+                Provisioning happens in the background at invoice creation and
+                can be absent (Paystack unreachable, DVA product not yet
+                approved), in which case this section simply doesn't render
+                and card payment above remains the only option. */}
+            {invoice.dedicated_account_number && (
+              <div className="mt-4 pt-4 border-t border-dashed border-slate-200">
+                <p className="text-xs font-semibold text-slate-700 mb-2 text-center">
+                  Or pay by bank transfer
+                </p>
+                <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Bank</span>
+                    <span className="font-medium text-slate-900">{invoice.dedicated_account_bank}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Account Number</span>
+                    <span className="font-mono font-semibold text-[#0B6B69]">{invoice.dedicated_account_number}</span>
+                  </div>
+                  {invoice.dedicated_account_name && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500">Account Name</span>
+                      <span className="font-medium text-slate-900 text-right max-w-[220px]">{invoice.dedicated_account_name}</span>
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400 text-center mt-2">
+                  This account is unique to this invoice — a transfer here settles it automatically, no reference needed.
+                </p>
+              </div>
+            )}
           </div>
         )}
       </div>
