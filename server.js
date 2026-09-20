@@ -411,14 +411,28 @@ app.get('/api/public/invoice/:invoiceNumber', async (req, res) => {
     try {
       const result = await pool.query(
         `SELECT invoice_number, patient_name, service_description, total_amount,
-                formatted_amount, paid_amount, status, status_label, due_date
+                formatted_amount, paid_amount, status, status_label, due_date,
+                payer_type, payer_name, copay_amount, claim_amount
          FROM invoices WHERE invoice_number = $1`,
         [invoiceNumber]
       );
       if (result.rows.length === 0) {
         return res.status(404).json({ error: 'Invoice not found.' });
       }
-      return res.json({ invoice: result.rows[0] });
+
+      // Itemized services this invoice covers, so the patient can see what
+      // they're paying for, not just a lump total. invoice_id on
+      // clinical_service_orders stores the invoice_number string directly
+      // (invoices.id === invoices.invoice_number at creation).
+      const ordersRes = await pool.query(
+        `SELECT service_type, category, amount::float as amount, performed_at
+         FROM clinical_service_orders
+         WHERE invoice_id = $1
+         ORDER BY performed_at ASC`,
+        [invoiceNumber]
+      );
+
+      return res.json({ invoice: result.rows[0], orders: ordersRes.rows });
     } catch (err) {
       console.error('[API /api/public/invoice] error:', err.message);
       return res.status(500).json({ error: 'Failed to load invoice.' });
@@ -441,8 +455,13 @@ app.get('/api/public/invoice/:invoiceNumber', async (req, res) => {
       paid_amount: found.paidAmount,
       status: found.status,
       status_label: found.statusLabel,
-      due_date: found.dueDate
-    }
+      due_date: found.dueDate,
+      payer_type: found.payerType || null,
+      payer_name: found.payerName || null,
+      copay_amount: found.copayAmount ?? null,
+      claim_amount: found.claimAmount ?? null
+    },
+    orders: []
   });
 });
 

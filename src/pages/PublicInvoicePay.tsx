@@ -28,12 +28,24 @@ interface InvoiceData {
   status: string;
   status_label: string;
   due_date: string;
+  payer_type: string | null;
+  payer_name: string | null;
+  copay_amount: number | null;
+  claim_amount: number | null;
+}
+
+interface InvoiceOrder {
+  service_type: string;
+  category: string;
+  amount: number;
+  performed_at: string;
 }
 
 export default function PublicInvoicePay() {
   const { invoiceNumber } = useParams<{ invoiceNumber: string }>();
   const [searchParams] = useSearchParams();
   const [invoice, setInvoice] = useState<InvoiceData | null>(null);
+  const [orders, setOrders] = useState<InvoiceOrder[]>([]);
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -43,8 +55,12 @@ export default function PublicInvoicePay() {
     fetch(`/api/public/invoice/${invoiceNumber}`)
       .then(res => res.json())
       .then(data => {
-        if (data.error) setError(data.error);
-        else setInvoice(data.invoice);
+        if (data.error) {
+          setError(data.error);
+        } else {
+          setInvoice(data.invoice);
+          setOrders(Array.isArray(data.orders) ? data.orders : []);
+        }
       })
       .catch(err => {
         setError(err.message || 'Failed to connect to server');
@@ -156,17 +172,59 @@ export default function PublicInvoicePay() {
             <span className="font-medium text-slate-900">{invoice.patient_name}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-slate-500">Service Description</span>
-            <span className="font-medium text-slate-900 text-right max-w-[220px]">{invoice.service_description}</span>
-          </div>
-          <div className="flex justify-between text-sm">
             <span className="text-slate-500">Due Date</span>
             <span className="text-slate-700">{invoice.due_date}</span>
           </div>
+
+          {/* Itemized services, when the invoice has line items on record.
+              Falls back to the single description for older invoices that
+              predate itemized clinical_service_orders linkage. */}
+          {orders.length > 0 ? (
+            <div className="border-t border-slate-100 pt-3">
+              <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                Services billed
+              </span>
+              <div className="mt-1.5 space-y-1.5">
+                {orders.map((o, idx) => (
+                  <div key={idx} className="flex justify-between text-sm">
+                    <span className="text-slate-700">{o.service_type}</span>
+                    <span className="font-medium text-slate-900">₦{Number(o.amount).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex justify-between text-sm">
+              <span className="text-slate-500">Service Description</span>
+              <span className="font-medium text-slate-900 text-right max-w-[220px]">{invoice.service_description}</span>
+            </div>
+          )}
+
           <div className="border-t border-dashed border-slate-200 pt-3 flex justify-between items-baseline">
             <span className="text-sm font-semibold text-slate-900">Total Amount Due</span>
             <span className="text-xl font-bold text-[#0B6B69]">{invoice.formatted_amount}</span>
           </div>
+
+          {/* Payer split — only shown when the invoice was billed with HMO
+              context. copay_amount is what the patient owes; claim_amount is
+              what the insurer covers. Informational only: this page still
+              collects the invoice's total_amount, unchanged from before. */}
+          {invoice.payer_type === 'hmo' && invoice.copay_amount != null && invoice.claim_amount != null && (
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Insurer</span>
+                <span className="font-semibold text-[#0B6B69]">{invoice.payer_name || 'HMO'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Insurer covers</span>
+                <span className="font-medium text-slate-700">₦{Number(invoice.claim_amount).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between pt-1 border-t border-slate-200">
+                <span className="text-slate-600 font-medium">Your copay</span>
+                <span className="font-bold text-slate-900">₦{Number(invoice.copay_amount).toLocaleString()}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {showSuccess ? (
