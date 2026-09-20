@@ -59,7 +59,7 @@ export interface HMOClaim {
   payer?: string;
   amount: number;
   formattedAmount: string;
-  status: 'submitted' | 'approved' | 'paid' | 'rejected';
+  status: 'submitted' | 'approved' | 'paid' | 'remitted' | 'adjusted' | 'rejected';
   statusLabel?: string;
   isDisputed: boolean;
   denialRisk: 'high' | 'low' | 'missing-auth';
@@ -71,6 +71,15 @@ export interface HMOClaim {
   patientMrn?: string;
   diagnosis?: string;
   planRule?: string;
+  // Populated only once a claim has been matched against an HMO remittance
+  // (server-side LEFT JOIN on hmo_remittance_lines). expectedAmount is what
+  // the claim was for; paidAmount is what the remittance actually paid;
+  // varianceAmount is expected minus paid (0 for a clean 'remitted' claim).
+  remittanceId?: string;
+  expectedAmount?: number;
+  paidAmount?: number;
+  varianceAmount?: number;
+  varianceReason?: string;
 }
 
 export type PersonaType = 'provider' | 'hmo';

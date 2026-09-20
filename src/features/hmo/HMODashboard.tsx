@@ -79,7 +79,11 @@ export const HMODashboard: React.FC = () => {
   }, [hmoClaims]);
 
   const paidClaims = useMemo(() => {
-    return hmoClaims.filter(c => c.status === 'paid');
+    return hmoClaims.filter(c => c.status === 'paid' || c.status === 'remitted');
+  }, [hmoClaims]);
+
+  const adjustedClaims = useMemo(() => {
+    return hmoClaims.filter(c => c.status === 'adjusted');
   }, [hmoClaims]);
 
   const disputedClaims = useMemo(() => {
@@ -98,6 +102,14 @@ export const HMODashboard: React.FC = () => {
     return paidClaims.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
   }, [paidClaims]);
 
+  const adjustedVarianceSum = useMemo(() => {
+    return adjustedClaims.reduce((sum, c) => sum + (Number(c.varianceAmount) || 0), 0);
+  }, [adjustedClaims]);
+
+  const adjustedClaimAmountSum = useMemo(() => {
+    return adjustedClaims.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
+  }, [adjustedClaims]);
+
   const disputedSum = useMemo(() => {
     return disputedClaims.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
   }, [disputedClaims]);
@@ -110,8 +122,8 @@ export const HMODashboard: React.FC = () => {
 
   const approvalRate = useMemo(() => {
     if (totalClaimed === 0) return '0.0';
-    return (((approvedSum + paidSum) / totalClaimed) * 100).toFixed(1);
-  }, [approvedSum, paidSum, totalClaimed]);
+    return (((approvedSum + paidSum + adjustedClaimAmountSum) / totalClaimed) * 100).toFixed(1);
+  }, [approvedSum, paidSum, adjustedClaimAmountSum, totalClaimed]);
 
   const oldestDisputedAge = useMemo(() => {
     if (disputedClaims.length === 0) return 0;
@@ -136,7 +148,11 @@ export const HMODashboard: React.FC = () => {
         if (statusFilter === 'disputed' && !claim.isDisputed) return false;
         if (statusFilter !== 'disputed') {
           if (claim.isDisputed) return false;
-          if (claim.status !== statusFilter) return false;
+          if (statusFilter === 'paid') {
+            if (claim.status !== 'paid' && claim.status !== 'remitted') return false;
+          } else if (claim.status !== statusFilter) {
+            return false;
+          }
         }
       }
       if (denialRiskFilter !== 'All') {
@@ -283,6 +299,27 @@ export const HMODashboard: React.FC = () => {
         </div>
       </div>
 
+      {/* Adjusted (Short-Paid) Claims Banner — distinct from disputed: the payer
+          did settle these, but for less than claimed, with a stated reason. */}
+      {adjustedClaims.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg px-3.5 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-amber-900 shadow-xs">
+          <div className="flex items-center gap-2 font-medium">
+            <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-amber-600 text-white tracking-wide">
+              Review Variance
+            </span>
+            <span>
+              <strong>{adjustedClaims.length} claims</strong> paid short by the payer — <strong>₦{adjustedVarianceSum.toLocaleString()}</strong> total variance against claimed amount.
+            </span>
+          </div>
+          <button
+            onClick={() => setStatusFilter('adjusted')}
+            className="font-bold text-amber-800 hover:underline underline-offset-4 self-start sm:self-auto cursor-pointer"
+          >
+            Filter Adjusted Queue →
+          </button>
+        </div>
+      )}
+
       {/* Disputed Claims 1-Line Banner Directly Above Table */}
       {disputedClaims.length > 0 && (
         <div className="bg-rose-50 border border-rose-200 rounded-lg px-3.5 py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs text-rose-800 shadow-xs">
@@ -333,6 +370,7 @@ export const HMODashboard: React.FC = () => {
               <option value="submitted">Submitted</option>
               <option value="approved">Approved</option>
               <option value="paid">Paid</option>
+              <option value="adjusted">Adjusted / Short-paid</option>
               <option value="disputed">Disputed</option>
             </select>
 
@@ -426,9 +464,16 @@ export const HMODashboard: React.FC = () => {
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
                           Approved
                         </span>
-                      ) : claim.status === 'paid' ? (
+                      ) : claim.status === 'paid' || claim.status === 'remitted' ? (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
                           Paid Remittance
+                        </span>
+                      ) : claim.status === 'adjusted' ? (
+                        <span
+                          className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200"
+                          title={claim.varianceReason}
+                        >
+                          Adjusted · Short-Paid
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200">
@@ -440,7 +485,15 @@ export const HMODashboard: React.FC = () => {
                     <td>
                       <div className="space-y-0.5">
                         <div>
-                          {claim.isDisputed || claim.denialRisk === 'missing-auth' ? (
+                          {claim.status === 'adjusted' ? (
+                            <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold uppercase bg-amber-100 text-amber-800 border border-amber-200">
+                              Variance
+                            </span>
+                          ) : claim.status === 'remitted' || claim.status === 'paid' ? (
+                            <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-medium bg-slate-100 text-slate-700 border border-slate-200">
+                              Settled
+                            </span>
+                          ) : claim.isDisputed || claim.denialRisk === 'missing-auth' ? (
                             <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold uppercase bg-rose-100 text-rose-800 border border-rose-200">
                               Action Required
                             </span>
@@ -454,8 +507,12 @@ export const HMODashboard: React.FC = () => {
                             </span>
                           )}
                         </div>
-                        <span className="block text-[11px] text-[#64748b] truncate max-w-[170px]" title={claim.denialReason}>
-                          {claim.denialReason || (claim.isDisputed ? 'Missing pre-authorization' : 'Routine review')}
+                        <span className="block text-[11px] text-[#64748b] truncate max-w-[170px]" title={claim.status === 'adjusted' ? claim.varianceReason : claim.denialReason}>
+                          {claim.status === 'adjusted'
+                            ? (claim.varianceReason || 'Short-paid, no reason recorded')
+                            : claim.status === 'remitted' || claim.status === 'paid'
+                            ? 'Paid in full'
+                            : (claim.denialReason || (claim.isDisputed ? 'Missing pre-authorization' : 'Routine review'))}
                         </span>
                       </div>
                     </td>
@@ -567,6 +624,55 @@ export const HMODashboard: React.FC = () => {
                 {selectedClaim.planRule || `${selectedClaim.payer || 'HMO'} Standard Policy · Pre-authorization criteria verified.`}
               </p>
             </div>
+
+            {/* Remittance Settlement Box — only for claims matched against an
+                HMO remittance (status 'remitted' or 'adjusted'). */}
+            {(selectedClaim.status === 'remitted' || selectedClaim.status === 'adjusted') && (
+              <div className={`p-3.5 rounded-lg border space-y-2 text-xs ${
+                selectedClaim.status === 'adjusted'
+                  ? 'bg-amber-50 border-amber-200'
+                  : 'bg-emerald-50 border-emerald-200'
+              }`}>
+                <div className={`font-bold flex items-center gap-1.5 text-sm ${
+                  selectedClaim.status === 'adjusted' ? 'text-amber-900' : 'text-emerald-900'
+                }`}>
+                  {selectedClaim.status === 'adjusted' ? (
+                    <AlertTriangle className="w-4 h-4 text-amber-700" />
+                  ) : (
+                    <Check className="w-4 h-4 text-emerald-700" />
+                  )}
+                  Remittance Settlement
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#64748b]">Claimed amount:</span>
+                  <span className="font-semibold text-[#0f172a]">
+                    ₦{(selectedClaim.expectedAmount ?? selectedClaim.amount).toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#64748b]">Amount remitted:</span>
+                  <span className="font-semibold text-[#0f172a]">
+                    ₦{(selectedClaim.paidAmount ?? selectedClaim.amount).toLocaleString()}
+                  </span>
+                </div>
+                {selectedClaim.status === 'adjusted' && (
+                  <>
+                    <div className="flex justify-between">
+                      <span className="text-[#64748b]">Variance:</span>
+                      <span className="font-bold text-amber-800">
+                        ₦{(selectedClaim.varianceAmount ?? 0).toLocaleString()} short
+                      </span>
+                    </div>
+                    <div className="pt-1 border-t border-amber-200">
+                      <span className="block text-[#64748b] mb-0.5">Payer's stated reason:</span>
+                      <span className="text-amber-900">
+                        {selectedClaim.varianceReason || 'No reason recorded.'}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Disputed Alert & Clinical Appeal Form */}
             {selectedClaim.isDisputed && (

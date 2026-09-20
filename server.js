@@ -686,15 +686,21 @@ app.get('/api/claims', requireAuth, async (req, res) => {
   if (pool) {
     try {
       const result = await query(`
-        SELECT 
-          id, provider, amount::float as amount, formatted_amount as "formattedAmount",
-          status, status_label as "statusLabel", is_disputed as "isDisputed",
-          denial_risk as "denialRisk", age, patient_name as "patientName",
-          patient_mrn as "patientMrn", payer, diagnosis, pre_auth_code as "preAuthCode",
-          denial_reason as "denialReason", plan_rule as "planRule",
-          COALESCE(sla_days, 14) as "slaDays"
-        FROM hmo_claims
-        ORDER BY id ASC
+        SELECT
+          c.id, c.provider, c.amount::float as amount, c.formatted_amount as "formattedAmount",
+          c.status, c.status_label as "statusLabel", c.is_disputed as "isDisputed",
+          c.denial_risk as "denialRisk", c.age, c.patient_name as "patientName",
+          c.patient_mrn as "patientMrn", c.payer, c.diagnosis, c.pre_auth_code as "preAuthCode",
+          c.denial_reason as "denialReason", c.plan_rule as "planRule",
+          COALESCE(c.sla_days, 14) as "slaDays",
+          rl.remittance_id as "remittanceId",
+          rl.expected_amount::float as "expectedAmount",
+          rl.paid_amount::float as "paidAmount",
+          rl.variance::float as "varianceAmount",
+          rl.variance_reason as "varianceReason"
+        FROM hmo_claims c
+        LEFT JOIN hmo_remittance_lines rl ON rl.claim_id = c.id
+        ORDER BY c.id ASC
       `);
       return res.json({ source: 'postgresql', claims: result.rows });
     } catch (err) {
