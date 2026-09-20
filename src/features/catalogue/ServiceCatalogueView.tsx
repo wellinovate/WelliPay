@@ -45,7 +45,8 @@ const TURNAROUND_PRESETS = [
   { hours: 12, label: '12h (Half day)' },
   { hours: 24, label: '24h (Next day)' },
   { hours: 48, label: '48h (2 days)' },
-  { hours: 72, label: '72h (3 days)' }
+  { hours: 72, label: '72h (3 days)' },
+  { hours: 120, label: '120h (5-7 days)' }
 ];
 
 export const ServiceCatalogueView: React.FC = () => {
@@ -75,15 +76,16 @@ export const ServiceCatalogueView: React.FC = () => {
   const [drawerLastEditedBy, setDrawerLastEditedBy] = useState<string>('Dr. K. Balogun · Revenue Cycle Lead');
   const [drawerSaving, setDrawerSaving] = useState<boolean>(false);
 
-  // Add Service Modal State
+  // Add Service Modal State (Strictly hazard-free defaults)
   const [isAddModalOpen, setIsAddModalOpen] = useState<boolean>(false);
   const [modalSearchQuery, setModalSearchQuery] = useState<string>('');
   const [modalDepartment, setModalDepartment] = useState<string>('all');
   const [selectedMasterService, setSelectedMasterService] = useState<MasterService | null>(null);
   const [modalPrice, setModalPrice] = useState<string>('');
-  const [modalHours, setModalHours] = useState<number>(4);
-  const [modalHMOs, setModalHMOs] = useState<string[]>(['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Leadway Health', 'Avon HMO']);
-  const [modalIsPublished, setModalIsPublished] = useState<boolean>(true);
+  const [modalHours, setModalHours] = useState<number | null>(null); // Blank until chosen
+  const [modalHMOs, setModalHMOs] = useState<string[]>([]); // No HMOs pre-ticked!
+  const [modalIsPublished, setModalIsPublished] = useState<boolean>(false); // Saves as draft by default!
+  const [modalEffectiveDate, setModalEffectiveDate] = useState<string>('1 Jan 2026');
   const [modalSubmitting, setModalSubmitting] = useState<boolean>(false);
 
   // Auth header helper
@@ -216,8 +218,9 @@ export const ServiceCatalogueView: React.FC = () => {
     const draftCount = totalOffered - totalPublished;
     const coveredDepts = new Set(catalogue.map(c => c.department)).size;
     const allHMOs = new Set(catalogue.flatMap(c => c.hmoAccepted || [])).size;
-    return { totalOffered, totalPublished, draftCount, coveredDepts, allHMOs };
-  }, [catalogue]);
+    const availableToAdd = Math.max(0, masterServices.length - catalogue.length);
+    return { totalOffered, totalPublished, draftCount, coveredDepts, allHMOs, availableToAdd };
+  }, [catalogue, masterServices]);
 
   // Affected active open invoices for currently selected item in drawer
   const affectedOpenInvoices = useMemo(() => {
@@ -277,7 +280,8 @@ export const ServiceCatalogueView: React.FC = () => {
   };
 
   // Clinical Sample/Method helper
-  const isImagingOrCardio = (dept: string): boolean => {
+  const isImagingOrCardio = (dept?: string): boolean => {
+    if (!dept) return false;
     return [
       'Diagnostic Ultrasound',
       'Diagnostic Radiology',
@@ -432,18 +436,25 @@ export const ServiceCatalogueView: React.FC = () => {
   };
 
   // Add new service from modal
-  const handleAddServiceSubmit = async (e: React.FormEvent) => {
+  const handleAddServiceSubmit = async (e: React.FormEvent, addAnother: boolean = false) => {
     e.preventDefault();
     if (!selectedMasterService) {
-      addNotification('Please select a standardised service from the master directory', 'error');
+      addNotification('Please select an available service from the master directory', 'error');
       return;
     }
 
     const priceNum = parseFloat(modalPrice.replace(/[^0-9.]/g, ''));
     if (isNaN(priceNum) || priceNum <= 0) {
-      addNotification('Please enter a valid price greater than ₦0', 'error');
+      addNotification('Please enter a valid tariff price greater than ₦0', 'error');
       return;
     }
+
+    if (!modalHours || modalHours <= 0) {
+      addNotification('Please select a target turnaround time', 'error');
+      return;
+    }
+
+    const serviceName = selectedMasterService.serviceName || selectedMasterService.service_name || 'Service';
 
     setModalSubmitting(true);
     try {
@@ -459,18 +470,31 @@ export const ServiceCatalogueView: React.FC = () => {
           turnaround_hours: modalHours,
           hmo_accepted: modalHMOs,
           is_published: modalIsPublished,
-          effective_date: '1 Jan 2026',
+          effective_date: modalEffectiveDate || '1 Jan 2026',
           last_edited_by: 'Dr. K. Balogun · Revenue Cycle Lead'
         })
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
-        addNotification(`Added ${selectedMasterService.serviceName} to catalogue (₦${priceNum.toLocaleString()})`, 'success');
-        setIsAddModalOpen(false);
-        setSelectedMasterService(null);
-        setModalPrice('');
+        addNotification(`Added ${serviceName} to catalogue (₦${priceNum.toLocaleString()})`, 'success');
         await fetchCatalogue(selectedProviderId);
+
+        if (addAnother) {
+          // Reset form fields but keep modal open for adding another
+          setSelectedMasterService(null);
+          setModalPrice('');
+          setModalHours(null);
+          setModalHMOs([]);
+          setModalIsPublished(false);
+        } else {
+          setIsAddModalOpen(false);
+          setSelectedMasterService(null);
+          setModalPrice('');
+          setModalHours(null);
+          setModalHMOs([]);
+          setModalIsPublished(false);
+        }
       } else {
         throw new Error(data.error || 'Failed to add service');
       }
@@ -480,6 +504,53 @@ export const ServiceCatalogueView: React.FC = () => {
       setModalSubmitting(false);
     }
   };
+
+  // Filtered Master Services in Add Modal
+  const modalFilteredServices = useMemo(() => {
+    return masterServices.filter(service => {
+      if (modalDepartment !== 'all' && service.department !== modalDepartment) return false;
+      if (modalSearchQuery.trim()) {
+        const q = modalSearchQuery.toLowerCase();
+        const name = (service.serviceName || service.service_name || '').toLowerCase();
+        const code = (service.serviceCode || service.service_code || '').toLowerCase();
+        const dept = (service.department || '').toLowerCase();
+        return name.includes(q) || code.includes(q) || dept.includes(q);
+      }
+      return true;
+    });
+  }, [masterServices, modalDepartment, modalSearchQuery]);
+
+  // Reference Benchmark calculation & warning for modal
+  const selectedRefPrice = useMemo(() => {
+    if (!selectedMasterService) return 15000;
+    return selectedMasterService.referencePrice || selectedMasterService.reference_price || 15000;
+  }, [selectedMasterService]);
+
+  const modalParsedPrice = useMemo(() => {
+    const num = parseFloat(modalPrice.replace(/[^0-9.]/g, ''));
+    return isNaN(num) ? 0 : num;
+  }, [modalPrice]);
+
+  const priceWarning = useMemo(() => {
+    if (!selectedMasterService || modalParsedPrice <= 0) return null;
+    if (modalParsedPrice < selectedRefPrice * 0.5) {
+      const percentBelow = Math.round((1 - modalParsedPrice / selectedRefPrice) * 100);
+      return `Entered price (₦${modalParsedPrice.toLocaleString()}) is ${percentBelow}% below the master reference benchmark (₦${selectedRefPrice.toLocaleString()}). Please verify you did not omit a zero.`;
+    }
+    if (modalParsedPrice > selectedRefPrice * 1.8) {
+      const percentAbove = Math.round((modalParsedPrice / selectedRefPrice - 1) * 100);
+      return `Notice: Entered price (₦${modalParsedPrice.toLocaleString()}) is ${percentAbove}% above the master reference benchmark (₦${selectedRefPrice.toLocaleString()}).`;
+    }
+    return null;
+  }, [modalParsedPrice, selectedRefPrice, selectedMasterService]);
+
+  // Validation state for modal primary button
+  const modalDisabledReason = useMemo(() => {
+    if (!selectedMasterService) return 'Select a test on the left';
+    if (!modalPrice || modalParsedPrice <= 0) return 'Enter tariff price';
+    if (!modalHours) return 'Select turnaround time';
+    return '';
+  }, [selectedMasterService, modalPrice, modalParsedPrice, modalHours]);
 
   return (
     <div className="space-y-4">
@@ -527,6 +598,9 @@ export const ServiceCatalogueView: React.FC = () => {
               onClick={() => {
                 setSelectedMasterService(null);
                 setModalPrice('');
+                setModalHours(null);
+                setModalHMOs([]);
+                setModalIsPublished(false);
                 setIsAddModalOpen(true);
               }}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-[#12244D] hover:bg-[#0A152E] text-white text-xs font-semibold shadow-xs transition-colors cursor-pointer"
@@ -1053,249 +1127,456 @@ export const ServiceCatalogueView: React.FC = () => {
 
       {/* 5. Add Service From Master Directory Modal */}
       {isAddModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs">
-          <div className="bg-white rounded-xl border border-slate-200 shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-5 border-b border-slate-100">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-2xl w-full max-w-4xl max-h-[88vh] flex flex-col animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+            {/* Pinned Modal Header */}
+            <div className="flex items-center justify-between p-4 px-5 border-b border-slate-200 bg-slate-50/80 flex-shrink-0">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-brand-navy">
-                  Standard master directory
-                </span>
-                <h2 className="text-lg font-bold text-slate-900 mt-0.5">
-                  Add standardised diagnostic service
+                <h2 className="text-base font-bold text-slate-900">
+                  Add service
                 </h2>
-                <p className="text-xs text-slate-500">
-                  Select a clinical test to configure fee schedules, turnaround, and accepted HMO networks.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Select a test from the master directory to configure hospital tariff and payer terms.
                 </p>
               </div>
               <button
                 onClick={() => setIsAddModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 p-1 rounded-md transition-colors cursor-pointer"
+                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
+                title="Close modal"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Body - 2 Columns */}
-            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 flex-1 overflow-hidden">
+            {/* Modal Body - 2 Columns (Left column scrollable, right panel form) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-200 flex-1 overflow-hidden min-h-0">
+              
               {/* Left Column: Master Directory Browser */}
-              <div className="p-4 flex flex-col space-y-3 overflow-hidden">
-                <div className="text-xs font-semibold text-slate-800">
-                  1. Select master test ({masterServices.length})
+              <div className="p-4 flex flex-col overflow-hidden min-h-0 space-y-3 bg-slate-50/30">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-bold text-slate-800">
+                    1. Select test
+                  </div>
+                  <div className="text-[11px] font-medium text-slate-500">
+                    <span className="font-semibold text-emerald-700">{metrics.availableToAdd} available</span>
+                    <span className="text-slate-300 mx-1">·</span>
+                    <span>{catalogue.length} in catalogue</span>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={modalSearchQuery}
-                    onChange={(e) => setModalSearchQuery(e.target.value)}
-                    placeholder="Search master tests..."
-                    className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-xs focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#12244D]"
-                  />
+                {/* Filters */}
+                <div className="space-y-2 flex-shrink-0">
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={modalSearchQuery}
+                      onChange={(e) => setModalSearchQuery(e.target.value)}
+                      placeholder="Search tests by name or code..."
+                      className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-[#12244D]"
+                    />
+                    {modalSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setModalSearchQuery('')}
+                        className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
 
                   <select
                     value={modalDepartment}
                     onChange={(e) => setModalDepartment(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-md text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none cursor-pointer"
                   >
-                    <option value="all">All 10 departments</option>
-                    {departments.map(d => (
-                      <option key={d} value={d}>{d}</option>
-                    ))}
+                    <option value="all">All 10 departments ({metrics.availableToAdd} available)</option>
+                    {departments.map(d => {
+                      const availInDept = masterServices.filter(s => 
+                        s.department === d && !catalogue.some(c => c.masterServiceId === s.id || c.serviceCode === (s.serviceCode || s.service_code))
+                      ).length;
+                      return (
+                        <option key={d} value={d}>{d} ({availInDept} available)</option>
+                      );
+                    })}
                   </select>
                 </div>
 
-                {/* Service List */}
-                <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 max-h-[340px] scrollbar-thin">
-                  {masterServices
-                    .filter(s => {
-                      if (modalDepartment !== 'all' && s.department !== modalDepartment) return false;
-                      if (modalSearchQuery.trim()) {
-                        const q = modalSearchQuery.toLowerCase();
-                        return s.serviceName.toLowerCase().includes(q) || s.serviceCode.toLowerCase().includes(q) || s.department.toLowerCase().includes(q);
-                      }
-                      return true;
-                    })
-                    .map(service => {
-                      const isSelected = selectedMasterService?.id === service.id;
-                      const isAlreadyInCatalogue = catalogue.some(c => c.masterServiceId === service.id);
+                {/* The ONLY Scrollable List on the Left */}
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin min-h-0">
+                  {modalFilteredServices.map(service => {
+                    const serviceName = service.serviceName || service.service_name || 'Service';
+                    const serviceCode = service.serviceCode || service.service_code || 'LAB-SVC';
+                    const refPrice = service.referencePrice || service.reference_price || 15000;
+                    const existingCatItem = catalogue.find(c => 
+                      c.masterServiceId === service.id || c.serviceCode === serviceCode
+                    );
+                    const isSelected = selectedMasterService?.id === service.id;
 
-                      return (
-                        <div
-                          key={service.id}
-                          onClick={() => setSelectedMasterService(service)}
-                          className={`p-2.5 rounded-lg border text-left cursor-pointer transition-all ${
-                            isSelected
-                              ? 'border-[#12244D] bg-blue-50/50 ring-1 ring-[#12244D]'
-                              : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
-                          }`}
-                        >
-                          <div className="flex items-start justify-between gap-1">
-                            <div className="font-semibold text-xs text-slate-900 leading-snug">
-                              {service.serviceName}
-                            </div>
-                            {isAlreadyInCatalogue && (
-                              <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                                Added
-                              </span>
-                            )}
+                    return (
+                      <div
+                        key={service.id}
+                        className={`p-3 rounded-xl border text-left transition-all ${
+                          existingCatItem
+                            ? 'bg-slate-100/70 border-slate-200/90 opacity-80'
+                            : isSelected
+                            ? 'border-[#12244D] bg-blue-50/70 ring-1 ring-[#12244D] shadow-2xs'
+                            : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/60 cursor-pointer shadow-2xs'
+                        }`}
+                        onClick={() => {
+                          if (!existingCatItem) {
+                            setSelectedMasterService(service);
+                            // Do not preset price, but provide clean reference price display
+                          }
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="font-bold text-xs text-slate-900 leading-snug">
+                            {serviceName}
                           </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="font-mono text-[10px] text-slate-500 bg-slate-100 px-1 rounded">
-                              {service.serviceCode}
+                          {existingCatItem ? (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-slate-200 text-slate-700 whitespace-nowrap">
+                              In catalogue
                             </span>
-                            <span className="text-[11px] text-slate-500">
+                          ) : (
+                            <span className="font-mono text-xs font-bold text-slate-800 whitespace-nowrap">
+                              ₦{refPrice.toLocaleString()}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 mt-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-[10px] font-bold text-slate-700 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded">
+                              {serviceCode}
+                            </span>
+                            <span className="text-[11px] text-slate-500 truncate max-w-[130px]">
                               {service.department}
                             </span>
                           </div>
+
+                          {existingCatItem ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setIsAddModalOpen(false);
+                                setSelectedItem(existingCatItem);
+                              }}
+                              className="text-[11px] font-semibold text-brand-navy hover:underline flex items-center gap-0.5 cursor-pointer"
+                              title="Open tariff editor for this service"
+                            >
+                              <span>Edit tariff</span>
+                              <ChevronRight className="w-3 h-3" />
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              Ref benchmark
+                            </span>
+                          )}
                         </div>
-                      );
-                    })}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Right Column: Pricing & Tariff Configuration */}
-              <form onSubmit={handleAddServiceSubmit} className="p-4 flex flex-col justify-between overflow-y-auto max-h-[500px] scrollbar-thin">
-                <div className="space-y-4">
-                  <div className="text-xs font-semibold text-slate-800">
-                    2. Provider tariff & terms
-                  </div>
+              {/* Right Column: Pricing & Tariff Configuration Form */}
+              <div className="p-4 flex flex-col justify-between overflow-y-auto scrollbar-thin min-h-0 bg-white">
+                {selectedMasterService ? (
+                  <div className="space-y-4">
+                    {/* Unclipped Section Header & Selected Test Banner */}
+                    <div>
+                      <div className="text-xs font-bold text-slate-800 mb-2">
+                        2. Provider tariff & terms
+                      </div>
+                      
+                      <div className="p-3.5 bg-blue-50/50 border border-blue-200/70 rounded-xl space-y-1.5 text-xs">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="font-bold text-sm text-slate-900 leading-snug">
+                              {selectedMasterService.serviceName || selectedMasterService.service_name}
+                            </div>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="font-mono text-xs font-bold text-slate-800 bg-white border border-slate-200 px-2 py-0.5 rounded shadow-2xs">
+                                {selectedMasterService.serviceCode || selectedMasterService.service_code}
+                              </span>
+                              <span className="text-[11px] font-medium bg-blue-100 text-brand-navy px-2 py-0.5 rounded">
+                                {selectedMasterService.department}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-[10px] text-slate-400 uppercase font-semibold">Reference price</div>
+                            <div className="font-mono font-bold text-sm text-slate-800">
+                              ₦{selectedRefPrice.toLocaleString()}
+                            </div>
+                          </div>
+                        </div>
 
-                  {selectedMasterService ? (
-                    <div className="p-3 bg-blue-50/40 border border-blue-200/60 rounded-lg space-y-1.5 text-xs">
-                      <div className="font-bold text-slate-900">
-                        {selectedMasterService.serviceName}
+                        <p className="text-[11px] text-slate-600 pt-1 leading-relaxed">
+                          {selectedMasterService.description}
+                        </p>
+
+                        {!isImagingOrCardio(selectedMasterService.department) && (selectedMasterService.specimenType || selectedMasterService.specimen_type) && (
+                          <div className="text-[11px] text-slate-500 pt-0.5">
+                            <span className="font-medium text-slate-700">Sample or method:</span> {selectedMasterService.specimenType || selectedMasterService.specimen_type}
+                          </div>
+                        )}
                       </div>
-                      <div className="text-slate-600 text-[11px]">
-                        {selectedMasterService.description}
+                    </div>
+
+                    {/* Tariff Price Field with Master Reference Comparison */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-semibold text-slate-800">
+                          Tariff price (₦) *
+                        </label>
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          Master reference: ₦{selectedRefPrice.toLocaleString()}
+                        </span>
                       </div>
-                      {!isImagingOrCardio(selectedMasterService.department) && selectedMasterService.specimenType && (
-                        <div className="text-slate-500 text-[11px]">
-                          <span className="font-medium text-slate-700">Sample:</span> {selectedMasterService.specimenType}
+                      
+                      <div className="relative">
+                        <span className="absolute left-3 top-2 text-slate-500 font-bold text-xs">₦</span>
+                        <input
+                          type="text"
+                          value={modalPrice}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9]/g, '');
+                            setModalPrice(val ? Number(val).toLocaleString() : '');
+                          }}
+                          placeholder={`e.g. ${selectedRefPrice.toLocaleString()}`}
+                          className="w-full pl-8 pr-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#12244D]"
+                          required
+                          autoFocus
+                        />
+                      </div>
+
+                      {/* Discrepancy Warning if entered price deviates wildly */}
+                      {priceWarning && (
+                        <div className="mt-1.5 p-2.5 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-800 flex items-start gap-2 animate-in fade-in">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                          <span className="leading-snug">{priceWarning}</span>
                         </div>
                       )}
                     </div>
-                  ) : (
-                    <div className="p-6 border border-dashed border-slate-300 rounded-lg text-center text-slate-400 text-xs">
-                      ← Select a standardised test from the master directory on the left
-                    </div>
-                  )}
 
-                  {/* Price */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Our tariff price (₦) *
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3 top-2 text-slate-500 font-bold text-xs">₦</span>
-                      <input
-                        type="text"
-                        value={modalPrice}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(/[^0-9]/g, '');
-                          setModalPrice(val ? Number(val).toLocaleString() : '');
-                        }}
-                        placeholder="e.g. 15,000"
-                        className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#12244D]"
+                    {/* Turnaround Time (Hours) */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-800 mb-1">
+                        Target turnaround time *
+                      </label>
+                      <select
+                        value={modalHours || ''}
+                        onChange={(e) => setModalHours(e.target.value ? parseInt(e.target.value) : null)}
+                        className={`w-full px-3 py-1.5 bg-white border rounded-lg text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#12244D] cursor-pointer ${
+                          !modalHours ? 'border-slate-300 text-slate-400' : 'border-slate-300 text-slate-900'
+                        }`}
                         required
-                      />
-                    </div>
-                  </div>
-
-                  {/* Turnaround Time */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1">
-                      Turnaround time (hours)
-                    </label>
-                    <select
-                      value={modalHours}
-                      onChange={(e) => setModalHours(parseInt(e.target.value))}
-                      className="w-full px-3 py-1.5 bg-white border border-slate-300 rounded-md text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-[#12244D] cursor-pointer"
-                    >
-                      {TURNAROUND_PRESETS.map(p => (
-                        <option key={p.hours} value={p.hours}>{p.label}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* HMOs Accepted */}
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-700 mb-1.5">
-                      Accepted HMO partners
-                    </label>
-                    <div className="grid grid-cols-2 gap-1.5">
-                      {NIGERIAN_HMOS.map(hmo => {
-                        const isChecked = modalHMOs.includes(hmo);
-                        return (
-                          <label 
-                            key={hmo}
-                            className={`flex items-center gap-2 p-1.5 rounded border text-xs cursor-pointer select-none transition-colors ${
-                              isChecked ? 'bg-blue-50/70 border-blue-200 text-[#12244D]' : 'border-slate-200 text-slate-600'
+                      >
+                        <option value="">Select turnaround time...</option>
+                        {TURNAROUND_PRESETS.map(p => (
+                          <option key={p.hours} value={p.hours}>{p.label}</option>
+                        ))}
+                      </select>
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {TURNAROUND_PRESETS.slice(0, 5).map(p => (
+                          <button
+                            key={p.hours}
+                            type="button"
+                            onClick={() => setModalHours(p.hours)}
+                            className={`px-2 py-0.5 rounded text-[11px] font-medium border transition-colors cursor-pointer ${
+                              modalHours === p.hours
+                                ? 'bg-[#12244D] text-white border-[#12244D]'
+                                : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                             }`}
                           >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  setModalHMOs(prev => [...prev, hmo]);
-                                } else {
-                                  setModalHMOs(prev => prev.filter(h => h !== hmo));
-                                }
-                              }}
-                              className="rounded text-[#12244D] focus:ring-0"
-                            />
-                            <span className="text-[11px] font-medium">{hmo}</span>
-                          </label>
-                        );
-                      })}
+                            {p.label.split(' ')[0]}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Accepted HMO Networks */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-semibold text-slate-800">
+                          Accepted HMO networks ({modalHMOs.length} of {NIGERIAN_HMOS.length})
+                        </label>
+                        <div className="flex items-center gap-2 text-[11px]">
+                          <button
+                            type="button"
+                            onClick={() => setModalHMOs([...NIGERIAN_HMOS])}
+                            className="text-brand-navy hover:underline cursor-pointer font-medium"
+                          >
+                            All 6 HMOs
+                          </button>
+                          <span className="text-slate-300">|</span>
+                          <button
+                            type="button"
+                            onClick={() => setModalHMOs([])}
+                            className="text-slate-500 hover:underline cursor-pointer"
+                          >
+                            Clear
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {NIGERIAN_HMOS.map(hmo => {
+                          const isChecked = modalHMOs.includes(hmo);
+                          return (
+                            <label 
+                              key={hmo}
+                              className={`flex items-center gap-2 p-1.5 px-2 rounded-lg border text-xs cursor-pointer select-none transition-colors ${
+                                isChecked 
+                                  ? 'bg-blue-50/70 border-blue-200 text-[#12244D] font-medium' 
+                                  : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setModalHMOs(prev => [...prev, hmo]);
+                                  } else {
+                                    setModalHMOs(prev => prev.filter(h => h !== hmo));
+                                  }
+                                }}
+                                className="rounded text-[#12244D] focus:ring-0 cursor-pointer"
+                              />
+                              <span className="text-[11px]">{hmo}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Effective Date & Last Edited By */}
+                    <div className="grid grid-cols-2 gap-2 pt-1 border-t border-slate-100">
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          Effective date
+                        </label>
+                        <input
+                          type="text"
+                          value={modalEffectiveDate}
+                          onChange={(e) => setModalEffectiveDate(e.target.value)}
+                          className="w-full px-2.5 py-1 bg-slate-50 border border-slate-200 rounded text-xs font-medium text-slate-800 focus:bg-white focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                          Authorising clinician
+                        </label>
+                        <input
+                          type="text"
+                          readOnly
+                          value="Dr. K. Balogun · Lead"
+                          className="w-full px-2.5 py-1 bg-slate-100 border border-slate-200 rounded text-xs text-slate-600 focus:outline-none cursor-default"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Publish Immediately Checkbox (UNCHECKED BY DEFAULT) */}
+                    <div className="pt-1">
+                      <label className="flex items-start gap-2 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={modalIsPublished}
+                          onChange={(e) => setModalIsPublished(e.target.checked)}
+                          className="rounded text-emerald-600 focus:ring-0 w-4 h-4 mt-0.5 cursor-pointer"
+                        />
+                        <div>
+                          <span className="text-xs font-semibold text-slate-800">
+                            Publish live immediately upon saving
+                          </span>
+                          <p className="text-[11px] text-slate-500">
+                            Unchecked: saves safely as a draft. Checked: immediately visible to payers and estimator.
+                          </p>
+                        </div>
+                      </label>
+                    </div>
+
+                    {/* Real-time Publishing Summary Strip */}
+                    <div className={`p-3 rounded-lg border text-xs font-medium ${
+                      modalParsedPrice <= 0
+                        ? 'bg-slate-50 border-slate-200 text-slate-500'
+                        : modalIsPublished
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-900 font-semibold'
+                        : 'bg-blue-50 border-blue-200 text-blue-900'
+                    }`}>
+                      {modalParsedPrice <= 0 ? (
+                        'Enter a tariff price to preview publishing summary.'
+                      ) : modalIsPublished ? (
+                        `✅ Goes live immediately to ${modalHMOs.length} HMO${modalHMOs.length === 1 ? '' : 's'} at ₦${modalParsedPrice.toLocaleString()}${modalHMOs.length === 0 ? ' (self-pay only)' : ''}.`
+                      ) : (
+                        `📋 Saves as draft to ${modalHMOs.length} HMO${modalHMOs.length === 1 ? '' : 's'} at ₦${modalParsedPrice.toLocaleString()} · Hidden from live quotes until published.`
+                      )}
                     </div>
                   </div>
-
-                  {/* Publish Immediately */}
-                  <div className="pt-2">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={modalIsPublished}
-                        onChange={(e) => setModalIsPublished(e.target.checked)}
-                        className="rounded text-emerald-600 focus:ring-0 w-4 h-4"
-                      />
-                      <span className="text-xs font-semibold text-slate-800">
-                        Publish live immediately upon saving
-                      </span>
-                    </label>
+                ) : (
+                  /* Disabled Placeholder State when no test is selected */
+                  <div className="p-8 border border-dashed border-slate-300 rounded-xl text-center text-slate-400 text-xs flex flex-col items-center justify-center min-h-[380px] space-y-2">
+                    <Layers className="w-8 h-8 text-slate-300 mb-1" />
+                    <div className="font-semibold text-slate-700 text-sm">No test selected</div>
+                    <p className="max-w-xs text-slate-400 leading-relaxed">
+                      Select an available clinical test from the master directory on the left to configure tariff price, turnaround hours, and accepted HMO networks.
+                    </p>
                   </div>
-                </div>
+                )}
+              </div>
+            </div>
 
-                {/* Modal Actions */}
-                <div className="pt-5 mt-4 border-t border-slate-100 flex items-center justify-end gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddModalOpen(false)}
-                    className="px-3.5 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={!selectedMasterService || !modalPrice || modalSubmitting}
-                    className="px-4 py-2 rounded-lg bg-[#12244D] hover:bg-[#0A152E] disabled:bg-slate-300 text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
-                  >
-                    {modalSubmitting ? (
-                      <>
-                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                        <span>Saving...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Add to catalogue</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
+            {/* Pinned Modal Footer */}
+            <div className="p-4 px-5 border-t border-slate-200 bg-slate-50/90 flex items-center justify-between gap-3 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-700 bg-white border border-slate-300 hover:bg-slate-100 hover:text-slate-900 transition-colors cursor-pointer shadow-2xs"
+                >
+                  Cancel
+                </button>
+                {modalDisabledReason && (
+                  <span className="text-[11px] text-slate-500 italic hidden sm:inline-block">
+                    {modalDisabledReason}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={!selectedMasterService || modalParsedPrice <= 0 || !modalHours || modalSubmitting}
+                  onClick={(e) => handleAddServiceSubmit(e, true)}
+                  className="px-3.5 py-2 rounded-lg bg-white border border-slate-300 hover:border-slate-400 text-slate-700 text-xs font-semibold transition-colors cursor-pointer shadow-2xs disabled:bg-slate-100 disabled:text-slate-400 disabled:border-slate-200 disabled:cursor-not-allowed"
+                >
+                  Save and add another
+                </button>
+
+                <button
+                  type="button"
+                  disabled={!selectedMasterService || modalParsedPrice <= 0 || !modalHours || modalSubmitting}
+                  onClick={(e) => handleAddServiceSubmit(e, false)}
+                  className="px-4 py-2 rounded-lg bg-[#12244D] hover:bg-[#0A152E] disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-semibold transition-colors cursor-pointer shadow-xs flex items-center gap-1.5"
+                >
+                  {modalSubmitting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Add service</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

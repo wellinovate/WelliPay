@@ -42,7 +42,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-HEM-FBC',
     description: 'Automated complete blood count with 5-part differential, platelets, and RBC indices',
     specimen_type: 'Whole Blood (EDTA)',
-    benchmark_turnaround: 'Same day (2-4 hrs)'
+    benchmark_turnaround: 'Same day (2-4 hrs)',
+    reference_price: 12000
   },
   {
     provider_type: 'laboratory',
@@ -51,7 +52,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-HEM-ESR',
     description: 'Westergren ESR measurement for systemic inflammatory monitoring',
     specimen_type: 'Whole Blood (Citrate)',
-    benchmark_turnaround: 'Same day (2 hrs)'
+    benchmark_turnaround: 'Same day (2 hrs)',
+    reference_price: 5000
   },
   {
     provider_type: 'laboratory',
@@ -60,7 +62,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-HEM-COAG',
     description: 'Prothrombin Time, International Normalized Ratio, and Partial Thromboplastin Time with Kaolin',
     specimen_type: 'Citrated Plasma',
-    benchmark_turnaround: 'Same day (4 hrs)'
+    benchmark_turnaround: 'Same day (4 hrs)',
+    reference_price: 25000
   },
   {
     provider_type: 'laboratory',
@@ -69,7 +72,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-HEM-GENO',
     description: 'Alkaline hemoglobin electrophoresis for screening Hb variants (AA, AS, SS, AC, SC)',
     specimen_type: 'Whole Blood (EDTA)',
-    benchmark_turnaround: '24 hours'
+    benchmark_turnaround: '24 hours',
+    reference_price: 9000
   },
   {
     provider_type: 'laboratory',
@@ -78,7 +82,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-HEM-BGRH',
     description: 'ABO forward and reverse grouping with Rh(D) agglutination typing',
     specimen_type: 'Whole Blood (EDTA)',
-    benchmark_turnaround: 'Same day (1 hr)'
+    benchmark_turnaround: 'Same day (1 hr)',
+    reference_price: 6000
   },
 
   // 2. Chemical Pathology
@@ -89,7 +94,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-CHM-EUCR',
     description: 'Sodium, Potassium, Chloride, Bicarbonate, Urea, and Creatinine with eGFR calculation',
     specimen_type: 'Serum (SST)',
-    benchmark_turnaround: 'Same day (4 hrs)'
+    benchmark_turnaround: 'Same day (4 hrs)',
+    reference_price: 28000
   },
   {
     provider_type: 'laboratory',
@@ -98,7 +104,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-CHM-LFT',
     description: 'Total and Direct Bilirubin, AST, ALT, Alkaline Phosphatase, Total Protein, and Albumin',
     specimen_type: 'Serum (SST)',
-    benchmark_turnaround: 'Same day (4 hrs)'
+    benchmark_turnaround: 'Same day (4 hrs)',
+    reference_price: 25000
   },
   {
     provider_type: 'laboratory',
@@ -107,7 +114,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-CHM-LIP',
     description: 'Total Cholesterol, HDL Cholesterol, LDL Cholesterol, Triglycerides, and Atherogenic Ratio',
     specimen_type: 'Fasting Serum (10-12h)',
-    benchmark_turnaround: 'Same day (4 hrs)'
+    benchmark_turnaround: 'Same day (4 hrs)',
+    reference_price: 26000
   },
   {
     provider_type: 'laboratory',
@@ -116,7 +124,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-CHM-GLUC',
     description: 'Acute fasting plasma glucose combined with 90-day glycated hemoglobin assessment',
     specimen_type: 'Fluoride Oxalate + EDTA',
-    benchmark_turnaround: 'Same day (2-4 hrs)'
+    benchmark_turnaround: 'Same day (2-4 hrs)',
+    reference_price: 15000
   },
   {
     provider_type: 'laboratory',
@@ -125,7 +134,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-CHM-RFT',
     description: 'Serum Uric Acid, Calcium, Inorganic Phosphate, Total Protein, Albumin, and 24h Creatinine Clearance',
     specimen_type: 'Serum + 24h Urine',
-    benchmark_turnaround: '24 hours'
+    benchmark_turnaround: '24 hours',
+    reference_price: 32000
   },
 
   // 3. Medical Microbiology
@@ -136,7 +146,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-MIC-URN',
     description: 'Multiparameter chemical reagent strip testing plus centrifuged sediment light microscopy',
     specimen_type: 'Clean Catch Midstream Urine',
-    benchmark_turnaround: 'Same day (1 hr)'
+    benchmark_turnaround: 'Same day (1 hr)',
+    reference_price: 4500
   },
   {
     provider_type: 'laboratory',
@@ -145,7 +156,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-MIC-UMCS',
     description: 'Quantitative bacterial culture on CLED/MacConkey agar with CLSI antibiotic sensitivity discs',
     specimen_type: 'Sterile Midstream Clean Catch',
-    benchmark_turnaround: '48-72 hours'
+    benchmark_turnaround: '48-72 hours',
+    reference_price: 18000
   },
   {
     provider_type: 'laboratory',
@@ -154,7 +166,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-MIC-SMCS',
     description: 'Formol-ether concentration microscopy for ova/cysts and enteric pathogen culture on XLD/DCA',
     specimen_type: 'Fresh Stool Specimen',
-    benchmark_turnaround: '48-72 hours'
+    benchmark_turnaround: '48-72 hours',
+    reference_price: 18000
   },
   {
     provider_type: 'laboratory',
@@ -163,7 +176,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-MIC-BCS',
     description: 'Automated continuous-monitoring blood culture bottles with pathogen speciation and antibiogram',
     specimen_type: 'Sterile Venipuncture Blood',
-    benchmark_turnaround: '5-7 days'
+    benchmark_turnaround: '5-7 days',
+    reference_price: 32000
   },
   {
     provider_type: 'laboratory',
@@ -172,7 +186,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-MIC-HVS',
     description: 'Wet mount for Trichomonas and clue cells, Gram stain for bacterial vaginosis, and culture',
     specimen_type: 'Sterile Dacron Swab',
-    benchmark_turnaround: '48 hours'
+    benchmark_turnaround: '48 hours',
+    reference_price: 16000
   },
 
   // 4. Immunology & Serology
@@ -183,7 +198,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-IMM-MAL',
     description: 'Gold-standard Giemsa thick/thin film quantification plus dual Pf/Pan histidine-rich protein RDT',
     specimen_type: 'Whole Blood (EDTA)',
-    benchmark_turnaround: 'Same day (1 hr)'
+    benchmark_turnaround: 'Same day (1 hr)',
+    reference_price: 5000
   },
   {
     provider_type: 'laboratory',
@@ -192,7 +208,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-IMM-HBS',
     description: 'Enzyme-linked immunosorbent assay / chemiluminescence for qualitative detection of HBsAg',
     specimen_type: 'Serum (SST)',
-    benchmark_turnaround: 'Same day (2 hrs)'
+    benchmark_turnaround: 'Same day (2 hrs)',
+    reference_price: 8500
   },
   {
     provider_type: 'laboratory',
@@ -201,7 +218,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-IMM-HCV',
     description: 'Third-generation recombinant antigen EIA/chemiluminescent microparticle immunoassay',
     specimen_type: 'Serum (SST)',
-    benchmark_turnaround: 'Same day (2 hrs)'
+    benchmark_turnaround: 'Same day (2 hrs)',
+    reference_price: 9500
   },
   {
     provider_type: 'laboratory',
@@ -210,7 +228,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-IMM-HIV',
     description: 'National serial algorithm using Determine HIV-1/2, Stat-Pak confirmation, and Uni-Gold tiebreaker',
     specimen_type: 'Serum or Whole Blood',
-    benchmark_turnaround: 'Same day (1 hr)'
+    benchmark_turnaround: 'Same day (1 hr)',
+    reference_price: 8000
   },
   {
     provider_type: 'laboratory',
@@ -219,7 +238,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-IMM-TFT',
     description: 'Automated chemiluminescence immunoassay for Thyroid Stimulating Hormone, Free T3, and Free T4',
     specimen_type: 'Serum (SST)',
-    benchmark_turnaround: '24 hours'
+    benchmark_turnaround: '24 hours',
+    reference_price: 35000
   },
   {
     provider_type: 'laboratory',
@@ -228,7 +248,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-IMM-PSA',
     description: 'Quantitative Total PSA and percentage Free PSA calculation for prostate risk stratification',
     specimen_type: 'Serum (SST)',
-    benchmark_turnaround: '24 hours'
+    benchmark_turnaround: '24 hours',
+    reference_price: 22000
   },
   {
     provider_type: 'laboratory',
@@ -237,7 +258,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-IMM-WID',
     description: 'Semiquantitative slide agglutination for Salmonella enterica serovars Typhi/Paratyphi O and H antigens',
     specimen_type: 'Serum (SST)',
-    benchmark_turnaround: 'Same day (1 hr)'
+    benchmark_turnaround: 'Same day (1 hr)',
+    reference_price: 6000
   },
 
   // 5. Molecular Diagnostics
@@ -248,7 +270,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-MOL-HBV',
     description: 'Real-time TaqMan RT-PCR quantification of HBV DNA with lower limit of detection ≤ 10 IU/mL',
     specimen_type: 'EDTA Plasma (Frozen)',
-    benchmark_turnaround: '3-5 days'
+    benchmark_turnaround: '3-5 days',
+    reference_price: 65000
   },
   {
     provider_type: 'laboratory',
@@ -257,7 +280,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-MOL-XPT',
     description: 'Automated cartridge-based nested real-time PCR for MTB detection and Rifampicin resistance rpoB gene',
     specimen_type: 'Early Morning Sputum',
-    benchmark_turnaround: '24 hours'
+    benchmark_turnaround: '24 hours',
+    reference_price: 35000
   },
   {
     provider_type: 'laboratory',
@@ -266,7 +290,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-MOL-HPV',
     description: 'Multiplex real-time PCR identifying high-risk oncogenic HPV types 16, 18, and pooled 12 other genotypes',
     specimen_type: 'Cervical Cytology Brush',
-    benchmark_turnaround: '3-5 days'
+    benchmark_turnaround: '3-5 days',
+    reference_price: 45000
   },
 
   // 6. Histopathology & Cytology
@@ -277,7 +302,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-HIS-PAP',
     description: 'Liquid-based thin-layer automated cytology slide preparation with Bethesda System reporting',
     specimen_type: 'PreservCyt Cervical Vial',
-    benchmark_turnaround: '3-5 days'
+    benchmark_turnaround: '3-5 days',
+    reference_price: 28000
   },
   {
     provider_type: 'laboratory',
@@ -286,7 +312,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-HIS-FNAC',
     description: 'Clinical or ultrasound-guided needle aspiration of palpable mass with Papanicolaou and Giemsa stains',
     specimen_type: 'Alcohol-Fixed Aspirate Smear',
-    benchmark_turnaround: '48-72 hours'
+    benchmark_turnaround: '48-72 hours',
+    reference_price: 30000
   },
   {
     provider_type: 'laboratory',
@@ -295,7 +322,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-HIS-BX',
     description: 'Formalin fixation, gross examination, tissue processing, paraffin block sectioning, and H&E diagnostic report',
     specimen_type: '10% Neutral Buffered Formalin',
-    benchmark_turnaround: '5-7 days'
+    benchmark_turnaround: '5-7 days',
+    reference_price: 40000
   },
 
   // 7. Diagnostic Ultrasound
@@ -306,7 +334,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'ULT-ABD-PEL',
     description: 'Comprehensive high-resolution real-time B-mode sonography of upper abdomen, kidneys, and pelvic organs',
     specimen_type: null,
-    benchmark_turnaround: 'Same day (immediate)'
+    benchmark_turnaround: 'Same day (immediate)',
+    reference_price: 22000
   },
   {
     provider_type: 'laboratory',
@@ -315,7 +344,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'ULT-OBS-GRO',
     description: 'Detailed fetal biometry (BPD, HC, AC, FL), placental grading, amniotic fluid volume, and anomaly survey',
     specimen_type: null,
-    benchmark_turnaround: 'Same day (immediate)'
+    benchmark_turnaround: 'Same day (immediate)',
+    reference_price: 25000
   },
   {
     provider_type: 'laboratory',
@@ -324,7 +354,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'ULT-PEL-TVS',
     description: 'High-frequency endovaginal sonography for high-resolution uterine, endometrial, and adnexal evaluation',
     specimen_type: null,
-    benchmark_turnaround: 'Same day (immediate)'
+    benchmark_turnaround: 'Same day (immediate)',
+    reference_price: 25000
   },
 
   // 8. Diagnostic Radiology (X-Ray)
@@ -335,7 +366,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'RAD-XRY-CXR',
     description: 'Digital radiography of thorax evaluating cardiac silhouette, pulmonary parenchyma, and pleural spaces',
     specimen_type: null,
-    benchmark_turnaround: 'Same day (1-2 hrs)'
+    benchmark_turnaround: 'Same day (1-2 hrs)',
+    reference_price: 18000
   },
   {
     provider_type: 'laboratory',
@@ -344,7 +376,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'RAD-XRY-LSS',
     description: 'Digital plain radiograph assessing lumbar vertebral alignment, pedicles, disc spaces, and osteophytes',
     specimen_type: null,
-    benchmark_turnaround: 'Same day (1-2 hrs)'
+    benchmark_turnaround: 'Same day (1-2 hrs)',
+    reference_price: 20000
   },
 
   // 9. Cardiology (Non-Invasive)
@@ -355,7 +388,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'CAR-ECG-12L',
     description: 'Computerized 12-lead digital electrocardiography tracing with cardiologist diagnostic interpretation',
     specimen_type: null,
-    benchmark_turnaround: 'Same day (immediate)'
+    benchmark_turnaround: 'Same day (immediate)',
+    reference_price: 18000
   },
   {
     provider_type: 'laboratory',
@@ -364,7 +398,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'CAR-ECH-2D',
     description: '2D, M-mode, color flow, and continuous-wave Doppler ultrasound assessing myocardial and valvular function',
     specimen_type: null,
-    benchmark_turnaround: 'Same day (immediate)'
+    benchmark_turnaround: 'Same day (immediate)',
+    reference_price: 45000
   },
 
   // 10. Wellness & Preventive Health
@@ -375,7 +410,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-WEL-PREEMP',
     description: 'Standard baseline panel: FBC, Urinalysis, Fasting Glucose, Chest X-Ray, HIV, HBsAg, Blood Group & Genotype',
     specimen_type: 'Blood, Urine & Digital X-Ray',
-    benchmark_turnaround: '24 hours'
+    benchmark_turnaround: '24 hours',
+    reference_price: 35000
   },
   {
     provider_type: 'laboratory',
@@ -384,7 +420,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-WEL-EXEC',
     description: 'Annual corporate executive health screen: FBC, E/U/Cr, LFT, Fasting Lipids & Glucose, ECG, and Abdominal Scan',
     specimen_type: 'Multidisciplinary Panel',
-    benchmark_turnaround: '24-48 hours'
+    benchmark_turnaround: '24-48 hours',
+    reference_price: 85000
   },
   {
     provider_type: 'laboratory',
@@ -393,7 +430,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-WEL-WOMAN',
     description: 'FBC, Lipids, Glycemic panel, Pap smear, Pelvic ultrasound, Thyroid panel, and Clinical breast examination',
     specimen_type: 'Gynecologic & Laboratory Battery',
-    benchmark_turnaround: '24-48 hours'
+    benchmark_turnaround: '24-48 hours',
+    reference_price: 65000
   },
   {
     provider_type: 'laboratory',
@@ -402,7 +440,8 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     service_code: 'LAB-WEL-MAN',
     description: 'FBC, Lipids, E/U/Cr, Total & Free PSA, Resting ECG, and Abdomino-Pelvic scan for prostate assessment',
     specimen_type: 'Cardio, Uro & Laboratory Battery',
-    benchmark_turnaround: '24-48 hours'
+    benchmark_turnaround: '24-48 hours',
+    reference_price: 70000
   }
 ];
 

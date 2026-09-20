@@ -2287,6 +2287,14 @@ let MOCK_PROVIDERS_STATE = [...SEED_PROVIDERS];
 let MOCK_MASTER_DIRECTORY_STATE = MASTER_DIAGNOSTIC_SERVICES.map((s, idx) => ({
   id: idx + 1,
   ...s,
+  serviceName: s.service_name,
+  serviceCode: s.service_code,
+  providerType: s.provider_type,
+  specimenType: s.specimen_type,
+  benchmarkTurnaround: s.benchmark_turnaround,
+  turnaroundHours: s.benchmark_turnaround?.includes('24') ? 24 : s.benchmark_turnaround?.includes('4') ? 4 : s.benchmark_turnaround?.includes('1-2') ? 2 : 1,
+  referencePrice: s.reference_price || 15000,
+  reference_price: s.reference_price || 15000,
   is_active: true
 }));
 let MOCK_PROVIDER_CATALOGUE_STATE = INITIAL_PROVIDER_TARIFFS.map((t, idx) => {
@@ -2347,9 +2355,25 @@ app.get('/api/directory/master', async (req, res) => {
         ORDER BY department ASC
       `, [provider_type]);
 
+      const formatMasterService = (s) => ({
+        ...s,
+        serviceName: s.service_name || s.serviceName,
+        serviceCode: s.service_code || s.serviceCode,
+        providerType: s.provider_type || s.providerType,
+        specimenType: s.specimen_type || s.specimenType,
+        benchmarkTurnaround: s.benchmark_turnaround || s.benchmarkTurnaround,
+        turnaroundHours: s.turnaround_hours || (s.benchmark_turnaround?.includes('24') ? 24 : s.benchmark_turnaround?.includes('4') ? 4 : s.benchmark_turnaround?.includes('1-2') ? 2 : 1),
+        referencePrice: s.reference_price || s.referencePrice || 15000,
+        reference_price: s.reference_price || s.referencePrice || 15000,
+        service_name: s.service_name || s.serviceName,
+        service_code: s.service_code || s.serviceCode,
+        is_active: s.is_active !== false,
+        isActive: s.is_active !== false
+      });
+
       return res.json({
         success: true,
-        services: result.rows,
+        services: result.rows.map(formatMasterService),
         departments: allDeptsRes.rows.map(r => r.department),
         total: result.rows.length
       });
@@ -2370,17 +2394,33 @@ app.get('/api/directory/master', async (req, res) => {
   if (search && search.trim()) {
     const q = search.trim().toLowerCase();
     filtered = filtered.filter(s => 
-      s.service_name.toLowerCase().includes(q) || 
-      s.service_code.toLowerCase().includes(q) ||
+      (s.service_name || s.serviceName || '').toLowerCase().includes(q) || 
+      (s.service_code || s.serviceCode || '').toLowerCase().includes(q) ||
       (s.description && s.description.toLowerCase().includes(q))
     );
   }
 
   const depts = [...new Set(MOCK_MASTER_DIRECTORY_STATE.filter(s => s.provider_type === provider_type).map(s => s.department))];
 
+  const formatMasterService = (s) => ({
+    ...s,
+    serviceName: s.service_name || s.serviceName,
+    serviceCode: s.service_code || s.serviceCode,
+    providerType: s.provider_type || s.providerType,
+    specimenType: s.specimen_type || s.specimenType,
+    benchmarkTurnaround: s.benchmark_turnaround || s.benchmarkTurnaround,
+    turnaroundHours: s.turnaround_hours || (s.benchmark_turnaround?.includes('24') ? 24 : s.benchmark_turnaround?.includes('4') ? 4 : s.benchmark_turnaround?.includes('1-2') ? 2 : 1),
+    referencePrice: s.reference_price || s.referencePrice || 15000,
+    reference_price: s.reference_price || s.referencePrice || 15000,
+    service_name: s.service_name || s.serviceName,
+    service_code: s.service_code || s.serviceCode,
+    is_active: s.is_active !== false,
+    isActive: s.is_active !== false
+  });
+
   return res.json({
     success: true,
-    services: filtered,
+    services: filtered.map(formatMasterService),
     departments: depts,
     total: filtered.length
   });

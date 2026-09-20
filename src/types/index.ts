@@ -145,6 +145,12 @@ export interface MasterService {
   specimenType?: string;
   benchmarkTurnaround?: string;
   turnaroundHours?: number;
+  referencePrice?: number;
+  reference_price?: number;
+  service_name?: string;
+  service_code?: string;
+  benchmark_turnaround?: string;
+  specimen_type?: string;
   isActive: boolean;
 }
 
