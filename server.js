@@ -298,6 +298,55 @@ async function requireAuth(req, res, next) {
   }
 }
 
+// API-key middleware for the external, versioned ingestion API (see
+// docs/multi-vendor-ehr-integration.md). Distinct from requireAuth: external EHR
+// vendors (WelliRecord, or a third party such as eClinicalWorks/OpenMRS) have no
+// Firebase login — they authenticate with a per-facility API key issued via
+// POST /api/admin/integration-credentials. The key is hashed with SHA-256 before
+// lookup, matching the hash-only storage already used for that credential; the raw
+// key is never persisted, so `key_hash` is compared, never `key`. provider_id is
+// ALWAYS resolved from the credential, never trusted from the request body — this
+// is what scopes an external vendor to exactly its own facility's data.
+async function requireApiKey(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Not authenticated. Bearer API key missing.' });
+  }
+  const rawKey = authHeader.split('Bearer ')[1]?.trim();
+  if (!rawKey) {
+    return res.status(401).json({ error: 'Not authenticated. Bearer API key missing.' });
+  }
+
+  if (!pool) {
+    return res.status(500).json({ error: 'Database unavailable.' });
+  }
+
+  try {
+    const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
+    const credRes = await query(`
+      SELECT id, provider_id as "providerId", vendor_name as "vendorName", is_active as "isActive"
+      FROM integration_credentials
+      WHERE key_hash = $1
+    `, [keyHash]);
+
+    const cred = credRes.rows[0];
+    if (!cred || !cred.isActive) {
+      return res.status(401).json({ error: 'Invalid or revoked API key.' });
+    }
+
+    req.integration = { credentialId: cred.id, providerId: cred.providerId, vendorName: cred.vendorName };
+
+    // Fire-and-forget: last_used_at is observability, not correctness — never block or fail
+    // the request if this update fails.
+    query(`UPDATE integration_credentials SET last_used_at = NOW() WHERE id = $1`, [cred.id]).catch(() => {});
+
+    next();
+  } catch (err) {
+    console.error('[Auth] API key verification failed:', err.message);
+    res.status(500).json({ error: 'API key verification failed.' });
+  }
+}
+
 // Initialize database tables on server start
 initializeDatabase().catch(err => {
   console.error('[Server] Database initialization failed:', err);
@@ -2771,6 +2820,193 @@ app.post('/api/directory/master', requireAuth, async (req, res) => {
     service: newItem,
     message: 'Master service registered successfully.'
   });
+});
+
+// ==========================================
+// Multi-vendor EHR integration (external ingestion API)
+// See docs/multi-vendor-ehr-integration.md for the design this implements.
+// ==========================================
+
+// Issues a new API key for a (provider, vendor) pairing. Internal-staff-only —
+// protected by the ordinary Firebase requireAuth, not the API key itself. The raw
+// key is returned exactly once in this response and never again; only its hash is
+// stored. Losing the raw key means issuing a new one, not recovering the old one.
+app.post('/api/admin/integration-credentials', requireAuth, async (req, res) => {
+  const { provider_id, vendor_name } = req.body;
+
+  if (!provider_id || !vendor_name) {
+    return res.status(400).json({ error: 'provider_id and vendor_name are required.' });
+  }
+
+  if (!pool) {
+    return res.status(500).json({ error: 'Database unavailable.' });
+  }
+
+  try {
+    const providerRes = await query('SELECT id FROM providers WHERE id = $1', [provider_id]);
+    if (providerRes.rows.length === 0) {
+      return res.status(404).json({ error: `No provider found with id ${provider_id}.` });
+    }
+
+    // wp_live_<12 random hex chars prefix, kept for lookup/display>_<32 random hex chars secret>
+    const prefix = `wp_live_${crypto.randomBytes(6).toString('hex')}`;
+    const secret = crypto.randomBytes(32).toString('hex');
+    const rawKey = `${prefix}_${secret}`;
+    const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex');
+
+    const result = await query(`
+      INSERT INTO integration_credentials (provider_id, vendor_name, key_prefix, key_hash, is_active)
+      VALUES ($1, $2, $3, $4, true)
+      RETURNING id, provider_id as "providerId", vendor_name as "vendorName", key_prefix as "keyPrefix", created_at as "createdAt"
+    `, [provider_id, vendor_name, prefix, keyHash]);
+
+    return res.status(201).json({
+      success: true,
+      credential: result.rows[0],
+      api_key: rawKey,
+      warning: 'This is the only time the full API key is shown. Store it now — it cannot be retrieved again, only revoked and reissued.'
+    });
+  } catch (err) {
+    console.error('[API] Error creating integration credential:', err);
+    return res.status(500).json({ error: 'Failed to create integration credential.' });
+  }
+});
+
+// Versioned, vendor-agnostic clinical order ingestion. WelliRecord is the first
+// caller of this endpoint, not a privileged one — a third-party EHR authenticates
+// the same way, with its own API key scoped to its own provider_id.
+//
+// master_service_code accepts WelliPay's own service_code (e.g. LAB-HEM-FBC) OR,
+// once populated and verified, a loinc_code or cpt_code — whichever coding system
+// the calling EHR already speaks. Today, loinc_code/cpt_code are unpopulated (see
+// the migration in server/db.js), so only service_code will resolve until someone
+// verifies and fills in real codes.
+app.post('/api/v1/encounters/orders', requireApiKey, async (req, res) => {
+  const { idempotency_key, master_service_code, external_patient_id, patient_full_name, patient_mrn, ordered_by, ordered_at } = req.body;
+  const { providerId, vendorName } = req.integration;
+
+  if (!idempotency_key || !master_service_code || !external_patient_id || !patient_full_name) {
+    return res.status(400).json({
+      error: 'idempotency_key, master_service_code, external_patient_id, and patient_full_name are required.'
+    });
+  }
+
+  if (!pool) {
+    return res.status(500).json({ error: 'Database unavailable.' });
+  }
+
+  try {
+    // Idempotent replay: if this (provider, idempotency_key) pair was already
+    // ingested, return the existing order rather than erroring or duplicating it.
+    const existingRes = await query(`
+      SELECT id, status FROM clinical_service_orders
+      WHERE provider_id = $1 AND idempotency_key = $2
+    `, [providerId, idempotency_key]);
+
+    if (existingRes.rows.length > 0) {
+      return res.status(200).json({
+        success: true,
+        replay: true,
+        order: existingRes.rows[0],
+        message: 'This idempotency_key was already ingested; returning the existing order, not creating a duplicate.'
+      });
+    }
+
+    // Resolve the service against WelliPay's own directory. Fails loud (422) rather
+    // than silently dropping the order or guessing a service — an unresolved code
+    // must surface to the caller, not disappear into an unbilled order with no
+    // price attached.
+    const serviceRes = await query(`
+      SELECT id, service_name FROM master_service_directory
+      WHERE service_code = $1 OR loinc_code = $1 OR cpt_code = $1
+    `, [master_service_code]);
+
+    if (serviceRes.rows.length === 0) {
+      return res.status(422).json({
+        error: `master_service_code "${master_service_code}" does not match any known service_code, loinc_code, or cpt_code in WelliPay's master_service_directory.`
+      });
+    }
+    const masterService = serviceRes.rows[0];
+
+    // Price the order from this provider's own published catalogue — the same
+    // source of truth the Estimator and Benefit Check already read from. An
+    // order for a service this provider hasn't priced yet still gets ingested
+    // (so it's visible as leakage risk), but with amount 0 and a warning, the
+    // same "untariffed at facility" case the Estimator UI already shows rather
+    // than a fabricated or guessed price.
+    const priceRes = await query(`
+      SELECT price FROM provider_catalogue
+      WHERE provider_id = $1 AND master_service_id = $2
+    `, [providerId, masterService.id]);
+    const orderAmount = priceRes.rows[0]?.price ?? 0;
+    const untariffed = priceRes.rows.length === 0;
+
+    // Per-facility patient matching: this vendor's external_patient_id is only
+    // meaningful within this provider_id. Never written into the global
+    // patients.mrn column, which would risk collisions with an unrelated system's
+    // identifiers of the same shape.
+    let patientId = null;
+    const mappingRes = await query(`
+      SELECT patient_id as "patientId" FROM patient_external_ids
+      WHERE provider_id = $1 AND external_patient_id = $2
+    `, [providerId, external_patient_id]);
+
+    if (mappingRes.rows.length > 0) {
+      patientId = mappingRes.rows[0].patientId;
+    } else {
+      patientId = `PAT-EXT-${crypto.randomBytes(4).toString('hex')}`;
+      // patients.mrn is NOT NULL UNIQUE. A third-party EHR may not use an
+      // MRN-LSH-style identifier at all (that format is WelliRecord's own) — this
+      // synthesizes a guaranteed-unique placeholder from the new patient_id itself
+      // rather than leaving mrn null, without inventing a fake WelliRecord-shaped MRN.
+      const resolvedMrn = patient_mrn || `EXT-${patientId}`;
+      await query(`
+        INSERT INTO patients (id, mrn, full_name, primary_coverage, status)
+        VALUES ($1, $2, $3, 'Pending verification', 'active')
+        ON CONFLICT (id) DO NOTHING
+      `, [patientId, resolvedMrn, patient_full_name]);
+
+      await query(`
+        INSERT INTO patient_external_ids (provider_id, external_patient_id, patient_id)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (provider_id, external_patient_id) DO NOTHING
+      `, [providerId, external_patient_id, patientId]);
+    }
+
+    const orderId = `ORD-${crypto.randomBytes(6).toString('hex')}`;
+    const insertRes = await query(`
+      INSERT INTO clinical_service_orders (
+        id, patient_name, patient_mrn, patient_id, service_type, category, amount, status,
+        provider_id, master_service_id, idempotency_key, source_vendor, performed_at
+      )
+      VALUES ($1, $2, $3, $4, $5, 'Laboratory', $6, 'unbilled', $7, $8, $9, $10, COALESCE($11, NOW()))
+      ON CONFLICT (provider_id, idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
+      RETURNING id, status, amount
+    `, [orderId, patient_full_name, patient_mrn || null, patientId, masterService.service_name, orderAmount, providerId, masterService.id, idempotency_key, vendorName, ordered_at || null]);
+
+    if (insertRes.rows.length === 0) {
+      // Lost the idempotency race to a concurrent duplicate delivery — fetch and
+      // return what actually landed, rather than reporting success on nothing.
+      const raceRes = await query(`
+        SELECT id, status, amount FROM clinical_service_orders
+        WHERE provider_id = $1 AND idempotency_key = $2
+      `, [providerId, idempotency_key]);
+      return res.status(200).json({ success: true, replay: true, order: raceRes.rows[0] });
+    }
+
+    return res.status(201).json({
+      success: true,
+      replay: false,
+      order: insertRes.rows[0],
+      untariffed,
+      message: untariffed
+        ? `Order ingested from ${vendorName}, but ${providerId} has not priced this service in its catalogue yet — flagged unbilled at ₦0 pending tariff setup.`
+        : `Order ingested from ${vendorName} and flagged unbilled pending cashier reconciliation.`
+    });
+  } catch (err) {
+    console.error('[API] Error ingesting encounter order:', err);
+    return res.status(500).json({ error: 'Failed to ingest encounter order.' });
+  }
 });
 
 // 8. Cost Estimate (Price Lookup for Cost Estimation & Benefit Check)

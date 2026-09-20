@@ -717,6 +717,54 @@ export async function initializeDatabase() {
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
       ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
       ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS master_service_id INTEGER;
+
+      -- Multi-vendor EHR integration (external ingestion API, see docs/multi-vendor-ehr-integration.md)
+
+      -- LOINC/CPT anchoring for master_service_directory: nullable, intentionally left unpopulated
+      -- here. These are real, externally-verifiable clinical coding identifiers (LOINC for labs,
+      -- CPT for procedures) — they must be filled in by someone who can check each one against the
+      -- actual LOINC/CPT registries, not guessed or invented. An external EHR integration that
+      -- matches on a wrong code silently misroutes clinical orders, so leave these NULL until verified
+      -- rather than filling them with plausible-looking placeholders.
+      ALTER TABLE master_service_directory ADD COLUMN IF NOT EXISTS loinc_code VARCHAR(20);
+      ALTER TABLE master_service_directory ADD COLUMN IF NOT EXISTS cpt_code VARCHAR(20);
+
+      -- One API credential per (provider, vendor) pairing. The raw key is shown to the caller
+      -- exactly once at creation time (see POST /api/admin/integration-credentials); only its
+      -- SHA-256 hash is ever stored, matching the pattern already used for Paystack webhook
+      -- signature verification (HMAC over a shared secret, never the secret itself in the DB).
+      CREATE TABLE IF NOT EXISTS integration_credentials (
+        id SERIAL PRIMARY KEY,
+        provider_id VARCHAR(50) NOT NULL REFERENCES providers(id),
+        vendor_name VARCHAR(100) NOT NULL,
+        key_prefix VARCHAR(20) NOT NULL UNIQUE,
+        key_hash VARCHAR(128) NOT NULL,
+        is_active BOOLEAN DEFAULT TRUE,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        last_used_at TIMESTAMPTZ
+      );
+
+      -- Per-facility patient identity mapping for third-party EHRs (see EMPI design notes: a
+      -- third-party vendor's patient id is only unique within that vendor+facility pairing, so it
+      -- is never written into WelliPay's own global patients.mrn column, which would risk collisions
+      -- across unrelated systems).
+      CREATE TABLE IF NOT EXISTS patient_external_ids (
+        id SERIAL PRIMARY KEY,
+        provider_id VARCHAR(50) NOT NULL REFERENCES providers(id),
+        external_patient_id VARCHAR(150) NOT NULL,
+        patient_id VARCHAR(50) NOT NULL REFERENCES patients(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(provider_id, external_patient_id)
+      );
+
+      -- Idempotent order ingestion: a vendor may retry a failed delivery, so the same
+      -- (provider_id, idempotency_key) pair must never create two orders.
+      ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS idempotency_key VARCHAR(150);
+      ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS source_vendor VARCHAR(100);
+      ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS patient_id VARCHAR(50);
+      CREATE UNIQUE INDEX IF NOT EXISTS clinical_service_orders_provider_idempotency_key
+        ON clinical_service_orders (provider_id, idempotency_key)
+        WHERE idempotency_key IS NOT NULL;
     `);
 
     // 2. Seed Organizations
