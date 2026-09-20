@@ -1847,7 +1847,7 @@ app.get('/api/invoices', requireAuth, async (req, res) => {
       const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
       const listRes = await query(`
-        SELECT 
+        SELECT
           id, invoice_number as "invoiceNumber", patient_id as "patientId",
           patient_name as "patientName", patient_mrn as "patientMrn",
           service_description as "serviceDescription",
@@ -1855,6 +1855,8 @@ app.get('/api/invoices', requireAuth, async (req, res) => {
           paid_amount as "paidAmount", status, status_label as "statusLabel",
           due_date as "dueDate", paid_date as "paidDate",
           is_inpatient as "isInpatient", discharge_status as "dischargeStatus",
+          payer_type as "payerType", payer_name as "payerName", policy_number as "policyNumber",
+          copay_amount as "copayAmount", claim_amount as "claimAmount", pre_auth_code as "preAuthCode",
           created_at as "createdAt"
         FROM invoices
         ${whereClause}
@@ -1909,6 +1911,15 @@ app.get('/api/invoices', requireAuth, async (req, res) => {
         paid_date: inv.paidDate,
         is_inpatient: Boolean(inv.isInpatient),
         discharge_status: inv.dischargeStatus,
+        payer_type: inv.payerType,
+        payer_name: inv.payerName,
+        policy_number: inv.policyNumber,
+        copay_amount: inv.copayAmount != null ? parseFloat(inv.copayAmount) : undefined,
+        copayAmount: inv.copayAmount != null ? parseFloat(inv.copayAmount) : undefined,
+        claim_amount: inv.claimAmount != null ? parseFloat(inv.claimAmount) : undefined,
+        claimAmount: inv.claimAmount != null ? parseFloat(inv.claimAmount) : undefined,
+        pre_auth_code: inv.preAuthCode,
+        preAuthCode: inv.preAuthCode,
         orders: ordersByInvoice[inv.id] || ordersByInvoice[inv.invoiceNumber] || [],
         created_at: inv.createdAt,
         totalAmount: parseFloat(inv.totalAmount || 0),
@@ -1997,12 +2008,15 @@ app.get('/api/invoices/:id', requireAuth, async (req, res) => {
   if (pool) {
     try {
       const invRes = await query(`
-        SELECT 
+        SELECT
           id, invoice_number as "invoiceNumber", patient_id as "patientId",
-          patient_name as "patientName", service_description as "serviceDescription",
+          patient_name as "patientName", patient_mrn as "patientMrn",
+          service_description as "serviceDescription",
           total_amount as "totalAmount", formatted_amount as "formattedAmount",
           paid_amount as "paidAmount", status, status_label as "statusLabel",
-          due_date as "dueDate", created_at as "createdAt"
+          due_date as "dueDate", created_at as "createdAt",
+          payer_type as "payerType", payer_name as "payerName", policy_number as "policyNumber",
+          copay_amount as "copayAmount", claim_amount as "claimAmount", pre_auth_code as "preAuthCode"
         FROM invoices
         WHERE id = $1 OR invoice_number = $1
       `, [id]);
@@ -2012,12 +2026,31 @@ app.get('/api/invoices/:id', requireAuth, async (req, res) => {
       }
 
       const inv = invRes.rows[0];
+
+      let orders = [];
+      try {
+        const ordersRes = await query(`
+          SELECT id, patient_name as "patientName", patient_mrn as "patientMrn",
+                 service_type as "serviceType", category, amount::float as amount,
+                 ('₦' || TO_CHAR(amount, 'FM999,999,999')) as "formattedAmount",
+                 status
+          FROM clinical_service_orders
+          WHERE invoice_id = $1
+        `, [inv.id]);
+        orders = ordersRes.rows || [];
+      } catch (e) {
+        // Table or columns may be empty or unmigrated
+      }
+
       return res.json({
         source: 'postgresql',
         invoice: {
           ...inv,
           totalAmount: parseFloat(inv.totalAmount || 0),
-          paidAmount: parseFloat(inv.paidAmount || 0)
+          paidAmount: parseFloat(inv.paidAmount || 0),
+          copayAmount: inv.copayAmount != null ? parseFloat(inv.copayAmount) : undefined,
+          claimAmount: inv.claimAmount != null ? parseFloat(inv.claimAmount) : undefined,
+          orders,
         }
       });
     } catch (err) {
@@ -2088,13 +2121,38 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
       const result = await pool.query(`
         INSERT INTO invoices
           (id, invoice_number, patient_id, patient_name, patient_mrn, service_description,
-           total_amount, formatted_amount, paid_amount, status, status_label, due_date, is_inpatient, created_at)
-        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, 0, 'pending', 'Pending Match', $8, false, NOW())
+           total_amount, formatted_amount, paid_amount, status, status_label, due_date, is_inpatient, created_at,
+           payer_type, payer_name, policy_number, copay_amount, claim_amount, pre_auth_code)
+        VALUES ($1, $1, $2, $3, $4, $5, $6, $7, 0, 'pending', 'Pending Match', $8, false, NOW(),
+                $9, $10, $11, $12, $13, $14)
         RETURNING *
       `, [
         invoiceNumber, patient_id || null, patient_name, effectiveMrn, finalDescription, total_amount,
         formattedAmount, due_date || null,
+        payer_type || null, payer_name || null, policy_number || null,
+        copay_amount != null ? Number(copay_amount) : null,
+        claim_amount != null ? Number(claim_amount) : null,
+        pre_auth_code || null,
       ]);
+
+      // Persist line items as clinical_service_orders linked to this invoice.
+      // Previously `orders` below was only ever built in memory for this
+      // response — GET /api/invoices reads orders from clinical_service_orders
+      // WHERE invoice_id IS NOT NULL, so an invoice created here would show
+      // zero line items the moment the page refetched (list count, itemization
+      // both silently reverted to empty). Also closes the leakage-detection
+      // gap: the dashboard reads this same table, so these orders now count
+      // toward it instead of only existing in seed data.
+      if (orders && orders.length > 0) {
+        for (const ord of orders) {
+          await pool.query(`
+            INSERT INTO clinical_service_orders
+              (id, patient_name, patient_mrn, service_type, category, amount, status, performed_at, invoice_id)
+            VALUES ($1, $2, $3, $4, $5, $6, 'invoiced', NOW(), $7)
+            ON CONFLICT (id) DO NOTHING
+          `, [ord.id, ord.patientName, ord.patientMrn, ord.serviceType, 'Laboratory', ord.amount, invoiceNumber]);
+        }
+      }
 
       const row = result.rows[0];
       return res.json({

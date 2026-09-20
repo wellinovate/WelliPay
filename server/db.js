@@ -650,6 +650,18 @@ export async function initializeDatabase() {
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS is_inpatient BOOLEAN DEFAULT FALSE;
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS discharge_status VARCHAR(50);
 
+      -- Payer/HMO context captured at invoice creation (Estimator and manual
+      -- invoice form both submit these). Previously accepted in the POST body
+      -- and echoed back in the create response only, never persisted, so a
+      -- page reload silently lost which payer, plan, copay split and pre-auth
+      -- code applied to the invoice.
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payer_type VARCHAR(20);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS payer_name VARCHAR(255);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS policy_number VARCHAR(100);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS copay_amount NUMERIC(15, 2);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS claim_amount NUMERIC(15, 2);
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS pre_auth_code VARCHAR(50);
+
       CREATE TABLE IF NOT EXISTS reconciliation_entries (
         id SERIAL PRIMARY KEY,
         date TIMESTAMPTZ DEFAULT NOW(),
