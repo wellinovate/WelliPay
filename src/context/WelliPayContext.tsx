@@ -105,7 +105,7 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   // Active tab persisted to localStorage across page reloads
   const [activeTab, setActiveTab] = useState<NavTab>(() => {
     const saved = localStorage.getItem('activeTab');
-    const validTabs: NavTab[] = ['dashboard', 'reconciliation', 'claims', 'invoices', 'patients', 'settings'];
+    const validTabs: NavTab[] = ['dashboard', 'reconciliation', 'claims', 'invoices', 'patients', 'catalogue', 'estimation', 'settings', 'preauth'];
     if (saved && validTabs.includes(saved as NavTab)) {
       return saved as NavTab;
     }

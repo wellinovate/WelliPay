@@ -82,9 +82,51 @@ export interface HMOClaim {
   varianceReason?: string;
 }
 
+export type PreAuthStatus =
+  | 'requested'
+  | 'submitted'
+  | 'under_review'
+  | 'approved'
+  | 'rejected'
+  | 'provider_notified'
+  | 'service_completed'
+  | 'claim_submitted'
+  | 'paid';
+
+export interface PreAuthorization {
+  id: string;
+  patientId?: string;
+  patientName: string;
+  patientMrn?: string;
+  providerId?: string;
+  providerName: string;
+  payerName: string;
+  serviceDescription: string;
+  clinicalJustification?: string;
+  documentationNotes?: string;
+  requestedAmount: number;
+  formattedAmount: string;
+  approvedAmount?: number;
+  status: PreAuthStatus;
+  statusLabel?: string;
+  authCode?: string;
+  rejectionReason?: string;
+  invoiceId?: string;
+  claimId?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface PreAuthEvent {
+  status: PreAuthStatus;
+  statusLabel?: string;
+  note?: string;
+  createdAt: string;
+}
+
 export type PersonaType = 'provider' | 'hmo';
 
-export type NavTab = 'dashboard' | 'reconciliation' | 'claims' | 'invoices' | 'patients' | 'catalogue' | 'estimation' | 'settings';
+export type NavTab = 'dashboard' | 'reconciliation' | 'claims' | 'invoices' | 'patients' | 'catalogue' | 'estimation' | 'settings' | 'preauth';
 
 export interface CostEstimate {
   price: number;

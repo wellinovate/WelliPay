@@ -37,6 +37,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'reconciliation', label: 'Reconciliation', badge: unmatchedCount > 0 ? unmatchedCount : 12 },
     { id: 'claims', label: 'Claims' },
+    { id: 'preauth', label: 'Pre-Auth' },
     { id: 'invoices', label: 'Invoices' },
     { id: 'patients', label: 'Patients' },
     { id: 'catalogue', label: 'Catalogue' },

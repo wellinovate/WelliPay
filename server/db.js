@@ -1140,6 +1140,49 @@ export async function initializeDatabase() {
         created_at TIMESTAMPTZ DEFAULT NOW(),
         UNIQUE(claim_id)
       );
+
+      -- Pre-Authorization Tracker. Previously "pre-auth" was only ever a
+      -- free-text code a user typed into hmo_claims.pre_auth_code or
+      -- invoices.pre_auth_code — nothing tracked the request itself through
+      -- its lifecycle. This table is the tracked entity; pre_authorization_events
+      -- is its status timeline (what patients/providers see as "what was
+      -- requested, and where it stands now"). invoice_id and claim_id are
+      -- nullable FKs populated once the request reaches that stage — a
+      -- pre-auth is requested before an invoice necessarily exists, and a
+      -- claim is only submitted after the service is completed.
+      CREATE TABLE IF NOT EXISTS pre_authorizations (
+        id VARCHAR(50) PRIMARY KEY,
+        patient_id VARCHAR(50),
+        patient_name VARCHAR(255) NOT NULL,
+        patient_mrn VARCHAR(100),
+        provider_id VARCHAR(50),
+        provider_name VARCHAR(255) NOT NULL,
+        payer_name VARCHAR(100) NOT NULL,
+        service_description TEXT NOT NULL,
+        clinical_justification TEXT,
+        documentation_notes TEXT,
+        requested_amount NUMERIC(15, 2) NOT NULL,
+        formatted_amount VARCHAR(50) NOT NULL,
+        approved_amount NUMERIC(15, 2),
+        status VARCHAR(30) NOT NULL DEFAULT 'requested',
+        auth_code VARCHAR(100),
+        rejection_reason TEXT,
+        invoice_id VARCHAR(50) REFERENCES invoices(id),
+        claim_id VARCHAR(50) REFERENCES hmo_claims(id),
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS pre_authorization_events (
+        id SERIAL PRIMARY KEY,
+        pre_auth_id VARCHAR(50) NOT NULL REFERENCES pre_authorizations(id),
+        status VARCHAR(30) NOT NULL,
+        note TEXT,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_preauth_events_preauth_id ON pre_authorization_events(pre_auth_id);
+      CREATE INDEX IF NOT EXISTS idx_preauth_status ON pre_authorizations(status);
     `);
 
     return { initialized: true };

@@ -540,7 +540,7 @@ app.get('/api/public/invoice/:invoiceNumber', async (req, res) => {
       const result = await pool.query(
         `SELECT invoice_number, patient_name, service_description, total_amount,
                 formatted_amount, paid_amount, status, status_label, due_date,
-                payer_type, payer_name, copay_amount, claim_amount,
+                payer_type, payer_name, copay_amount, claim_amount, pre_auth_code,
                 dedicated_account_number, dedicated_account_bank, dedicated_account_name
          FROM invoices WHERE invoice_number = $1`,
         [invoiceNumber]
@@ -1367,6 +1367,298 @@ app.post('/api/hmo-remittances/:id/lines', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[API POST /api/hmo-remittances/:id/lines] error:', err.message);
     return res.status(500).json({ error: 'Failed to record remittance line.' });
+  }
+});
+
+// ==========================================
+// Pre-Authorization Tracker
+// A pre-auth request moves through a fixed sequence of stages. Each stage
+// change is recorded as an event (pre_authorization_events) so both the
+// provider and — once a patient-facing surface exists — the patient can see
+// the full journey, not just the current state. PREAUTH_TRANSITIONS defines
+// which stage can follow which; anything else is rejected with 409 rather
+// than silently letting a request skip stages or move backward.
+// ==========================================
+const PREAUTH_TRANSITIONS = {
+  requested: ['submitted'],
+  submitted: ['under_review'],
+  under_review: ['approved', 'rejected'],
+  approved: ['provider_notified'],
+  provider_notified: ['service_completed'],
+  service_completed: ['claim_submitted'],
+  claim_submitted: ['paid'],
+  rejected: [],
+  paid: [],
+};
+
+const PREAUTH_STATUS_LABELS = {
+  requested: 'Requested',
+  submitted: 'Submitted to Payer',
+  under_review: 'Under Review',
+  approved: 'Approved',
+  rejected: 'Rejected',
+  provider_notified: 'Provider Notified',
+  service_completed: 'Service Completed',
+  claim_submitted: 'Claim Submitted',
+  paid: 'Paid',
+};
+
+// 1. Submit a new pre-authorization request. Starts at 'requested'; the
+// provider (or whatever staff workflow follows) advances it from there via
+// the status-transition endpoint below.
+app.post('/api/preauth-requests', requireAuth, async (req, res) => {
+  const {
+    patient_id, patient_name, patient_mrn,
+    provider_id, provider_name,
+    payer_name, service_description,
+    clinical_justification, documentation_notes,
+    requested_amount,
+  } = req.body;
+
+  if (!patient_name || !provider_name || !payer_name || !service_description || requested_amount == null) {
+    return res.status(400).json({
+      error: 'patient_name, provider_name, payer_name, service_description, and requested_amount are required.'
+    });
+  }
+
+  const id = `PA-${Math.floor(10000 + Math.random() * 90000)}`;
+  const formattedAmount = `₦${Number(requested_amount).toLocaleString()}`;
+
+  if (!pool) {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ error: 'Database service unavailable in production.' });
+    }
+    return res.status(201).json({
+      success: true,
+      preAuth: {
+        id, patientName: patient_name, patientMrn: patient_mrn, providerName: provider_name,
+        payerName: payer_name, serviceDescription: service_description, requestedAmount: Number(requested_amount),
+        formattedAmount, status: 'requested', statusLabel: PREAUTH_STATUS_LABELS.requested,
+      },
+      mode: 'demo',
+    });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await client.query(`
+      INSERT INTO pre_authorizations
+        (id, patient_id, patient_name, patient_mrn, provider_id, provider_name, payer_name,
+         service_description, clinical_justification, documentation_notes, requested_amount, formatted_amount, status)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'requested')
+      RETURNING *
+    `, [
+      id, patient_id || null, patient_name, patient_mrn || null, provider_id || null, provider_name,
+      payer_name, service_description, clinical_justification || null, documentation_notes || null,
+      Number(requested_amount), formattedAmount,
+    ]);
+
+    await client.query(
+      `INSERT INTO pre_authorization_events (pre_auth_id, status, note) VALUES ($1, 'requested', 'Request created')`,
+      [id]
+    );
+
+    await client.query('COMMIT');
+    return res.status(201).json({ success: true, preAuth: result.rows[0] });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[API POST /api/preauth-requests] error:', err.message);
+    return res.status(500).json({ error: 'Failed to create pre-authorization request.' });
+  } finally {
+    client.release();
+  }
+});
+
+// 2. List pre-authorization requests (newest first). Client-side filtering
+// by status/payer/provider, same pattern as GET /api/claims.
+app.get('/api/preauth-requests', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.json({ source: 'fallback', preAuths: [] });
+  }
+
+  try {
+    const result = await query(`
+      SELECT id, patient_id as "patientId", patient_name as "patientName", patient_mrn as "patientMrn",
+             provider_id as "providerId", provider_name as "providerName", payer_name as "payerName",
+             service_description as "serviceDescription", clinical_justification as "clinicalJustification",
+             documentation_notes as "documentationNotes",
+             requested_amount::float as "requestedAmount", formatted_amount as "formattedAmount",
+             approved_amount::float as "approvedAmount", status, auth_code as "authCode",
+             rejection_reason as "rejectionReason", invoice_id as "invoiceId", claim_id as "claimId",
+             created_at as "createdAt", updated_at as "updatedAt"
+      FROM pre_authorizations
+      ORDER BY created_at DESC
+    `);
+    const preAuths = result.rows.map(r => ({ ...r, statusLabel: PREAUTH_STATUS_LABELS[r.status] || r.status }));
+    return res.json({ source: 'postgresql', preAuths });
+  } catch (err) {
+    console.error('[API GET /api/preauth-requests] error:', err.message);
+    return res.status(500).json({ error: 'Failed to fetch pre-authorization requests.' });
+  }
+});
+
+// 3. Fetch one pre-authorization request with its full status timeline.
+app.get('/api/preauth-requests/:id', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  if (!pool) {
+    return res.status(404).json({ error: `Pre-authorization ${id} not found.` });
+  }
+
+  try {
+    const result = await query(`
+      SELECT id, patient_id as "patientId", patient_name as "patientName", patient_mrn as "patientMrn",
+             provider_id as "providerId", provider_name as "providerName", payer_name as "payerName",
+             service_description as "serviceDescription", clinical_justification as "clinicalJustification",
+             documentation_notes as "documentationNotes",
+             requested_amount::float as "requestedAmount", formatted_amount as "formattedAmount",
+             approved_amount::float as "approvedAmount", status, auth_code as "authCode",
+             rejection_reason as "rejectionReason", invoice_id as "invoiceId", claim_id as "claimId",
+             created_at as "createdAt", updated_at as "updatedAt"
+      FROM pre_authorizations WHERE id = $1
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: `Pre-authorization ${id} not found.` });
+    }
+
+    const eventsRes = await query(
+      `SELECT status, note, created_at as "createdAt" FROM pre_authorization_events WHERE pre_auth_id = $1 ORDER BY created_at ASC`,
+      [id]
+    );
+
+    const preAuth = { ...result.rows[0], statusLabel: PREAUTH_STATUS_LABELS[result.rows[0].status] || result.rows[0].status };
+    return res.json({
+      preAuth,
+      timeline: eventsRes.rows.map(e => ({ ...e, statusLabel: PREAUTH_STATUS_LABELS[e.status] || e.status })),
+    });
+  } catch (err) {
+    console.error('[API GET /api/preauth-requests/:id] error:', err.message);
+    return res.status(500).json({ error: 'Failed to fetch pre-authorization request.' });
+  }
+});
+
+// 4. Advance (or reject) a pre-authorization request. Validated against
+// PREAUTH_TRANSITIONS so a request can't skip stages or move backward —
+// e.g. a provider can't mark 'service_completed' before the payer has
+// 'approved' it. Approving requires approved_amount; rejecting requires
+// rejection_reason.
+app.patch('/api/preauth-requests/:id/status', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { status: nextStatus, note, approved_amount, rejection_reason, auth_code } = req.body;
+
+  if (!nextStatus || !PREAUTH_TRANSITIONS[nextStatus]) {
+    return res.status(400).json({ error: `Unknown status '${nextStatus}'.` });
+  }
+
+  if (!pool) {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ error: 'Database service unavailable in production.' });
+    }
+    return res.json({ success: true, id, status: nextStatus, mode: 'demo' });
+  }
+
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const current = await client.query(`SELECT status FROM pre_authorizations WHERE id = $1 FOR UPDATE`, [id]);
+    if (current.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: `Pre-authorization ${id} not found.` });
+    }
+
+    const currentStatus = current.rows[0].status;
+    const allowedNext = PREAUTH_TRANSITIONS[currentStatus] || [];
+    if (!allowedNext.includes(nextStatus)) {
+      await client.query('ROLLBACK');
+      return res.status(409).json({
+        error: `Cannot move from '${currentStatus}' to '${nextStatus}'. Valid next step(s): ${allowedNext.length ? allowedNext.join(', ') : 'none — this is a terminal state'}.`
+      });
+    }
+
+    if (nextStatus === 'approved' && approved_amount == null) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'approved_amount is required to approve a pre-authorization.' });
+    }
+    if (nextStatus === 'rejected' && !rejection_reason) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'rejection_reason is required to reject a pre-authorization.' });
+    }
+
+    await client.query(`
+      UPDATE pre_authorizations SET
+        status = $1,
+        approved_amount = CASE WHEN $2::text = 'approved' THEN $3 ELSE approved_amount END,
+        rejection_reason = CASE WHEN $2::text = 'rejected' THEN $4 ELSE rejection_reason END,
+        auth_code = COALESCE($5, auth_code),
+        updated_at = NOW()
+      WHERE id = $6
+    `, [nextStatus, nextStatus, approved_amount != null ? Number(approved_amount) : null, rejection_reason || null, auth_code || null, id]);
+
+    await client.query(
+      `INSERT INTO pre_authorization_events (pre_auth_id, status, note) VALUES ($1, $2, $3)`,
+      [id, nextStatus, note || null]
+    );
+
+    await client.query('COMMIT');
+
+    const updated = await pool.query(`SELECT * FROM pre_authorizations WHERE id = $1`, [id]);
+    return res.json({ success: true, preAuth: updated.rows[0] });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('[API PATCH /api/preauth-requests/:id/status] error:', err.message);
+    return res.status(500).json({ error: 'Failed to update pre-authorization status.' });
+  } finally {
+    client.release();
+  }
+});
+
+// 5. Link an approved pre-authorization to the invoice it ends up billed
+// against, so the bill reflects the payer-approved amount rather than a
+// number nobody checked. Requires the pre-auth to already be approved (or
+// further along); also mirrors the auth code onto invoices.pre_auth_code,
+// which until now was the only place a "pre-auth" existed at all.
+app.patch('/api/preauth-requests/:id/link-invoice', requireAuth, async (req, res) => {
+  const { id } = req.params;
+  const { invoice_number } = req.body;
+
+  if (!invoice_number) {
+    return res.status(400).json({ error: 'invoice_number is required.' });
+  }
+  if (!pool) {
+    if (process.env.NODE_ENV === 'production') {
+      return res.status(503).json({ error: 'Database service unavailable in production.' });
+    }
+    return res.json({ success: true, mode: 'demo' });
+  }
+
+  try {
+    const preAuthRes = await pool.query(`SELECT * FROM pre_authorizations WHERE id = $1`, [id]);
+    if (preAuthRes.rows.length === 0) {
+      return res.status(404).json({ error: `Pre-authorization ${id} not found.` });
+    }
+    const preAuth = preAuthRes.rows[0];
+
+    if (!['approved', 'provider_notified', 'service_completed', 'claim_submitted', 'paid'].includes(preAuth.status)) {
+      return res.status(409).json({ error: `Pre-authorization ${id} is '${preAuth.status}', not yet approved. Only an approved pre-authorization can be linked to an invoice.` });
+    }
+
+    const invoiceRes = await pool.query(`SELECT id, invoice_number FROM invoices WHERE invoice_number = $1`, [invoice_number]);
+    if (invoiceRes.rows.length === 0) {
+      return res.status(404).json({ error: `Invoice ${invoice_number} not found.` });
+    }
+    const invoice = invoiceRes.rows[0];
+
+    await pool.query(`UPDATE pre_authorizations SET invoice_id = $1, updated_at = NOW() WHERE id = $2`, [invoice.id, id]);
+    await pool.query(
+      `UPDATE invoices SET pre_auth_code = $1 WHERE id = $2`,
+      [preAuth.auth_code || preAuth.id, invoice.id]
+    );
+
+    return res.json({ success: true, preAuthId: id, invoiceNumber: invoice.invoice_number });
+  } catch (err) {
+    console.error('[API PATCH /api/preauth-requests/:id/link-invoice] error:', err.message);
+    return res.status(500).json({ error: 'Failed to link pre-authorization to invoice.' });
   }
 });
 
