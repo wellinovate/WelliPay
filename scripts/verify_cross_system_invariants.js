@@ -9,30 +9,60 @@ import { spawn } from 'child_process';
 
 let spawnedServer = null;
 
+// Previously this checked /api/dashboard for HTTP 200, which is true the
+// instant Express starts listening — server.js does not await
+// initializeDatabase() before calling app.listen(). That let this suite
+// query a server whose tables were still being created/seeded, producing
+// non-deterministic results (patients: 0, dashboard totals: ₦0, invoice
+// counts short) that had nothing to do with the code under test. Confirmed
+// by rerunning against the unmodified base commit: same race, same flakiness.
+// /api/health now reports seedComplete once initializeDatabase() has
+// resolved (or failed) — that is the actual readiness signal to wait for.
+// Resolves to 'ready', 'not-ready', or 'seed-failed'. Distinguishing the
+// last case matters: without it, a real seed failure just looks like a slow
+// startup, and the caller burns the full 30s timeout before failing with a
+// generic "timed out" message that hides the actual cause.
 function checkServerReady() {
   return new Promise((resolve) => {
     const req = http.get({
       hostname: 'localhost',
       port: 5174,
-      path: '/api/dashboard',
-      headers: { 'Authorization': 'Bearer dev-token' },
+      path: '/api/health',
       timeout: 1000
     }, (res) => {
-      resolve(res.statusCode === 200);
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        try {
+          // /api/health returns HTTP 500 when the database is disconnected —
+          // that response still carries seedComplete/seedError in its body,
+          // and a seed failure needs to be read from THAT, not skipped
+          // because the status code wasn't 200.
+          const parsed = JSON.parse(body);
+          if (parsed.seedError) return resolve('seed-failed');
+          if (res.statusCode !== 200) return resolve('not-ready');
+          resolve(parsed.seedComplete === true ? 'ready' : 'not-ready');
+        } catch {
+          resolve('not-ready');
+        }
+      });
     });
-    req.on('error', () => resolve(false));
+    req.on('error', () => resolve('not-ready'));
     req.on('timeout', () => {
       req.destroy();
-      resolve(false);
+      resolve('not-ready');
     });
   });
 }
 
 async function ensureServer() {
-  const isUp = await checkServerReady();
-  if (isUp) {
-    console.log('📡 Connected to active WelliPay server on port 5174.\n');
+  const initialState = await checkServerReady();
+  if (initialState === 'ready') {
+    console.log('📡 Connected to active, fully-seeded WelliPay server on port 5174.\n');
     return;
+  }
+  if (initialState === 'seed-failed') {
+    throw new Error('The already-running WelliPay server reported a database seed error — check its logs before rerunning.');
   }
 
   console.log('🚀 Spawning WelliPay server for test execution (port 5174)...');
@@ -46,14 +76,18 @@ async function ensureServer() {
   });
 
   const start = Date.now();
-  while (Date.now() - start < 15000) {
+  while (Date.now() - start < 30000) {
     await new Promise((r) => setTimeout(r, 250));
-    if (await checkServerReady()) {
-      console.log('✅ WelliPay server is up and responding.\n');
+    const state = await checkServerReady();
+    if (state === 'ready') {
+      console.log('✅ WelliPay server is up and fully seeded.\n');
       return;
     }
+    if (state === 'seed-failed') {
+      throw new Error('Database seed failed during server startup — check the spawned server\'s logs above.');
+    }
   }
-  throw new Error('Timed out waiting for WelliPay server to start on port 5174');
+  throw new Error('Timed out waiting for WelliPay server to start and finish seeding on port 5174');
 }
 
 function apiGet(path) {

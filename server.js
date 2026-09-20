@@ -347,10 +347,24 @@ async function requireApiKey(req, res, next) {
   }
 }
 
-// Initialize database tables on server start
-initializeDatabase().catch(err => {
-  console.error('[Server] Database initialization failed:', err);
-});
+// Initialize database tables on server start.
+// This runs unawaited (app.listen() below does not wait for it), so the
+// server accepts requests while table creation/seeding is still in flight.
+// dbInitState is how any caller (health checks, tests) tells the two apart
+// instead of inferring readiness from "the HTTP server responds" alone,
+// which is true immediately and says nothing about whether seed data exists.
+let dbInitState = { done: false, error: null };
+initializeDatabase()
+  .then((result) => {
+    // initializeDatabase() catches its own errors internally and resolves
+    // with { initialized: false, error } rather than rejecting, so success
+    // has to be read from the resolved value, not from reaching .then() at all.
+    dbInitState = { done: true, error: (result && result.error) || null };
+  })
+  .catch(err => {
+    console.error('[Server] Database initialization failed:', err);
+    dbInitState = { done: true, error: err.message };
+  });
 
 // ==========================================
 // Public Endpoints (Health & Status Checks)
@@ -358,7 +372,7 @@ initializeDatabase().catch(err => {
 
 app.get('/api/health', async (req, res) => {
   const dbHealth = await checkDatabaseHealth();
-  
+
   res.status(dbHealth.status === 'error' ? 500 : 200).json({
     status: dbHealth.connected ? 'healthy' : 'degraded',
     service: 'WelliPay Healthcare Financial Operating System',
@@ -366,6 +380,13 @@ app.get('/api/health', async (req, res) => {
     environment: process.env.NODE_ENV || 'production',
     port: PORT,
     database: dbHealth,
+    // seedComplete is distinct from database. connected: the pool can be
+    // connected while initializeDatabase() is still creating tables/seeding
+    // rows. A test or deploy check that only waits for HTTP 200 here can
+    // observe an empty or partially-seeded database. seedComplete is true
+    // once initializeDatabase() has resolved (or rejected), whichever first.
+    seedComplete: dbInitState.done,
+    seedError: dbInitState.error,
     auth: {
       firebaseAdminActive: firebaseInitialized,
       serviceAccountConfigured: !!process.env.FIREBASE_SERVICE_ACCOUNT
