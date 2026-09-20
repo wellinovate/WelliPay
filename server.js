@@ -2297,9 +2297,12 @@ let MOCK_PROVIDER_CATALOGUE_STATE = INITIAL_PROVIDER_TARIFFS.map((t, idx) => {
     master_service_id: master?.id || (idx + 1),
     price: t.price,
     turnaround_time: t.turnaround_time,
+    turnaround_hours: t.turnaround_hours || (t.turnaround_time?.includes('24') ? 24 : t.turnaround_time?.includes('4') ? 4 : t.turnaround_time?.includes('1-2') ? 2 : 1),
     availability: 'available',
     hmo_accepted: t.hmo_accepted,
     is_published: t.is_published,
+    effective_date: t.effective_date || '2026-01-01',
+    last_edited_by: t.last_edited_by || 'Dr. K. Balogun · Revenue Cycle Lead',
     created_at: new Date().toISOString()
   };
 });
@@ -2495,9 +2498,12 @@ app.get('/api/directory/catalogue/:provider_id', async (req, res) => {
       masterServiceId: c.master_service_id,
       price: c.price,
       turnaroundTime: c.turnaround_time,
+      turnaroundHours: c.turnaround_hours || (c.turnaround_time?.includes('24') ? 24 : c.turnaround_time?.includes('4') ? 4 : c.turnaround_time?.includes('1-2') ? 2 : 1),
       availability: c.availability,
       hmoAccepted: c.hmo_accepted || [],
       isPublished: c.is_published,
+      effectiveDate: c.effective_date || '2026-01-01',
+      lastEditedBy: c.last_edited_by || 'Dr. K. Balogun · Revenue Cycle Lead',
       createdAt: c.created_at,
       serviceName: master.service_name || 'Custom Service',
       serviceCode: master.service_code || 'CUSTOM',
@@ -2521,7 +2527,7 @@ app.get('/api/directory/catalogue/:provider_id', async (req, res) => {
 
 // 4. Upsert Item in Provider Catalogue (Requires Auth)
 app.post('/api/directory/catalogue', requireAuth, async (req, res) => {
-  const { provider_id, master_service_id, price, turnaround_time, hmo_accepted, is_published } = req.body;
+  const { provider_id, master_service_id, price, turnaround_time, turnaround_hours, hmo_accepted, is_published, effective_date, last_edited_by } = req.body;
 
   if (!provider_id || !master_service_id || price === undefined || price === null) {
     return res.status(400).json({ error: 'Missing required fields: provider_id, master_service_id, and price are mandatory.' });
@@ -2549,7 +2555,7 @@ app.post('/api/directory/catalogue', requireAuth, async (req, res) => {
         provider_id,
         master_service_id,
         numPrice,
-        turnaround_time || 'Same day',
+        turnaround_time || (turnaround_hours ? `${turnaround_hours} hours` : 'Same day'),
         Array.isArray(hmo_accepted) ? hmo_accepted : [],
         is_published ?? true
       ]);
@@ -2575,10 +2581,13 @@ app.post('/api/directory/catalogue', requireAuth, async (req, res) => {
     provider_id,
     master_service_id: Number(master_service_id),
     price: numPrice,
-    turnaround_time: turnaround_time || 'Same day',
+    turnaround_time: turnaround_time || (turnaround_hours ? `${turnaround_hours} hours` : 'Same day'),
+    turnaround_hours: turnaround_hours ? Number(turnaround_hours) : (turnaround_time?.includes('24') ? 24 : 4),
     availability: 'available',
     hmo_accepted: Array.isArray(hmo_accepted) ? hmo_accepted : [],
     is_published: is_published ?? true,
+    effective_date: effective_date || '2026-01-01',
+    last_edited_by: last_edited_by || 'Dr. K. Balogun · Revenue Cycle Lead',
     created_at: new Date().toISOString()
   };
 

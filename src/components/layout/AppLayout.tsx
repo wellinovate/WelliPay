@@ -88,13 +88,15 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
           
           {/* Brand & Main Tabs */}
-          <div className="flex items-center gap-8">
+          <div className="flex items-center gap-6 xl:gap-8 flex-shrink-0">
             <div 
-              className="flex items-center gap-3 cursor-pointer group py-1" 
+              className="flex items-center gap-3 cursor-pointer group py-1 flex-shrink-0" 
               onClick={() => setActiveTab('reconciliation')}
             >
-              <Logo size="md" variant="horizontal" />
-              <span className="hidden xl:inline-block text-[11px] font-sans font-medium text-[#64748b] pl-3 border-l border-[#e2e8f0] whitespace-nowrap">
+              <div className="flex-shrink-0">
+                <Logo size="md" variant="horizontal" />
+              </div>
+              <span className="hidden xl:inline-block text-[11px] font-sans font-medium text-[#64748b] pl-3 border-l border-[#e2e8f0] whitespace-nowrap flex-shrink-0">
                 One bill, every payer.
               </span>
             </div>
@@ -125,13 +127,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </div>
 
           {/* Persona & Facility Switcher (Right) */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <button
               onClick={togglePersona}
               title="Click to toggle between Lagoon Hospital (Provider) and Reliance HMO (Payer)"
-              className="group flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-[#e2e8f0] hover:border-[#0B6B69] bg-white hover:bg-[#F8FAFC] transition-all text-xs font-sans shadow-xs"
+              className="group flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-[#e2e8f0] hover:border-[#0B6B69] bg-white hover:bg-[#F8FAFC] transition-all text-xs font-sans shadow-xs cursor-pointer whitespace-nowrap"
             >
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-transform group-hover:scale-105 ${
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-transform group-hover:scale-105 flex-shrink-0 ${
                 persona === 'provider' 
                   ? 'bg-[#12244D] text-white' 
                   : 'bg-[#0B6B69] text-white'
@@ -139,13 +141,13 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
                 {persona === 'provider' ? 'LS' : 'RH'}
               </div>
 
-              <div className="text-left">
-                <div className="font-semibold text-[#12244D] flex items-center gap-1">
-                  {persona === 'provider' ? 'Lagoon Specialist Hospital' : 'Reliance HMO'}
-                  <ArrowRightLeft className="w-3 h-3 text-[#64748b] group-hover:text-[#0B6B69] transition-colors" />
+              <div className="text-left whitespace-nowrap">
+                <div className="font-semibold text-[#12244D] flex items-center gap-1 whitespace-nowrap">
+                  <span>{persona === 'provider' ? 'Lagoon Specialist Hospital' : 'Reliance HMO'}</span>
+                  <ArrowRightLeft className="w-3 h-3 text-[#64748b] group-hover:text-[#0B6B69] transition-colors flex-shrink-0" />
                 </div>
-                <div className="text-[10px] text-[#64748b]">
-                  {persona === 'provider' ? 'Healthcare Provider View' : 'Payer & Claims View'}
+                <div className="text-[10px] text-[#64748b] whitespace-nowrap">
+                  {persona === 'provider' ? 'Healthcare provider view' : 'Payer & claims view'}
                 </div>
               </div>
             </button>
@@ -154,7 +156,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               <button
                 onClick={() => logout()}
                 title={`Sign out (${user.email || 'User'})`}
-                className="p-2 rounded-lg border border-[#e2e8f0] hover:border-rose-300 hover:bg-rose-50 text-[#64748b] hover:text-rose-600 transition-colors shadow-xs"
+                className="p-2 rounded-lg border border-[#e2e8f0] hover:border-rose-300 hover:bg-rose-50 text-[#64748b] hover:text-rose-600 transition-colors shadow-xs cursor-pointer"
               >
                 <LogOut className="w-4 h-4" />
               </button>

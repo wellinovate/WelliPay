@@ -303,27 +303,27 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     provider_type: 'laboratory',
     department: 'Diagnostic Ultrasound',
     service_name: 'Abdomino-Pelvic Ultrasound',
-    service_code: 'LAB-RAD-USAP',
+    service_code: 'ULT-ABD-PEL',
     description: 'Comprehensive high-resolution real-time B-mode sonography of upper abdomen, kidneys, and pelvic organs',
-    specimen_type: 'Real-Time Sonography',
+    specimen_type: null,
     benchmark_turnaround: 'Same day (immediate)'
   },
   {
     provider_type: 'laboratory',
     department: 'Diagnostic Ultrasound',
     service_name: 'Obstetric Ultrasound (Anomaly / Growth)',
-    service_code: 'LAB-RAD-USOB',
+    service_code: 'ULT-OBS-GRO',
     description: 'Detailed fetal biometry (BPD, HC, AC, FL), placental grading, amniotic fluid volume, and anomaly survey',
-    specimen_type: 'Real-Time Sonography',
+    specimen_type: null,
     benchmark_turnaround: 'Same day (immediate)'
   },
   {
     provider_type: 'laboratory',
     department: 'Diagnostic Ultrasound',
     service_name: 'Pelvic / Transvaginal Ultrasound (TVS)',
-    service_code: 'LAB-RAD-USTV',
+    service_code: 'ULT-PEL-TVS',
     description: 'High-frequency endovaginal sonography for high-resolution uterine, endometrial, and adnexal evaluation',
-    specimen_type: 'Transvaginal Probe',
+    specimen_type: null,
     benchmark_turnaround: 'Same day (immediate)'
   },
 
@@ -332,18 +332,18 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     provider_type: 'laboratory',
     department: 'Diagnostic Radiology',
     service_name: 'Chest X-Ray (Postero-Anterior / Lateral)',
-    service_code: 'LAB-RAD-CXR',
+    service_code: 'RAD-XRY-CXR',
     description: 'Digital radiography of thorax evaluating cardiac silhouette, pulmonary parenchyma, and pleural spaces',
-    specimen_type: 'Digital Radiography (PA/Lat)',
+    specimen_type: null,
     benchmark_turnaround: 'Same day (1-2 hrs)'
   },
   {
     provider_type: 'laboratory',
     department: 'Diagnostic Radiology',
     service_name: 'Lumbosacral Spine X-Ray (AP & Lateral)',
-    service_code: 'LAB-RAD-LSS',
+    service_code: 'RAD-XRY-LSS',
     description: 'Digital plain radiograph assessing lumbar vertebral alignment, pedicles, disc spaces, and osteophytes',
-    specimen_type: 'Digital Radiography (AP/Lat)',
+    specimen_type: null,
     benchmark_turnaround: 'Same day (1-2 hrs)'
   },
 
@@ -352,18 +352,18 @@ export const MASTER_DIAGNOSTIC_SERVICES = [
     provider_type: 'laboratory',
     department: 'Cardiology (Non-Invasive)',
     service_name: 'Resting 12-Lead Electrocardiogram (ECG)',
-    service_code: 'LAB-CRD-ECG',
+    service_code: 'CAR-ECG-12L',
     description: 'Computerized 12-lead digital electrocardiography tracing with cardiologist diagnostic interpretation',
-    specimen_type: '12-Lead Surface Electrodes',
+    specimen_type: null,
     benchmark_turnaround: 'Same day (immediate)'
   },
   {
     provider_type: 'laboratory',
     department: 'Cardiology (Non-Invasive)',
     service_name: 'Transthoracic Echocardiography (2D/Doppler)',
-    service_code: 'LAB-CRD-ECHO',
+    service_code: 'CAR-ECH-2D',
     description: '2D, M-mode, color flow, and continuous-wave Doppler ultrasound assessing myocardial and valvular function',
-    specimen_type: 'Ultrasound Transducer',
+    specimen_type: null,
     benchmark_turnaround: 'Same day (immediate)'
   },
 
@@ -413,72 +413,99 @@ export const INITIAL_PROVIDER_TARIFFS = [
     service_code: 'LAB-HEM-FBC',
     price: 12000,
     turnaround_time: 'Same day (2-4 hrs)',
-    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Leadway Health'],
-    is_published: true
+    turnaround_hours: 4,
+    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Leadway Health', 'Avon HMO'],
+    is_published: true,
+    effective_date: '2026-01-01',
+    last_edited_by: 'Dr. K. Balogun · Revenue Cycle Lead'
   },
   {
     provider_id: 'PRV-LAG-01',
     service_code: 'LAB-CHM-EUCR',
     price: 28000,
     turnaround_time: 'Same day (4 hrs)',
-    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Leadway Health'],
-    is_published: true
+    turnaround_hours: 4,
+    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Leadway Health', 'Avon HMO'],
+    is_published: true,
+    effective_date: '2026-01-01',
+    last_edited_by: 'Dr. K. Balogun · Revenue Cycle Lead'
   },
   {
     provider_id: 'PRV-LAG-01',
     service_code: 'LAB-CHM-LIP',
     price: 26000,
     turnaround_time: 'Same day (4 hrs)',
-    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Leadway Health'],
-    is_published: true
+    turnaround_hours: 4,
+    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Leadway Health', 'Avon HMO'],
+    is_published: true,
+    effective_date: '2026-01-01',
+    last_edited_by: 'Dr. K. Balogun · Revenue Cycle Lead'
   },
   {
     provider_id: 'PRV-LAG-01',
     service_code: 'LAB-CHM-GLUC',
     price: 15000,
     turnaround_time: 'Same day (2-4 hrs)',
-    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO'],
-    is_published: true
+    turnaround_hours: 4,
+    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Avon HMO'],
+    is_published: true,
+    effective_date: '2026-01-01',
+    last_edited_by: 'Dr. K. Balogun · Revenue Cycle Lead'
   },
   {
     provider_id: 'PRV-LAG-01',
     service_code: 'LAB-CHM-LFT',
     price: 25000,
     turnaround_time: 'Same day (4 hrs)',
-    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO'],
-    is_published: true
+    turnaround_hours: 4,
+    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Avon HMO'],
+    is_published: true,
+    effective_date: '2026-01-01',
+    last_edited_by: 'Dr. K. Balogun · Revenue Cycle Lead'
   },
   {
     provider_id: 'PRV-LAG-01',
-    service_code: 'LAB-CRD-ECG',
+    service_code: 'CAR-ECG-12L',
     price: 18000,
     turnaround_time: 'Same day (immediate)',
-    hmo_accepted: ['Reliance HMO', 'AXA Mansard'],
-    is_published: true
+    turnaround_hours: 1,
+    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Avon HMO'],
+    is_published: true,
+    effective_date: '2026-01-01',
+    last_edited_by: 'Dr. K. Balogun · Revenue Cycle Lead'
   },
   {
     provider_id: 'PRV-LAG-01',
-    service_code: 'LAB-RAD-USAP',
+    service_code: 'ULT-ABD-PEL',
     price: 22000,
     turnaround_time: 'Same day (immediate)',
-    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Leadway Health'],
-    is_published: true
+    turnaround_hours: 1,
+    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Leadway Health', 'Avon HMO'],
+    is_published: true,
+    effective_date: '2026-01-01',
+    last_edited_by: 'Dr. K. Balogun · Revenue Cycle Lead'
   },
   {
     provider_id: 'PRV-LAG-01',
-    service_code: 'LAB-RAD-CXR',
+    service_code: 'RAD-XRY-CXR',
     price: 18000,
     turnaround_time: 'Same day (1-2 hrs)',
-    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Leadway Health'],
-    is_published: true
+    turnaround_hours: 2,
+    hmo_accepted: ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Leadway Health', 'Avon HMO'],
+    is_published: true,
+    effective_date: '2026-01-01',
+    last_edited_by: 'Dr. K. Balogun · Revenue Cycle Lead'
   },
   {
     provider_id: 'PRV-LAG-01',
     service_code: 'LAB-WEL-PREEMP',
     price: 35000,
     turnaround_time: '24 hours',
+    turnaround_hours: 24,
     hmo_accepted: ['Reliance HMO', 'AXA Mansard'],
-    is_published: true
+    is_published: true,
+    effective_date: '2026-01-01',
+    last_edited_by: 'Dr. K. Balogun · Revenue Cycle Lead'
   },
 
   // ABC Diagnostics (Referral Diagnostic Partner)
@@ -687,6 +714,28 @@ export const SEED_PAYER_PLAN_RULES = [
     plan_name: 'Standard Benefit Plan',
     copay_percentage: 15.00,
     preauth_threshold: 75000,
+    deductible: 0,
+    covered_categories: null,
+    excluded_services: [],
+    is_active: true
+  },
+
+  // 5. Avon HMO
+  {
+    payer_name: 'Avon HMO',
+    plan_name: 'Avon Plus Plan',
+    copay_percentage: 10.00,
+    preauth_threshold: 50000,
+    deductible: 0,
+    covered_categories: null,
+    excluded_services: [],
+    is_active: true
+  },
+  {
+    payer_name: 'Avon HMO',
+    plan_name: 'Avon Executive Plan',
+    copay_percentage: 0.00,
+    preauth_threshold: 100000,
     deductible: 0,
     covered_categories: null,
     excluded_services: [],

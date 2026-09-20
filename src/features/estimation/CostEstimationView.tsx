@@ -129,7 +129,7 @@ export const CostEstimationView: React.FC = () => {
   // Distinct Payers
   const distinctPayers = useMemo(() => {
     const fromPlans = [...new Set(payerPlans.map(p => p.payerName))];
-    return fromPlans.length > 0 ? fromPlans : ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Leadway Health'];
+    return fromPlans.length > 0 ? fromPlans : ['Reliance HMO', 'AXA Mansard', 'Hygeia HMO', 'Leadway Health', 'Avon HMO'];
   }, [payerPlans]);
 
   // Available plans for selected payer
@@ -586,8 +586,11 @@ export const CostEstimationView: React.FC = () => {
                             ₦{service.price.toLocaleString()}
                           </span>
                         ) : (
-                          <span className="text-[10px] text-slate-400 italic">
-                            Unpriced
+                          <span 
+                            className="text-[10px] font-medium text-amber-700 bg-amber-50 border border-amber-200/60 px-1.5 py-0.5 rounded whitespace-nowrap"
+                            title="Untariffed at Lagoon Specialist Hospital. Set tariff in Service Catalogue."
+                          >
+                            Untariffed at facility
                           </span>
                         )}
 
@@ -615,6 +618,7 @@ export const CostEstimationView: React.FC = () => {
                           <button
                             disabled={!service.price}
                             onClick={() => addToBasket(service)}
+                            title={!service.price ? 'Untariffed at facility. Configure in Service Catalogue.' : 'Add to calculation basket'}
                             className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold transition-colors cursor-pointer ${
                               service.price
                                 ? 'bg-[#12244D] hover:bg-[#0B6B69] text-white shadow-2xs'

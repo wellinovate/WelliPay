@@ -144,6 +144,7 @@ export interface MasterService {
   description: string;
   specimenType?: string;
   benchmarkTurnaround?: string;
+  turnaroundHours?: number;
   isActive: boolean;
 }
 
@@ -163,9 +164,12 @@ export interface ProviderCatalogueItem {
   masterServiceId: number;
   price: number;
   turnaroundTime: string;
+  turnaroundHours?: number;
   availability: string;
   hmoAccepted: string[];
   isPublished: boolean;
+  effectiveDate?: string;
+  lastEditedBy?: string;
   createdAt?: string;
   serviceName: string;
   serviceCode: string;
