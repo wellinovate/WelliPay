@@ -1,21 +1,39 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useWelliPay } from '../../context/WelliPayContext';
-import { 
-  Sliders, 
-  CreditCard, 
-  RefreshCw, 
-  Scale, 
-  ShieldCheck, 
-  CheckCircle2, 
-  AlertCircle, 
-  Wifi, 
-  ArrowUpRight, 
-  Building2, 
-  Check, 
-  Clock, 
+import {
+  Sliders,
+  CreditCard,
+  RefreshCw,
+  Scale,
+  ShieldCheck,
+  CheckCircle2,
+  AlertCircle,
+  Wifi,
+  ArrowUpRight,
+  Building2,
+  Check,
+  Clock,
   Server,
-  Activity
+  Activity,
+  KeyRound,
+  Copy,
+  Ban,
+  Plus
 } from 'lucide-react';
+
+interface IntegrationCredential {
+  id: number;
+  providerId: string;
+  providerName: string | null;
+  vendorName: string;
+  keyPrefix: string;
+  isActive: boolean;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+const EHR_VENDOR_OPTIONS = ['WelliRecord', 'OpenMRS', 'eClinicalWorks', 'Other'];
+const HOSPITAL_PROVIDER_ID = 'PRV-LAG-01';
 import { 
   SystemSettingsResponse, 
   MatchingSettings, 
@@ -33,7 +51,17 @@ export const SettingsView: React.FC = () => {
   const [dirty, setDirty] = useState(false);
 
   // Active section for sidebar navigation
-  const [activeSection, setActiveSection] = useState<'matching' | 'channels' | 'sync' | 'integrity'>('matching');
+  const [activeSection, setActiveSection] = useState<'matching' | 'channels' | 'sync' | 'integrations' | 'integrity'>('matching');
+
+  // EHR Integration Credentials
+  const [credentials, setCredentials] = useState<IntegrationCredential[]>([]);
+  const [loadingCredentials, setLoadingCredentials] = useState(false);
+  const [newVendorName, setNewVendorName] = useState(EHR_VENDOR_OPTIONS[0]);
+  const [customVendorName, setCustomVendorName] = useState('');
+  const [issuingKey, setIssuingKey] = useState(false);
+  const [newlyIssuedKey, setNewlyIssuedKey] = useState<{ vendorName: string; apiKey: string } | null>(null);
+  const [keyCopied, setKeyCopied] = useState(false);
+  const [revokingId, setRevokingId] = useState<number | null>(null);
 
   // Matching Settings
   const [matching, setMatching] = useState<MatchingSettings>({
@@ -140,6 +168,92 @@ export const SettingsView: React.FC = () => {
   useEffect(() => {
     fetchSettings();
   }, [fetchSettings]);
+
+  // Fetch Issued EHR Integration Credentials
+  const fetchCredentials = useCallback(async () => {
+    try {
+      setLoadingCredentials(true);
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/admin/integration-credentials', { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.credentials)) setCredentials(data.credentials);
+      }
+    } catch (err) {
+      console.error('Error fetching integration credentials:', err);
+    } finally {
+      setLoadingCredentials(false);
+    }
+  }, [getAuthHeaders]);
+
+  useEffect(() => {
+    fetchCredentials();
+  }, [fetchCredentials]);
+
+  // Issue a New API Key
+  const handleIssueKey = async () => {
+    const vendorName = newVendorName === 'Other' ? customVendorName.trim() : newVendorName;
+    if (!vendorName) {
+      addNotification('Enter a vendor name for the custom integration.', 'error');
+      return;
+    }
+    setIssuingKey(true);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch('/api/admin/integration-credentials', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ provider_id: HOSPITAL_PROVIDER_ID, vendor_name: vendorName })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setNewlyIssuedKey({ vendorName, apiKey: data.api_key });
+        setKeyCopied(false);
+        setCustomVendorName('');
+        await fetchCredentials();
+        addNotification(`API key issued for ${vendorName}.`, 'success');
+      } else {
+        addNotification(data.error || 'Failed to issue API key.', 'error');
+      }
+    } catch (err) {
+      addNotification('Network error issuing API key.', 'error');
+    } finally {
+      setIssuingKey(false);
+    }
+  };
+
+  const handleCopyIssuedKey = () => {
+    if (!newlyIssuedKey) return;
+    navigator.clipboard.writeText(newlyIssuedKey.apiKey);
+    setKeyCopied(true);
+    setTimeout(() => setKeyCopied(false), 3000);
+  };
+
+  // Revoke an Existing API Key
+  const handleRevokeKey = async (cred: IntegrationCredential) => {
+    if (!window.confirm(`Revoke the ${cred.vendorName} key (${cred.keyPrefix})? This takes effect immediately and cannot be undone — a new key would need to be issued.`)) {
+      return;
+    }
+    setRevokingId(cred.id);
+    try {
+      const headers = await getAuthHeaders();
+      const res = await fetch(`/api/admin/integration-credentials/${cred.id}/revoke`, {
+        method: 'PATCH',
+        headers
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setCredentials(prev => prev.map(c => c.id === cred.id ? { ...c, isActive: false } : c));
+        addNotification(`${cred.vendorName} key (${cred.keyPrefix}) revoked.`, 'info');
+      } else {
+        addNotification(data.error || 'Failed to revoke API key.', 'error');
+      }
+    } catch (err) {
+      addNotification('Network error revoking API key.', 'error');
+    } finally {
+      setRevokingId(null);
+    }
+  };
 
   // Dynamic calculation: How many of the 45 reconciliation rows match at the current threshold?
   // 33 confirmed rows have confidence scores >= 86%.
@@ -389,6 +503,28 @@ export const SettingsView: React.FC = () => {
                 <span>EHR & POS sync</span>
               </div>
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveSection('integrations');
+                document.getElementById('section-integrations')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+              className={`w-full text-left px-3 py-2 rounded-lg font-medium transition-all flex items-center justify-between cursor-pointer ${
+                activeSection === 'integrations'
+                  ? 'bg-[#12244D] text-white font-semibold'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <KeyRound className="w-4 h-4" />
+                <span>EHR integrations</span>
+              </div>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                activeSection === 'integrations' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {credentials.filter(c => c.isActive).length}
+              </span>
             </button>
 
             <button
@@ -837,6 +973,136 @@ export const SettingsView: React.FC = () => {
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* Section: EHR Integration Credentials */}
+          <div
+            id="section-integrations"
+            className="bg-white border border-slate-200 rounded-xl p-5 shadow-subtle space-y-4 font-sans"
+          >
+            <div className="border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-2 text-[#12244D]">
+                <KeyRound className="w-5 h-5 text-[#0B6B69]" />
+                <h2 className="font-heading text-lg font-bold text-[#12244D]">
+                  EHR integrations
+                </h2>
+              </div>
+              <p className="text-xs text-slate-600 mt-1">
+                API keys for third-party EHRs (WelliRecord, OpenMRS, eClinicalWorks) to submit clinical orders into this facility's record.
+              </p>
+            </div>
+
+            {/* Issue New Key */}
+            <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/80 space-y-3 text-xs">
+              <span className="font-semibold text-sm text-[#12244D] block">
+                Issue a new API key
+              </span>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <select
+                  value={newVendorName}
+                  onChange={(e) => setNewVendorName(e.target.value)}
+                  className="px-3 py-2 border border-slate-300 rounded-lg text-xs bg-white text-[#0f172a] focus:outline-none focus:border-[#12244D]"
+                >
+                  {EHR_VENDOR_OPTIONS.map(v => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+                {newVendorName === 'Other' && (
+                  <input
+                    type="text"
+                    placeholder="Vendor name..."
+                    value={customVendorName}
+                    onChange={(e) => setCustomVendorName(e.target.value)}
+                    className="flex-1 px-3 py-2 border border-slate-300 rounded-lg text-xs text-[#0f172a] focus:outline-none focus:border-[#12244D]"
+                  />
+                )}
+                <button
+                  onClick={handleIssueKey}
+                  disabled={issuingKey}
+                  className="px-3.5 py-2 text-xs font-bold rounded-lg bg-[#12244D] hover:bg-[#0A152E] text-white transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-60"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  {issuingKey ? 'Issuing...' : 'Issue key'}
+                </button>
+              </div>
+
+              {/* One-Time Raw Key Reveal */}
+              {newlyIssuedKey && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg space-y-2">
+                  <div className="flex items-center gap-1.5 text-amber-800 font-bold text-xs">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    Copy this key now — it will not be shown again
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 px-2.5 py-1.5 bg-white border border-amber-200 rounded font-mono text-[11px] text-slate-800 break-all">
+                      {newlyIssuedKey.apiKey}
+                    </code>
+                    <button
+                      onClick={handleCopyIssuedKey}
+                      className="px-2.5 py-1.5 text-[11px] font-semibold rounded-lg border border-amber-300 bg-white hover:bg-amber-100 text-amber-800 flex items-center gap-1 cursor-pointer shrink-0"
+                    >
+                      {keyCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                      {keyCopied ? 'Copied' : 'Copy'}
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-amber-700">
+                    Issued for {newlyIssuedKey.vendorName}. If lost, revoke it and issue a new one — the raw key cannot be retrieved again.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Issued Keys List */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                Issued keys
+              </span>
+              {loadingCredentials ? (
+                <div className="text-xs text-slate-500 py-4 text-center">Loading...</div>
+              ) : credentials.length === 0 ? (
+                <div className="text-xs text-slate-500 py-4 text-center">
+                  No API keys issued yet for this facility.
+                </div>
+              ) : (
+                <div className="border border-slate-200 rounded-lg divide-y divide-slate-100">
+                  {credentials.map(cred => (
+                    <div key={cred.id} className="p-3 flex items-center justify-between gap-3 text-xs">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-sm text-[#12244D]">{cred.vendorName}</span>
+                          {cred.isActive ? (
+                            <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-1.5 py-0.2 rounded-full text-[10px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                              Revoked
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-mono mt-0.5">
+                          {cred.keyPrefix}••••••••
+                        </div>
+                        <div className="text-[11px] text-slate-400 mt-0.5">
+                          Issued {formatDate(cred.createdAt)}
+                          {cred.lastUsedAt ? ` · Last used ${formatDate(cred.lastUsedAt)}` : ' · Never used'}
+                        </div>
+                      </div>
+                      {cred.isActive && (
+                        <button
+                          onClick={() => handleRevokeKey(cred)}
+                          disabled={revokingId === cred.id}
+                          className="px-2.5 py-1.5 text-[11px] font-semibold rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50 shrink-0"
+                        >
+                          <Ban className="w-3.5 h-3.5" />
+                          {revokingId === cred.id ? 'Revoking...' : 'Revoke'}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

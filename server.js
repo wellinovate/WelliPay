@@ -3144,6 +3144,60 @@ app.post('/api/admin/integration-credentials', requireAuth, async (req, res) => 
   }
 });
 
+// Lists issued credentials for the settings UI. Never returns key_hash —
+// only the prefix, which is safe to display and lets staff recognize which
+// key is which without ever being able to reconstruct the secret from it.
+app.get('/api/admin/integration-credentials', requireAuth, async (req, res) => {
+  if (!pool) {
+    return res.json({ success: true, credentials: [] });
+  }
+
+  try {
+    const result = await query(`
+      SELECT
+        c.id, c.provider_id as "providerId", p.name as "providerName",
+        c.vendor_name as "vendorName", c.key_prefix as "keyPrefix",
+        c.is_active as "isActive", c.created_at as "createdAt", c.last_used_at as "lastUsedAt"
+      FROM integration_credentials c
+      LEFT JOIN providers p ON p.id = c.provider_id
+      ORDER BY c.created_at DESC
+    `);
+    return res.json({ success: true, credentials: result.rows });
+  } catch (err) {
+    console.error('[API] Error listing integration credentials:', err);
+    return res.status(500).json({ error: 'Failed to list integration credentials.' });
+  }
+});
+
+// Revokes a credential — a one-way switch. is_active is checked on every
+// call in requireApiKey, so this takes effect on the vendor's very next
+// request; there is no un-revoke, only issuing a fresh key.
+app.patch('/api/admin/integration-credentials/:id/revoke', requireAuth, async (req, res) => {
+  const { id } = req.params;
+
+  if (!pool) {
+    return res.status(500).json({ error: 'Database unavailable.' });
+  }
+
+  try {
+    const result = await query(`
+      UPDATE integration_credentials SET is_active = false
+      WHERE id = $1
+      RETURNING id, provider_id as "providerId", vendor_name as "vendorName",
+                key_prefix as "keyPrefix", is_active as "isActive"
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: `No credential found with id ${id}.` });
+    }
+
+    return res.json({ success: true, credential: result.rows[0] });
+  } catch (err) {
+    console.error('[API] Error revoking integration credential:', err);
+    return res.status(500).json({ error: 'Failed to revoke integration credential.' });
+  }
+});
+
 // Versioned, vendor-agnostic clinical order ingestion. WelliRecord is the first
 // caller of this endpoint, not a privileged one — a third-party EHR authenticates
 // the same way, with its own API key scoped to its own provider_id.
