@@ -1,7 +1,33 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Logo } from './ui/Logo';
-import { ShieldCheck, Lock, Mail, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
+import { ShieldCheck, Lock, Mail, AlertCircle, ArrowRight, Loader2, Zap } from 'lucide-react';
+
+// Quick demo login slots — off by default. Each slot is only shown once all
+// three of its env vars are set, so an unconfigured deployment renders no
+// demo buttons at all. These credentials end up in the public JS bundle
+// (that's what VITE_-prefixed vars do), so this must point at dedicated,
+// low-privilege demo accounts — never a real staff member's credentials.
+interface DemoLoginSlot {
+  label: string;
+  email: string;
+  password: string;
+}
+
+function loadDemoLoginSlots(): DemoLoginSlot[] {
+  const slots: DemoLoginSlot[] = [];
+  for (let i = 1; i <= 4; i++) {
+    const label = import.meta.env[`VITE_DEMO_LOGIN_${i}_LABEL`];
+    const email = import.meta.env[`VITE_DEMO_LOGIN_${i}_EMAIL`];
+    const password = import.meta.env[`VITE_DEMO_LOGIN_${i}_PASSWORD`];
+    if (label && email && password) {
+      slots.push({ label, email, password });
+    }
+  }
+  return slots;
+}
+
+const DEMO_LOGIN_SLOTS = loadDemoLoginSlots();
 
 export const Login: React.FC = () => {
   const { login } = useAuth();
@@ -9,14 +35,14 @@ export const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [quickLoginLabel, setQuickLoginLabel] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const attemptLogin = async (loginEmail: string, loginPassword: string) => {
     setError(null);
     setIsSubmitting(true);
 
     try {
-      await login(email, password);
+      await login(loginEmail, loginPassword);
     } catch (err: any) {
       console.error('Login error:', err);
       if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
@@ -28,7 +54,20 @@ export const Login: React.FC = () => {
       }
     } finally {
       setIsSubmitting(false);
+      setQuickLoginLabel(null);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    attemptLogin(email, password);
+  };
+
+  const handleQuickLogin = (slot: DemoLoginSlot) => {
+    setEmail(slot.email);
+    setPassword(slot.password);
+    setQuickLoginLabel(slot.label);
+    attemptLogin(slot.email, slot.password);
   };
 
   return (
@@ -118,6 +157,34 @@ export const Login: React.FC = () => {
               )}
             </button>
           </form>
+
+          {/* Quick Demo Login — only rendered when demo accounts are configured
+              via VITE_DEMO_LOGIN_*_LABEL/EMAIL/PASSWORD env vars. */}
+          {DEMO_LOGIN_SLOTS.length > 0 && (
+            <div className="mt-5 pt-4 border-t border-dashed border-[#e2e8f0]">
+              <p className="text-[11px] font-semibold text-[#64748b] mb-2 text-center">
+                Quick demo access
+              </p>
+              <div className="flex flex-wrap justify-center gap-1.5">
+                {DEMO_LOGIN_SLOTS.map((slot) => (
+                  <button
+                    key={slot.label}
+                    type="button"
+                    onClick={() => handleQuickLogin(slot)}
+                    disabled={isSubmitting}
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-semibold rounded-lg bg-white border border-[#cbd5e1] text-[#12244D] hover:bg-slate-50 transition-colors disabled:opacity-60 cursor-pointer"
+                  >
+                    {isSubmitting && quickLoginLabel === slot.label ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Zap className="w-3 h-3 text-[#0B6B69]" />
+                    )}
+                    {slot.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Security Notice */}
           <div className="mt-6 pt-4 border-t border-[#e2e8f0] flex items-center justify-center gap-2 text-[11px] text-[#64748b]">
