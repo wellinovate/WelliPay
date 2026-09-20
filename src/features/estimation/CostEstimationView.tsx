@@ -72,11 +72,15 @@ export const CostEstimationView: React.FC = () => {
     async function loadData() {
       setInitialLoading(true);
       try {
+        const patientAuthToken = await auth.currentUser?.getIdToken().catch(() => undefined);
+
         const [masterRes, catRes, plansData, patientsRes] = await Promise.all([
           fetch('/api/directory/master?provider_type=laboratory').then(r => r.json()),
           fetch('/api/directory/catalogue/PRV-LAG-01').then(r => r.json()).catch(() => ({ catalogue: [] })),
           getPayerPlans().catch(() => []),
-          fetch('/api/patients').then(r => r.json()).catch(() => ({ patients: [] }))
+          fetch('/api/patients', {
+            headers: patientAuthToken ? { Authorization: `Bearer ${patientAuthToken}` } : {}
+          }).then(r => r.json()).catch(() => ({ patients: [] }))
         ]);
 
         if (masterRes.success && masterRes.services) {
