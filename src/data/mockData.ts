@@ -922,8 +922,8 @@ export const INITIAL_HMO_CLAIMS: HMOClaim[] = [
     statusLabel: 'Flagged for Review',
     isDisputed: true,
     denialRisk: 'missing-auth',
-    denialReason: 'Missing pre-authorization code',
-    planRule: 'Reliance HMO Silver Plan · Pre-authorization mandatory for all inpatient/surgical care regardless of amount, and all procedures exceeding ₦100,000 (POL-SILVER-V3)',
+    denialReason: 'Missing pre-authorisation code',
+    planRule: 'Reliance HMO Silver Plan · Pre-authorisation mandatory for all inpatient/surgical care regardless of amount, and all procedures exceeding ₦100,000 (POL-SILVER-V3)',
     age: '18d',
     slaDays: 14,
     patientName: 'Emeka Okonkwo',
@@ -945,7 +945,7 @@ export const INITIAL_HMO_CLAIMS: HMOClaim[] = [
     age: '5d',
     patientName: 'Halima Bello',
     patientMrn: 'MRN-LSH-10403',
-    diagnosis: 'Pelvic ultrasound without pre-authorization code'
+    diagnosis: 'Pelvic ultrasound without pre-authorisation code'
   },
   {
     id: 'CLM-4474',

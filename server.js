@@ -1978,6 +1978,8 @@ let FALLBACK_LEAKAGE = {
   ]
 };
 
+const FALLBACK_COMPLIANCE_RESOLUTIONS = [];
+
 const FALLBACK_INVOICES = [
   {
     id: 'INV-93105',
@@ -1993,8 +1995,14 @@ const FALLBACK_INVOICES = [
     statusLabel: 'Pending Payment',
     dueDate: '2026-09-19',
     createdAt: '2026-09-17T10:15:00.000Z',
+    updatedAt: '2026-09-17T10:15:00.000Z',
     isInpatient: true,
-    dischargeStatus: 'awaiting_settlement'
+    dischargeStatus: 'awaiting_settlement',
+    payerType: 'self-pay',
+    payer_type: 'self-pay',
+    orders: [
+      { id: 'ORD-93105-1', orderId: 'ORD-93105-1', patientName: 'Taiwo Adeyemi', patientMrn: 'MRN-LSH-10004', serviceType: 'Pediatric Inpatient Observation', amount: 11500, formattedAmount: '₦11,500', status: 'invoiced' }
+    ]
   },
   {
     id: 'INV-92831',
@@ -2011,8 +2019,14 @@ const FALLBACK_INVOICES = [
     dueDate: '2026-09-17',
     paidDate: '2026-09-17',
     createdAt: '2026-09-17T09:00:00.000Z',
+    updatedAt: '2026-09-17T09:00:00.000Z',
     isInpatient: false,
-    dischargeStatus: null
+    dischargeStatus: null,
+    payerType: 'self-pay',
+    payer_type: 'self-pay',
+    orders: [
+      { id: 'ORD-92831-1', orderId: 'ORD-92831-1', patientName: 'John Umar', patientMrn: 'MRN-LSH-10006', serviceType: 'Cardiology Consultation & ECG', amount: 25000, formattedAmount: '₦25,000', status: 'invoiced' }
+    ]
   },
   {
     id: 'INV-93010',
@@ -2029,8 +2043,14 @@ const FALLBACK_INVOICES = [
     dueDate: '2026-09-17',
     paidDate: '2026-09-17',
     createdAt: '2026-09-17T09:30:00.000Z',
+    updatedAt: '2026-09-17T09:30:00.000Z',
     isInpatient: false,
-    dischargeStatus: null
+    dischargeStatus: null,
+    payerType: 'self-pay',
+    payer_type: 'self-pay',
+    orders: [
+      { id: 'ORD-93010-1', orderId: 'ORD-93010-1', patientName: 'Mariam Bello', patientMrn: 'MRN-LSH-10005', serviceType: 'Pharmacy Prescription Checkout', amount: 8500, formattedAmount: '₦8,500', status: 'invoiced' }
+    ]
   },
   {
     id: 'INV-93044',
@@ -2047,8 +2067,91 @@ const FALLBACK_INVOICES = [
     dueDate: '2026-09-17',
     paidDate: '2026-09-17',
     createdAt: '2026-09-17T10:00:00.000Z',
+    updatedAt: '2026-09-17T10:00:00.000Z',
     isInpatient: false,
-    dischargeStatus: null
+    dischargeStatus: null,
+    payerType: 'self-pay',
+    payer_type: 'self-pay',
+    orders: [
+      { id: 'ORD-93044-1', orderId: 'ORD-93044-1', patientName: 'ABC Diagnostics', patientMrn: 'EXT-ACC-1120', serviceType: 'Referred Pathology Panel Batch', amount: 12000, formattedAmount: '₦12,000', status: 'invoiced' }
+    ]
+  },
+  // Compliance Fixtures:
+  {
+    id: 'INV-93401',
+    invoiceNumber: 'INV-93401',
+    patientId: 'PAT-1085',
+    patientName: 'Adewale Adeleke',
+    patientMrn: 'MRN-LSH-10022',
+    serviceDescription: 'Comprehensive Metabolic Panel (2 orders)',
+    totalAmount: 110000,
+    formattedAmount: '₦110,000',
+    paidAmount: 0,
+    status: 'pending',
+    statusLabel: 'Pending Payment',
+    dueDate: '2026-09-25',
+    createdAt: '2026-09-18T08:30:00.000Z',
+    updatedAt: '2026-09-18T08:30:00.000Z',
+    isInpatient: false,
+    dischargeStatus: null,
+    payerType: 'self-pay',
+    payer_type: 'self-pay',
+    orders: [
+      { id: 'CSO-DUP-01', orderId: 'ORD-DUP-93401', patientName: 'Adewale Adeleke', patientMrn: 'MRN-LSH-10022', serviceType: 'Comprehensive Metabolic Panel', amount: 55000, formattedAmount: '₦55,000', status: 'invoiced' },
+      { id: 'CSO-DUP-02', orderId: 'ORD-DUP-93401', patientName: 'Adewale Adeleke', patientMrn: 'MRN-LSH-10022', serviceType: 'Comprehensive Metabolic Panel', amount: 55000, formattedAmount: '₦55,000', status: 'invoiced' }
+    ]
+  },
+  {
+    id: 'INV-93402',
+    invoiceNumber: 'INV-93402',
+    patientId: 'PAT-1086',
+    patientName: 'Folashade Johnson',
+    patientMrn: 'MRN-LSH-10023',
+    serviceDescription: 'Lipid Profile Panel',
+    totalAmount: 45000,
+    formattedAmount: '₦45,000',
+    paidAmount: 0,
+    status: 'pending',
+    statusLabel: 'Pending Payment',
+    dueDate: '2026-09-26',
+    createdAt: '2026-09-18T09:00:00.000Z',
+    updatedAt: '2026-09-18T09:00:00.000Z',
+    isInpatient: false,
+    dischargeStatus: null,
+    payerType: 'self-pay',
+    payer_type: 'self-pay',
+    orders: [
+      { id: 'CSO-TAR-01', orderId: 'ORD-TAR-93402', patientName: 'Folashade Johnson', patientMrn: 'MRN-LSH-10023', serviceType: 'Lipid Profile Panel', amount: 45000, formattedAmount: '₦45,000', status: 'invoiced', masterServiceId: 8, master_service_id: 8, providerId: 'PRV-LAG-01', provider_id: 'PRV-LAG-01' }
+    ]
+  },
+  {
+    id: 'INV-93403',
+    invoiceNumber: 'INV-93403',
+    patientId: 'PAT-1087',
+    patientName: 'Chukwudi Nnamdi',
+    patientMrn: 'MRN-LSH-10024',
+    serviceDescription: 'MRI Lumbar Spine Investigation',
+    totalAmount: 185000,
+    formattedAmount: '₦185,000',
+    paidAmount: 0,
+    status: 'pending',
+    statusLabel: 'Pending Payment',
+    dueDate: '2026-09-27',
+    createdAt: '2026-09-18T10:00:00.000Z',
+    updatedAt: '2026-09-18T10:00:00.000Z',
+    isInpatient: false,
+    dischargeStatus: null,
+    payerType: 'hmo',
+    payer_type: 'hmo',
+    payerName: 'Reliance HMO',
+    payer_name: 'Reliance HMO',
+    planName: 'Silver Plan',
+    plan_name: 'Silver Plan',
+    preAuthCode: null,
+    pre_auth_code: null,
+    orders: [
+      { id: 'CSO-PRE-01', orderId: 'ORD-PRE-93403', patientName: 'Chukwudi Nnamdi', patientMrn: 'MRN-LSH-10024', serviceType: 'MRI Lumbar Spine Investigation', amount: 185000, formattedAmount: '₦185,000', status: 'invoiced' }
+    ]
   }
 ];
 
@@ -3036,7 +3139,8 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
 
   const orders = Array.isArray(line_items) && line_items.length > 0
     ? line_items.map((item, idx) => ({
-        id: `ORD-${invoiceNumber}-${idx + 1}`,
+        id: (item.orderId || item.order_id) || `ORD-${invoiceNumber}-${idx + 1}`,
+        orderId: (item.orderId || item.order_id) || `ORD-${invoiceNumber}-${idx + 1}`,
         patientName: patient_name,
         patientMrn: effectiveMrn,
         serviceType: item.description,
@@ -3236,27 +3340,125 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
 });
 
 // ==========================================
-// Patient Bill Audit
-// Runs a fixed set of checks against one invoice before it's presented for
-// payment, comparing: the bill itself, the provider catalogue tariff, the
-// payer's plan rule, and any linked pre-authorization. Each check is
-// independent — one being unavailable (e.g. no catalogue link on an older
-// line item) doesn't block the others from running.
+// Settings, Payment Channels, Sync & Ledger Verification State
+// Placed before Patient Bill Audit so compliance thresholds are configurable
 // ==========================================
-// Runs the same 7 checks as the per-invoice endpoint below, extracted so the
-// Provider Compliance Dashboard (GET /api/compliance/summary) can run them
-// across every invoice and aggregate the result, without a second copy of
-// this logic drifting out of sync with the per-invoice version.
-async function computeInvoiceAuditFlags(invoice) {
+
+let SETTINGS_STATE = {
+  facility: {
+    id: 'FAC-LAG-001',
+    name: 'Lagoon Specialist Hospital',
+    tier: 'Tier 1 Multi-Specialty Hospital',
+    location: '174B Corporation Drive, Victoria Island, Lagos'
+  },
+  matching: {
+    threshold: 85,
+    autoConfirm: false,
+    autoConfirmThreshold: 98,
+    fuzzyNameMatching: true,
+    lastChangedBy: 'Dr. Babatunde Fashola (Chief Medical Officer)',
+    lastChangedAt: '2026-09-14T11:24:00Z'
+  },
+  compliance: {
+    duplicateCriticalThreshold: 50000,
+    defaultPreAuthThreshold: 100000,
+  },
+  channels: [
+    { id: 'pos_moniepoint', name: 'POS Terminal (Moniepoint)', channel: 'POS card', protocol: 'ISO 8583 / Terminal SDK', status: 'active', latencyMs: 1200, dailyVolume: '₦1,420,000', txnCount: 14 },
+    { id: 'pos_opay', name: 'POS Terminal (OPay)', channel: 'POS card', protocol: 'Smart POS Webhook', status: 'active', latencyMs: 900, dailyVolume: '₦380,000', txnCount: 4 },
+    { id: 'nip_direct', name: 'NIBSS Instant Payments (NIP)', channel: 'Bank transfer', protocol: 'NIP Settlement Feed / CBN Direct', status: 'active', latencyMs: 2400, dailyVolume: '₦520,000', txnCount: 7 },
+    { id: 'gtbank_ussd', name: 'GTBank USSD (*737#)', channel: 'USSD', protocol: 'Telco Aggregator / USSD Push', status: 'active', latencyMs: 1800, dailyVolume: '₦180,000', txnCount: 3 },
+    { id: 'paystack_online', name: 'Paystack Web & Virtual Accounts', channel: 'Web / Virtual Transfer', protocol: 'REST Webhooks (HMAC-SHA512)', status: 'active', latencyMs: 400, dailyVolume: '₦340,000', txnCount: 5 },
+    { id: 'interswitch_clearing', name: 'Interswitch Healthcare Clearinghouse', channel: 'HMO Remittance Gateway', protocol: 'Direct Clearing House API', status: 'active', latencyMs: 3100, dailyVolume: '₦1,900,000', txnCount: 12 }
+  ],
+  sync: {
+    ehr: {
+      name: 'Hospital EHR (InstaEMR / Meditech)',
+      status: 'active',
+      protocol: 'HL7 FHIR v4 REST & WebSocket',
+      lastSyncSecondsAgo: 32,
+      inboundPending: 0,
+      ordersSyncedToday: 17
+    },
+    posFleet: {
+      name: 'POS Fleet Terminal Gateway',
+      status: 'active',
+      terminalsOnline: 6,
+      terminalsTotal: 6,
+      lastHeartbeatSecondsAgo: 18,
+      pollIntervalSeconds: 15
+    },
+    clearinghouse: {
+      name: 'NHIA e-Claim Clearinghouse',
+      status: 'active',
+      lastBatch: 'Today at 17:30',
+      claimsInFlight: 48
+    }
+  }
+};
+
+async function getAllBilledOrdersMap() {
+  const orderMap = new Map();
+  if (pool) {
+    try {
+      const ordersRes = await pool.query(`
+        SELECT cso.id, COALESCE(cso.order_id, cso.id) as "orderId", cso.invoice_id as "invoiceId",
+               cso.service_type as "serviceType", cso.amount::float as amount
+        FROM clinical_service_orders cso
+        WHERE cso.invoice_id IS NOT NULL
+      `);
+      for (const ord of (ordersRes.rows || [])) {
+        const oid = ord.orderId || ord.id;
+        if (!orderMap.has(oid)) orderMap.set(oid, []);
+        orderMap.get(oid).push({
+          orderId: oid,
+          invoiceNumber: ord.invoiceId,
+          serviceType: ord.serviceType,
+          amount: Number(ord.amount || 0)
+        });
+      }
+    } catch (e) {
+      console.warn('[getAllBilledOrdersMap] pool query warning:', e.message);
+    }
+  } else {
+    for (const inv of FALLBACK_INVOICES) {
+      const invNum = inv.invoice_number || inv.invoiceNumber || inv.id;
+      const rawOrders = inv.orders || inv.line_items || inv.lineItems || [];
+      for (const ord of rawOrders) {
+        const oid = ord.orderId || ord.order_id || ord.id;
+        if (oid) {
+          if (!orderMap.has(oid)) orderMap.set(oid, []);
+          orderMap.get(oid).push({
+            orderId: oid,
+            invoiceNumber: invNum,
+            serviceType: ord.serviceType || ord.service_type || ord.description || 'Clinical Service',
+            amount: Number(ord.amount != null ? ord.amount : (ord.totalAmount != null ? ord.totalAmount : 0))
+          });
+        }
+      }
+    }
+  }
+  return orderMap;
+}
+
+// ==========================================
+// Patient Bill Audit
+// Runs a fixed set of 7 checks against one invoice before it's presented for
+// payment, comparing: the bill itself, the provider catalogue tariff, the
+// payer's plan rule, and any linked pre-authorisation. Each check is
+// independent — one being unavailable doesn't block the others from running.
+// ==========================================
+async function computeInvoiceAuditFlags(invoice, precomputedOrderMap = null) {
   const invoiceNumber = invoice.invoice_number || invoice.invoiceNumber || invoice.id;
   const flags = [];
 
   let lineItems = [];
   if (pool) {
     const lineItemsRes = await pool.query(`
-      SELECT cso.id, cso.service_type as "serviceType", cso.amount::float as amount,
-             cso.master_service_id as "masterServiceId", cso.provider_id as "providerId",
-             pc.price::float as "cataloguePrice", msd.service_name as "catalogueServiceName"
+      SELECT cso.id, COALESCE(cso.order_id, cso.id) as "orderId", cso.service_type as "serviceType",
+             cso.amount::float as amount, cso.master_service_id as "masterServiceId",
+             cso.provider_id as "providerId", pc.price::float as "cataloguePrice",
+             msd.service_name as "catalogueServiceName"
       FROM clinical_service_orders cso
       LEFT JOIN provider_catalogue pc ON pc.provider_id = cso.provider_id AND pc.master_service_id = cso.master_service_id
       LEFT JOIN master_service_directory msd ON msd.id = cso.master_service_id
@@ -3277,6 +3479,7 @@ async function computeInvoiceAuditFlags(invoice) {
         : null;
       return {
         id: item.id || `item-${idx + 1}`,
+        orderId: item.orderId || item.order_id || item.id || `item-${idx + 1}`,
         serviceType: item.serviceType || item.service_type || item.description || 'Clinical Service',
         amount: Number(item.amount != null ? item.amount : (item.totalAmount != null ? item.totalAmount : item.unitPrice || 0)),
         masterServiceId: msId != null ? Number(msId) : null,
@@ -3287,13 +3490,12 @@ async function computeInvoiceAuditFlags(invoice) {
     });
   }
 
-  // 1 & 2. Price-vs-catalogue check, per line item — only possible where the
-  // line item carries a real catalogue link (see the POST /api/invoices
-  // comment on masterServiceId/providerId for why many won't).
+  // 1. Price-vs-catalogue check, per line item
   for (const item of lineItems) {
     if (item.masterServiceId == null || item.providerId == null) {
       flags.push({
         code: 'tariff_unknown',
+        name: 'Tariff unknown',
         severity: 'info',
         lineItemId: item.id,
         message: `"${item.serviceType}" isn't linked to a catalogue tariff, so its price can't be checked against the published rate.`,
@@ -3303,6 +3505,7 @@ async function computeInvoiceAuditFlags(invoice) {
     if (item.cataloguePrice == null) {
       flags.push({
         code: 'tariff_unknown',
+        name: 'Tariff unknown',
         severity: 'info',
         lineItemId: item.id,
         message: `"${item.serviceType}" references a catalogue entry that no longer exists.`,
@@ -3312,38 +3515,82 @@ async function computeInvoiceAuditFlags(invoice) {
     const billed = Number(item.amount);
     const catalogue = Number(item.cataloguePrice);
     if (Math.abs(billed - catalogue) > 0.01) {
+      const variance = Number((billed - catalogue).toFixed(2));
       flags.push({
         code: 'price_mismatch',
+        name: 'Tariff mismatch',
         severity: 'warning',
         lineItemId: item.id,
-        message: `"${item.catalogueServiceName || item.serviceType}" billed at ₦${billed.toLocaleString()}, but the published tariff is ₦${catalogue.toLocaleString()}.`,
+        message: `"${item.catalogueServiceName || item.serviceType}" billed at ₦${billed.toLocaleString()}, but the published catalogue tariff is ₦${catalogue.toLocaleString()}.`,
         billedAmount: billed,
         catalogueAmount: catalogue,
+        matchingRecord: {
+          source: 'catalogue',
+          id: `CAT-${item.providerId || 'PRV-LAG-01'}-${item.masterServiceId}`,
+          label: `Published Tariff: ₦${catalogue.toLocaleString()} (${item.catalogueServiceName || item.serviceType})`,
+          details: {
+            type: 'catalogue',
+            masterServiceId: item.masterServiceId,
+            providerId: item.providerId,
+            serviceName: item.catalogueServiceName || item.serviceType,
+            cataloguePrice: catalogue,
+            billedPrice: billed,
+            variance,
+          }
+        }
       });
     }
   }
 
-  // 3. Duplicate line items — same catalogue service (or, lacking that, the
-  // same free-text description) billed more than once on this invoice.
-  const seen = new Map();
+  // 2. Duplicate order check keyed strictly on order ID across all invoices.
+  // An order billed twice across invoices or within an invoice is a duplicate charge.
+  const orderMap = precomputedOrderMap || await getAllBilledOrdersMap();
+  const flaggedOrderIds = new Set();
+
   for (const item of lineItems) {
-    const key = item.masterServiceId != null ? `msd:${item.masterServiceId}` : `text:${(item.serviceType || '').toLowerCase()}`;
-    if (!seen.has(key)) { seen.set(key, []); }
-    seen.get(key).push(item);
-  }
-  for (const [, group] of seen) {
-    if (group.length > 1) {
+    const orderId = item.orderId || item.id;
+    if (!orderId || flaggedOrderIds.has(orderId)) continue;
+
+    const occurrences = orderMap.get(orderId) || [];
+    if (occurrences.length > 1) {
+      flaggedOrderIds.add(orderId);
+      const otherOcc = occurrences.find(o => o.invoiceNumber !== invoiceNumber) || occurrences.find(o => o !== occurrences[0]);
+      const isCrossInvoice = Boolean(otherOcc && otherOcc.invoiceNumber !== invoiceNumber);
+      const otherInvoiceNumber = otherOcc ? otherOcc.invoiceNumber : invoiceNumber;
+      const itemAmt = Number(item.amount || 0);
+
+      const criticalThreshold = SETTINGS_STATE.compliance?.duplicateCriticalThreshold || 50000;
+      const severity = itemAmt >= criticalThreshold ? 'critical' : 'warning';
+      const message = isCrossInvoice
+        ? `Clinical order ${orderId} ("${item.serviceType}") is billed on this invoice and was also billed on ${otherInvoiceNumber}.`
+        : `Clinical order ${orderId} ("${item.serviceType}") appears ${occurrences.length} times on this invoice.`;
+
       flags.push({
         code: 'duplicate_charge',
-        severity: 'warning',
-        lineItemIds: group.map(g => g.id),
-        message: `"${group[0].catalogueServiceName || group[0].serviceType}" appears ${group.length} times on this invoice.`,
+        name: 'Duplicate charge',
+        severity,
+        lineItemId: item.id,
+        orderId,
+        message,
+        billedAmount: itemAmt,
+        matchingRecord: {
+          source: 'clinical_order',
+          id: orderId,
+          label: isCrossInvoice ? `Duplicate order billed on ${otherInvoiceNumber}` : `Duplicate order billed twice`,
+          details: {
+            type: 'line_item',
+            duplicateOrderId: orderId,
+            duplicateInvoiceNumber: otherInvoiceNumber,
+            serviceType: item.serviceType,
+            amount: itemAmt,
+            billedAmount: itemAmt,
+          }
+        }
       });
     }
   }
 
-  // 4 & 5. Payer plan rule checks (pre-auth threshold, copay percentage) —
-  // only possible when the invoice recorded which HMO plan applied.
+  // 3 & 4. Payer plan rule checks (pre-auth threshold, copay percentage)
   const payerType = invoice.payer_type || invoice.payerType;
   const payerName = invoice.payer_name || invoice.payerName;
   const planName = invoice.plan_name || invoice.planName;
@@ -3371,34 +3618,65 @@ async function computeInvoiceAuditFlags(invoice) {
     }
   }
 
-  if (planRule) {
-    const totalAmount = Number(invoice.total_amount || invoice.totalAmount || 0);
-    const preAuthCode = invoice.pre_auth_code || invoice.preAuthCode;
-    if (planRule.preauthThreshold != null && totalAmount > Number(planRule.preauthThreshold) && !preAuthCode) {
-      flags.push({
-        code: 'missing_preauth',
-        severity: 'critical',
-        message: `This bill (₦${totalAmount.toLocaleString()}) exceeds ${payerName}'s pre-authorization threshold of ₦${Number(planRule.preauthThreshold).toLocaleString()} for the ${planName} plan, but no pre-authorization code is on file.`,
-      });
-    }
+  const totalAmount = Number(invoice.total_amount || invoice.totalAmount || 0);
+  const preAuthCode = invoice.pre_auth_code || invoice.preAuthCode;
+  const defaultPreAuth = SETTINGS_STATE.compliance?.defaultPreAuthThreshold || 100000;
+  const effectiveThreshold = planRule && planRule.preauthThreshold != null
+    ? Number(planRule.preauthThreshold)
+    : (payerType === 'hmo' ? defaultPreAuth : null);
 
-    const copayAmount = invoice.copay_amount != null ? invoice.copay_amount : invoice.copayAmount;
-    if (copayAmount != null && planRule.copayPercentage != null) {
-      const expectedCopay = Number((totalAmount * (Number(planRule.copayPercentage) / 100)).toFixed(2));
-      const actualCopay = Number(copayAmount);
-      if (Math.abs(actualCopay - expectedCopay) > 1) {
-        flags.push({
-          code: 'copay_exceeds_plan_rule',
-          severity: actualCopay > expectedCopay ? 'critical' : 'info',
-          message: `Patient copay is ₦${actualCopay.toLocaleString()}, but the ${planName} plan's ${planRule.copayPercentage}% copay rule works out to ₦${expectedCopay.toLocaleString()}.`,
-          billedCopay: actualCopay,
-          expectedCopay,
-        });
+  if (payerType === 'hmo' && effectiveThreshold != null && totalAmount > effectiveThreshold && !preAuthCode) {
+    flags.push({
+      code: 'missing_preauth',
+      name: 'Missing pre-authorisation',
+      severity: 'critical',
+      message: `This bill (₦${totalAmount.toLocaleString()}) exceeds ${payerName || 'HMO'}'s pre-authorisation threshold of ₦${effectiveThreshold.toLocaleString()}${planName ? ` for the ${planName} plan` : ''}, but no pre-authorisation code is on file.`,
+      matchingRecord: {
+        source: 'plan_rule',
+        id: `RULE-${(payerName || 'HMO').toUpperCase()}-${(planName || 'STANDARD').toUpperCase()}`,
+        label: `${payerName || 'HMO'} ${planName || 'Standard'} Pre-Authorisation Policy (₦${effectiveThreshold.toLocaleString()})`,
+        details: {
+          type: 'plan_rule',
+          payerName: payerName || 'HMO',
+          planName: planName || 'Standard Policy',
+          ruleDescription: `Mandatory pre-authorisation for all claims exceeding ₦${effectiveThreshold.toLocaleString()}`,
+          threshold: effectiveThreshold,
+          billedAmount: totalAmount,
+        }
       }
+    });
+  }
+
+  const copayAmount = invoice.copay_amount != null ? invoice.copay_amount : invoice.copayAmount;
+  if (copayAmount != null && planRule && planRule.copayPercentage != null) {
+    const expectedCopay = Number((totalAmount * (Number(planRule.copayPercentage) / 100)).toFixed(2));
+    const actualCopay = Number(copayAmount);
+    if (Math.abs(actualCopay - expectedCopay) > 1) {
+      flags.push({
+        code: 'copay_exceeds_plan_rule',
+        name: 'Copay discrepancy',
+        severity: actualCopay > expectedCopay ? 'critical' : 'info',
+        message: `Patient copay is ₦${actualCopay.toLocaleString()}, but the ${planName} plan's ${planRule.copayPercentage}% copay rule works out to ₦${expectedCopay.toLocaleString()}.`,
+        billedCopay: actualCopay,
+        expectedCopay,
+        matchingRecord: {
+          source: 'plan_rule',
+          id: `RULE-${payerName}-${planName}-COPAY`,
+          label: `${planName} ${planRule.copayPercentage}% Copay Rule`,
+          details: {
+            type: 'plan_rule',
+            payerName,
+            planName,
+            ruleDescription: `${planRule.copayPercentage}% patient copay responsibility`,
+            expectedCopay,
+            billedCopay: actualCopay,
+          }
+        }
+      });
     }
   }
 
-  // 6. Patient has known insurance on file, but this bill was billed self-pay.
+  // 5. Patient has known insurance on file, but this bill was billed self-pay.
   const patientId = invoice.patient_id || invoice.patientId;
   const patientMrn = invoice.patient_mrn || invoice.patientMrn;
   if (payerType === 'self-pay' && (patientId || patientMrn)) {
@@ -3415,17 +3693,27 @@ async function computeInvoiceAuditFlags(invoice) {
     if (hmoName) {
       flags.push({
         code: 'billed_self_pay_despite_coverage',
+        name: 'Billed self-pay despite active coverage',
         severity: 'warning',
-        message: `This patient has ${hmoName} on file, but this bill was billed as self-pay.`,
+        message: `This patient has active ${hmoName} coverage on file, but this bill was billed as self-pay.`,
+        matchingRecord: {
+          source: 'patient_record',
+          id: patientMrn || patientId,
+          label: `Active HMO coverage: ${hmoName} (${patientMrn || patientId})`,
+          details: {
+            type: 'patient_record',
+            patientId,
+            patientMrn,
+            patientName: invoice.patient_name || invoice.patientName,
+            hmoName,
+            policyVerificationStatus: 'verified',
+          }
+        }
       });
     }
   }
 
-  // 6b. Billed as HMO-covered, but the patient's HMO membership wasn't on
-  // record as verified at audit time (policy_verification_status). Doesn't
-  // re-check eligibility with the payer — there's no live feed for that —
-  // just surfaces WelliPay's own recorded status so a claim isn't submitted
-  // for cover the front desk never actually confirmed was current.
+  // 6. Billed as HMO-covered, but HMO membership is expired or unverified
   if (payerType === 'hmo' && (patientId || patientMrn)) {
     let membership = null;
     if (pool && patientId) {
@@ -3448,20 +3736,34 @@ async function computeInvoiceAuditFlags(invoice) {
     if (membership && membership.policyVerificationStatus && membership.policyVerificationStatus !== 'verified') {
       flags.push({
         code: 'membership_not_verified',
+        name: 'Membership not verified',
         severity: membership.policyVerificationStatus === 'expired' ? 'critical' : 'warning',
         message: membership.policyVerificationStatus === 'expired'
           ? `This patient's ${payerName} membership is on file as expired${membership.policyVerificationLabel ? ` (${membership.policyVerificationLabel})` : ''}, but this bill was billed as HMO-covered.`
           : `This patient's ${payerName} membership was never verified before this bill was billed as HMO-covered.`,
+        matchingRecord: {
+          source: 'patient_record',
+          id: patientMrn || patientId,
+          label: `Policy status: ${(membership.policyVerificationStatus || 'UNVERIFIED').toUpperCase()}`,
+          details: {
+            type: 'patient_record',
+            patientId,
+            patientMrn,
+            patientName: invoice.patient_name || invoice.patientName,
+            hmoName: payerName,
+            policyVerificationStatus: membership.policyVerificationStatus,
+          }
+        }
       });
     }
   }
 
-  // 7. Linked pre-authorization's approved amount differs from what was billed.
+  // 7. Linked pre-authorisation approved amount differs from billed amount
   let preAuthMatch = null;
   const invId = invoice.id || invoiceNumber;
   if (pool) {
     const preAuthRes = await pool.query(
-      `SELECT id, approved_amount::float as "approvedAmount" FROM pre_authorizations WHERE invoice_id = $1`,
+      `SELECT id, status, approved_amount::float as "approvedAmount" FROM pre_authorizations WHERE invoice_id = $1`,
       [invId]
     );
     if (preAuthRes.rows.length > 0) {
@@ -3472,6 +3774,7 @@ async function computeInvoiceAuditFlags(invoice) {
     if (pa) {
       preAuthMatch = {
         id: pa.id,
+        status: pa.status,
         approvedAmount: pa.approved_amount != null ? Number(pa.approved_amount) : (pa.approvedAmount != null ? Number(pa.approvedAmount) : null),
       };
     }
@@ -3482,10 +3785,24 @@ async function computeInvoiceAuditFlags(invoice) {
     if (Math.abs(approved - billed) > 0.01) {
       flags.push({
         code: 'authorized_amount_mismatch',
+        name: 'Authorised amount mismatch',
         severity: 'critical',
         message: `${preAuthMatch.id} was approved for ₦${approved.toLocaleString()}, but this invoice bills ₦${billed.toLocaleString()}.`,
         approvedAmount: approved,
         billedAmount: billed,
+        matchingRecord: {
+          source: 'preauth',
+          id: preAuthMatch.id,
+          label: `Pre-Authorisation ${preAuthMatch.id} Approved: ₦${approved.toLocaleString()}`,
+          details: {
+            type: 'preauth',
+            preAuthId: preAuthMatch.id,
+            status: preAuthMatch.status || 'approved',
+            authorizedAmount: approved,
+            billedAmount: billed,
+            variance: Number((billed - approved).toFixed(2)),
+          }
+        }
       });
     }
   }
@@ -3530,18 +3847,13 @@ app.get('/api/invoices/:invoiceNumber/audit', requireAuth, async (req, res) => {
 });
 
 // ==========================================
-// Provider Compliance Dashboard (Phase 1, partial)
-// Aggregates the Patient Bill Audit's checks across every invoice, plus
-// pre-authorization approval/rejection and turnaround stats, into a
-// provider-level summary. This is everything computable from WelliPay's own
-// records; the parts that need a patient-facing dispute intake (Phase 2's
-// "Report a Billing/Insurance Issue") — such as patient-reported complaint
-// volume or resolution time — are deliberately out of scope here.
+// Provider Compliance Dashboard & Resolution Endpoints
 // ==========================================
 app.get('/api/compliance/summary', requireAuth, async (req, res) => {
   try {
     let invoices = [];
     let preAuths = [];
+    let resolutions = [];
 
     if (pool) {
       const invoicesRes = await pool.query(`SELECT * FROM invoices ORDER BY created_at DESC`);
@@ -3551,6 +3863,13 @@ app.get('/api/compliance/summary', requireAuth, async (req, res) => {
         SELECT id, status, created_at, updated_at FROM pre_authorizations
       `);
       preAuths = preAuthRes.rows;
+
+      try {
+        const resRes = await pool.query(`SELECT * FROM compliance_resolutions ORDER BY resolved_at DESC`);
+        resolutions = resRes.rows;
+      } catch (e) {
+        // Table may be empty
+      }
     } else {
       invoices = [...FALLBACK_INVOICES];
       preAuths = FALLBACK_PREAUTHS.map(p => ({
@@ -3559,44 +3878,206 @@ app.get('/api/compliance/summary', requireAuth, async (req, res) => {
         created_at: p.created_at || p.createdAt || p.requested_at || new Date().toISOString(),
         updated_at: p.updated_at || p.updatedAt || p.created_at || p.createdAt || new Date().toISOString(),
       }));
+      resolutions = [...FALLBACK_COMPLIANCE_RESOLUTIONS];
     }
 
-    const flagCounts = {};
-    const flagsByInvoice = [];
+    // Build the cross-invoice order map once so duplicate check runs efficiently in O(N)
+    const orderMap = await getAllBilledOrdersMap();
+
+    const flagCounts = {
+      duplicate_charge: 0,
+      price_mismatch: 0,
+      missing_preauth: 0,
+      copay_exceeds_plan_rule: 0,
+      billed_self_pay_despite_coverage: 0,
+      membership_not_verified: 0,
+      authorized_amount_mismatch: 0,
+    };
+    const resolvedCounts = {
+      duplicate_charge: 0,
+      price_mismatch: 0,
+      missing_preauth: 0,
+      copay_exceeds_plan_rule: 0,
+      billed_self_pay_despite_coverage: 0,
+      membership_not_verified: 0,
+      authorized_amount_mismatch: 0,
+    };
+
+    const flaggedInvoicesList = [];
     let cleanCount = 0;
     let criticalInvoiceCount = 0;
     let warningInvoiceCount = 0;
+    let unresolvedFlaggedCount = 0;
+    let totalFlaggedCount = 0;
 
     for (const invoice of invoices) {
-      const flags = await computeInvoiceAuditFlags(invoice);
-      for (const f of flags) {
-        flagCounts[f.code] = (flagCounts[f.code] || 0) + 1;
-      }
-      const hasCritical = flags.some(f => f.severity === 'critical');
-      const hasWarning = flags.some(f => f.severity === 'warning');
-      if (hasCritical) criticalInvoiceCount++;
-      else if (hasWarning) warningInvoiceCount++;
-      if (flags.every(f => f.severity === 'info')) cleanCount++;
+      const invNum = invoice.invoice_number || invoice.invoiceNumber || invoice.id;
+      const flags = await computeInvoiceAuditFlags(invoice, orderMap);
 
-      if (hasCritical || hasWarning) {
-        flagsByInvoice.push({
-          invoiceNumber: invoice.invoice_number || invoice.invoiceNumber || invoice.id,
+      // Find resolutions for this invoice
+      const invResolutions = resolutions.filter(r => (r.invoice_number || r.invoiceNumber) === invNum);
+      const invoiceUpdatedAt = new Date(invoice.updated_at || invoice.updatedAt || invoice.created_at || invoice.createdAt || 0).getTime();
+
+      for (const f of flags) {
+        if (flagCounts[f.code] !== undefined) {
+          flagCounts[f.code]++;
+        } else {
+          flagCounts[f.code] = 1;
+        }
+
+        const matchRes = invResolutions.find(r => !(r.rule_code || r.ruleCode) || (r.rule_code || r.ruleCode) === f.code);
+        if (matchRes) {
+          const resolvedAtTime = new Date(matchRes.resolved_at || matchRes.resolvedAt).getTime();
+          // Flag reopens if invoice was edited post-resolution
+          if (invoiceUpdatedAt > resolvedAtTime) {
+            f.isResolved = false;
+            f.reopened = true;
+            f.reopenedNote = 'Reopened: invoice was updated after resolution was recorded';
+          } else {
+            f.isResolved = true;
+            f.resolution = {
+              id: matchRes.id,
+              invoiceNumber: invNum,
+              ruleCode: matchRes.rule_code || matchRes.ruleCode,
+              reason: matchRes.reason,
+              resolvedBy: matchRes.resolved_by || matchRes.resolvedBy,
+              resolvedAt: matchRes.resolved_at || matchRes.resolvedAt,
+              invoiceUpdatedAtSnapshot: matchRes.invoice_updated_at_snapshot || matchRes.invoiceUpdatedAtSnapshot
+            };
+            if (resolvedCounts[f.code] !== undefined) {
+              resolvedCounts[f.code]++;
+            } else {
+              resolvedCounts[f.code] = 1;
+            }
+          }
+        } else {
+          f.isResolved = false;
+        }
+      }
+
+      const activeFlags = flags.filter(f => f.severity !== 'info');
+      const hasUnresolvedCritical = flags.some(f => f.severity === 'critical' && !f.isResolved);
+      const hasUnresolvedWarning = flags.some(f => f.severity === 'warning' && !f.isResolved);
+      const isClean = flags.every(f => f.severity === 'info' || f.isResolved);
+
+      if (isClean) cleanCount++;
+      if (hasUnresolvedCritical) criticalInvoiceCount++;
+      else if (hasUnresolvedWarning) warningInvoiceCount++;
+
+      if (hasUnresolvedCritical || hasUnresolvedWarning) unresolvedFlaggedCount++;
+      if (activeFlags.length > 0) totalFlaggedCount++;
+
+      if (activeFlags.length > 0) {
+        const rawOrders = invoice.orders || invoice.line_items || invoice.lineItems || [];
+        const constituentOrders = rawOrders.map(o => ({
+          id: o.id || o.orderId,
+          patientName: o.patientName || invoice.patient_name || invoice.patientName,
+          patientMrn: o.patientMrn || invoice.patient_mrn || invoice.patientMrn,
+          serviceType: o.serviceType || o.service_type || o.description || 'Clinical Service',
+          amount: Number(o.amount || o.totalAmount || 0)
+        }));
+
+        flaggedInvoicesList.push({
+          invoiceNumber: invNum,
           patientName: invoice.patient_name || invoice.patientName,
+          patientMrn: invoice.patient_mrn || invoice.patientMrn,
+          payerName: invoice.payer_name || invoice.payerName || (invoice.payer_type === 'self-pay' ? 'Self-pay' : null),
+          planName: invoice.plan_name || invoice.planName,
+          date: (invoice.created_at || invoice.createdAt || new Date().toISOString()).split('T')[0],
           totalAmount: Number(invoice.total_amount || invoice.totalAmount || 0),
-          flagCount: flags.filter(f => f.severity !== 'info').length,
-          worstSeverity: hasCritical ? 'critical' : 'warning',
-          flags: flags.filter(f => f.severity !== 'info').map(f => ({ code: f.code, severity: f.severity, message: f.message })),
+          flagCount: activeFlags.length,
+          worstSeverity: hasUnresolvedCritical ? 'critical' : (hasUnresolvedWarning ? 'warning' : 'info'),
+          flags,
+          isResolved: isClean,
+          constituentOrders
         });
       }
     }
 
-    // Sort worst-first (critical before warning), then by flag count.
-    flagsByInvoice.sort((a, b) => {
+    // Sort: unresolved first, then critical before warning, then by flag count
+    flaggedInvoicesList.sort((a, b) => {
+      if (a.isResolved !== b.isResolved) return a.isResolved ? 1 : -1;
       if (a.worstSeverity !== b.worstSeverity) return a.worstSeverity === 'critical' ? -1 : 1;
       return b.flagCount - a.flagCount;
     });
 
-    // Pre-authorization approval/rejection and turnaround stats.
+    const duplicateThreshold = SETTINGS_STATE.compliance?.duplicateCriticalThreshold || 50000;
+    const preAuthThreshold = SETTINGS_STATE.compliance?.defaultPreAuthThreshold || 100000;
+
+    const rules = [
+      {
+        code: 'duplicate_charge',
+        name: 'Duplicate charge',
+        description: 'Clinical order billed more than once across invoices or within an invoice',
+        threshold: { value: duplicateThreshold, unit: 'NGN' },
+        severity: 'critical',
+        invoicesChecked: invoices.length,
+        flagsFound: flagCounts.duplicate_charge || 0,
+        resolvedCount: resolvedCounts.duplicate_charge || 0,
+      },
+      {
+        code: 'price_mismatch',
+        name: 'Tariff mismatch',
+        description: 'Billed price differs from published catalogue rate',
+        threshold: { value: 0, unit: 'NGN' },
+        severity: 'warning',
+        invoicesChecked: invoices.length,
+        flagsFound: flagCounts.price_mismatch || 0,
+        resolvedCount: resolvedCounts.price_mismatch || 0,
+      },
+      {
+        code: 'missing_preauth',
+        name: 'Missing pre-authorisation',
+        description: 'HMO bill exceeds plan threshold without pre-authorisation approval code',
+        threshold: { value: preAuthThreshold, unit: 'NGN' },
+        severity: 'critical',
+        invoicesChecked: invoices.length,
+        flagsFound: flagCounts.missing_preauth || 0,
+        resolvedCount: resolvedCounts.missing_preauth || 0,
+      },
+      {
+        code: 'copay_exceeds_plan_rule',
+        name: 'Copay discrepancy',
+        description: 'Patient copay differs from plan rule copay percentage',
+        threshold: { value: 0, unit: 'percent' },
+        severity: 'critical',
+        invoicesChecked: invoices.length,
+        flagsFound: flagCounts.copay_exceeds_plan_rule || 0,
+        resolvedCount: resolvedCounts.copay_exceeds_plan_rule || 0,
+      },
+      {
+        code: 'billed_self_pay_despite_coverage',
+        name: 'Billed self-pay despite active coverage',
+        description: 'Patient has active HMO coverage on record but was billed as self-pay',
+        threshold: null,
+        severity: 'warning',
+        invoicesChecked: invoices.length,
+        flagsFound: flagCounts.billed_self_pay_despite_coverage || 0,
+        resolvedCount: resolvedCounts.billed_self_pay_despite_coverage || 0,
+      },
+      {
+        code: 'membership_not_verified',
+        name: 'Membership not verified',
+        description: 'Billed as HMO-covered but membership is expired or unverified',
+        threshold: null,
+        severity: 'critical',
+        invoicesChecked: invoices.length,
+        flagsFound: flagCounts.membership_not_verified || 0,
+        resolvedCount: resolvedCounts.membership_not_verified || 0,
+      },
+      {
+        code: 'authorized_amount_mismatch',
+        name: 'Authorised amount mismatch',
+        description: 'Billed amount differs from pre-authorisation approved amount',
+        threshold: { value: 0, unit: 'NGN' },
+        severity: 'critical',
+        invoicesChecked: invoices.length,
+        flagsFound: flagCounts.authorized_amount_mismatch || 0,
+        resolvedCount: resolvedCounts.authorized_amount_mismatch || 0,
+      },
+    ];
+
+    // Pre-authorisation turnaround stats
     const decided = preAuths.filter(p => p.status === 'approved' || p.status === 'rejected');
     const approved = preAuths.filter(p => p.status === 'approved');
     const rejected = preAuths.filter(p => p.status === 'rejected');
@@ -3614,21 +4095,26 @@ app.get('/api/compliance/summary', requireAuth, async (req, res) => {
 
     return res.json({
       generatedAt: new Date().toISOString(),
+      auditPeriod: 'All active invoices',
       invoiceCount: invoices.length,
       cleanCount,
+      unresolvedFlaggedCount,
+      totalFlaggedCount,
       criticalInvoiceCount,
       warningInvoiceCount,
       flagCounts,
-      worstInvoices: flagsByInvoice.slice(0, 25),
+      rules,
+      worstInvoices: flaggedInvoicesList,
       preAuth: {
         totalRequests: preAuths.length,
+        submittedCount: preAuths.filter(p => p.status !== 'requested').length,
         decidedCount: decided.length,
         approvedCount: approved.length,
         rejectedCount: rejected.length,
         rejectionRate: decided.length > 0 ? Number(((rejected.length / decided.length) * 100).toFixed(1)) : null,
         avgTurnaroundHours,
       },
-      note: 'Computed from WelliPay\'s own invoice, catalogue, and pre-authorization records — not a live feed from any payer.',
+      note: 'Computed from WelliPay\'s own invoice, catalogue, and pre-authorisation records — not a live feed from any payer.',
     });
   } catch (err) {
     console.error('[API GET /api/compliance/summary] error:', err.message);
@@ -3636,58 +4122,78 @@ app.get('/api/compliance/summary', requireAuth, async (req, res) => {
   }
 });
 
-// ==========================================
-// Settings, Payment Channels, Sync & Ledger Verification Endpoints
-// ==========================================
+// Record compliance flag resolution
+app.post('/api/compliance/invoices/:invoiceNumber/resolve', requireAuth, async (req, res) => {
+  const { invoiceNumber } = req.params;
+  const reason = (req.body.reason || '').trim();
+  const ruleCode = req.body.ruleCode || null;
 
-let SETTINGS_STATE = {
-  facility: {
-    id: 'FAC-LAG-001',
-    name: 'Lagoon Specialist Hospital',
-    tier: 'Tier 1 Multi-Specialty Hospital',
-    location: '174B Corporation Drive, Victoria Island, Lagos'
-  },
-  matching: {
-    threshold: 85,
-    autoConfirm: false,
-    autoConfirmThreshold: 98,
-    fuzzyNameMatching: true,
-    lastChangedBy: 'Dr. Babatunde Fashola (Chief Medical Officer)',
-    lastChangedAt: '2026-09-14T11:24:00Z'
-  },
-  channels: [
-    { id: 'pos_moniepoint', name: 'POS Terminal (Moniepoint)', channel: 'POS card', protocol: 'ISO 8583 / Terminal SDK', status: 'active', latencyMs: 1200, dailyVolume: '₦1,420,000', txnCount: 14 },
-    { id: 'pos_opay', name: 'POS Terminal (OPay)', channel: 'POS card', protocol: 'Smart POS Webhook', status: 'active', latencyMs: 900, dailyVolume: '₦380,000', txnCount: 4 },
-    { id: 'nip_direct', name: 'NIBSS Instant Payments (NIP)', channel: 'Bank transfer', protocol: 'NIP Settlement Feed / CBN Direct', status: 'active', latencyMs: 2400, dailyVolume: '₦520,000', txnCount: 7 },
-    { id: 'gtbank_ussd', name: 'GTBank USSD (*737#)', channel: 'USSD', protocol: 'Telco Aggregator / USSD Push', status: 'active', latencyMs: 1800, dailyVolume: '₦180,000', txnCount: 3 },
-    { id: 'paystack_online', name: 'Paystack Web & Virtual Accounts', channel: 'Web / Virtual Transfer', protocol: 'REST Webhooks (HMAC-SHA512)', status: 'active', latencyMs: 400, dailyVolume: '₦340,000', txnCount: 5 },
-    { id: 'interswitch_clearing', name: 'Interswitch Healthcare Clearinghouse', channel: 'HMO Remittance Gateway', protocol: 'Direct Clearing House API', status: 'active', latencyMs: 3100, dailyVolume: '₦1,900,000', txnCount: 12 }
-  ],
-  sync: {
-    ehr: {
-      name: 'Hospital EHR (InstaEMR / Meditech)',
-      status: 'active',
-      protocol: 'HL7 FHIR v4 REST & WebSocket',
-      lastSyncSecondsAgo: 32,
-      inboundPending: 0,
-      ordersSyncedToday: 17
-    },
-    posFleet: {
-      name: 'POS Fleet Terminal Gateway',
-      status: 'active',
-      terminalsOnline: 6,
-      terminalsTotal: 6,
-      lastHeartbeatSecondsAgo: 18,
-      pollIntervalSeconds: 15
-    },
-    clearinghouse: {
-      name: 'NHIA e-Claim Clearinghouse',
-      status: 'active',
-      lastBatch: 'Today at 17:30',
-      claimsInFlight: 48
-    }
+  if (!reason) {
+    return res.status(400).json({ error: 'Resolution reason is required.' });
   }
-};
+
+  // Session enforcement: resolvedBy strictly from req.user, never request body
+  const resolvedBy = (req.user && (req.user.email || req.user.name)) || 'billing@lagoonhospital.com';
+  // Server timestamp enforcement
+  const resolvedAt = new Date().toISOString();
+
+  try {
+    let invoiceSnapshot = new Date().toISOString();
+    if (pool) {
+      const invRes = await pool.query(`SELECT updated_at, created_at FROM invoices WHERE invoice_number = $1`, [invoiceNumber]);
+      if (invRes.rows.length === 0) {
+        return res.status(404).json({ error: `Invoice ${invoiceNumber} not found.` });
+      }
+      invoiceSnapshot = invRes.rows[0].updated_at || invRes.rows[0].created_at || resolvedAt;
+
+      const insertRes = await pool.query(`
+        INSERT INTO compliance_resolutions (
+          invoice_number, rule_code, reason, resolved_by, resolved_at, invoice_updated_at_snapshot
+        ) VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *
+      `, [invoiceNumber, ruleCode, reason, resolvedBy, resolvedAt, invoiceSnapshot]);
+
+      return res.json({
+        success: true,
+        resolution: insertRes.rows[0]
+      });
+    } else {
+      const found = FALLBACK_INVOICES.find(
+        i => (i.invoice_number && i.invoice_number.toUpperCase() === invoiceNumber.toUpperCase()) ||
+             (i.invoiceNumber && i.invoiceNumber.toUpperCase() === invoiceNumber.toUpperCase()) ||
+             (i.id && i.id.toUpperCase() === invoiceNumber.toUpperCase())
+      );
+      if (!found) {
+        return res.status(404).json({ error: `Invoice ${invoiceNumber} not found.` });
+      }
+      invoiceSnapshot = found.updated_at || found.updatedAt || found.created_at || found.createdAt || resolvedAt;
+
+      const resolution = {
+        id: `RES-${Date.now()}`,
+        invoice_number: invoiceNumber,
+        invoiceNumber,
+        rule_code: ruleCode,
+        ruleCode,
+        reason,
+        resolved_by: resolvedBy,
+        resolvedBy,
+        resolved_at: resolvedAt,
+        resolvedAt,
+        invoice_updated_at_snapshot: invoiceSnapshot,
+        invoiceUpdatedAtSnapshot: invoiceSnapshot,
+      };
+      FALLBACK_COMPLIANCE_RESOLUTIONS.unshift(resolution);
+
+      return res.json({
+        success: true,
+        resolution
+      });
+    }
+  } catch (err) {
+    console.error('[API POST /api/compliance/invoices/:invoiceNumber/resolve] error:', err.message);
+    return res.status(500).json({ error: 'Failed to record compliance resolution.' });
+  }
+});
 
 function getRuntimeLedgerIntegrity() {
   const totalDebits = 2840000;
@@ -3718,7 +4224,7 @@ app.get('/api/settings', requireAuth, (req, res) => {
 });
 
 app.put('/api/settings', requireAuth, (req, res) => {
-  const { matching } = req.body;
+  const { matching, compliance } = req.body;
   if (matching) {
     if (typeof matching.threshold === 'number') SETTINGS_STATE.matching.threshold = matching.threshold;
     if (typeof matching.autoConfirm === 'boolean') SETTINGS_STATE.matching.autoConfirm = matching.autoConfirm;
@@ -3728,9 +4234,18 @@ app.put('/api/settings', requireAuth, (req, res) => {
     SETTINGS_STATE.matching.lastChangedBy = req.user?.name || req.user?.email || 'Dr. Babatunde Fashola (Admin)';
     SETTINGS_STATE.matching.lastChangedAt = new Date().toISOString();
   }
+  if (compliance) {
+    if (typeof compliance.duplicateCriticalThreshold === 'number') {
+      SETTINGS_STATE.compliance.duplicateCriticalThreshold = compliance.duplicateCriticalThreshold;
+    }
+    if (typeof compliance.defaultPreAuthThreshold === 'number') {
+      SETTINGS_STATE.compliance.defaultPreAuthThreshold = compliance.defaultPreAuthThreshold;
+    }
+  }
   res.json({
     success: true,
-    matching: SETTINGS_STATE.matching
+    matching: SETTINGS_STATE.matching,
+    compliance: SETTINGS_STATE.compliance
   });
 });
 

@@ -610,7 +610,7 @@ export default function InvoicesHub() {
                             <button
                               onClick={() => setAuditInvoice(inv)}
                               className="text-xs border border-amber-200 bg-amber-50/60 rounded-md px-2.5 py-1 hover:bg-amber-100 transition-colors text-amber-800 font-semibold cursor-pointer"
-                              title="Check this bill against the catalogue tariff, plan rules, and any pre-authorization before the patient pays"
+                              title="Check this bill against the catalogue tariff, plan rules, and any pre-authorisation before the patient pays"
                             >
                               Audit
                             </button>
@@ -1474,19 +1474,19 @@ function NewInvoiceModal({
               </div>
             </div>
 
-            {/* Pre-authorization Safety Warning for HMO above ₦100,000 */}
+            {/* Pre-authorisation Safety Warning for HMO above ₦100,000 */}
             {requiresPreAuth && (
               <div className="bg-amber-50 border border-amber-300 rounded-lg p-3 text-xs space-y-2 text-amber-900">
                 <div className="flex items-center gap-1.5 font-bold text-amber-800">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>Pre-authorization required for HMO claims exceeding ₦100,000</span>
+                  <span>Pre-authorisation required for HMO claims exceeding ₦100,000</span>
                 </div>
                 <p className="text-amber-700 text-[11px] leading-relaxed">
-                  Silver Plan guidelines mandate a verified pre-authorization approval code before billing procedures over ₦100,000 to avoid payer claim rejection.
+                  Silver Plan guidelines mandate a verified pre-authorisation approval code before billing procedures over ₦100,000 to avoid payer claim rejection.
                 </p>
                 <div className="pt-0.5">
                   <label className="block text-[11px] font-semibold text-amber-900 mb-1">
-                    Pre-authorization code <span className="text-red-500">*</span>
+                    Pre-authorisation code <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -1847,14 +1847,14 @@ function BillAuditModal({ invoice, onClose }: { invoice: Invoice; onClose: () =>
         </div>
 
         {loading ? (
-          <p className="text-xs text-slate-500 text-center py-6">Checking this bill against the catalogue tariff, plan rules, and pre-authorization...</p>
+          <p className="text-xs text-slate-500 text-center py-6">Checking this bill against the catalogue tariff, plan rules, and pre-authorisation...</p>
         ) : error ? (
           <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-lg p-3">{error}</p>
         ) : flags.length === 0 ? (
           <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
             <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
             <p className="text-xs text-emerald-800 font-medium">
-              No issues found. This bill matches the catalogue tariff, the plan rule, and any linked pre-authorization.
+              No issues found. This bill matches the catalogue tariff, the plan rule, and any linked pre-authorisation.
             </p>
           </div>
         ) : (

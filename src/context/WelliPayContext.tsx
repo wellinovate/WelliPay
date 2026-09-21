@@ -473,7 +473,7 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
   };
 
-  const rejectClaim = (id: string, reason: string = 'Pre-authorization absent') => {
+  const rejectClaim = (id: string, reason: string = 'Pre-authorisation absent') => {
     setHmoClaims(prev => prev.map(c => 
       c.id === id ? { ...c, status: 'rejected', statusLabel: 'Rejected', isDisputed: false, diagnosis: reason } : c
     ));

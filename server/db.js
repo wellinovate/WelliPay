@@ -962,8 +962,21 @@ export async function initializeDatabase() {
         ('LAB-LIP-01', 'Ibrahim Danjuma', 'MRN-LSH-10018', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
         ('LAB-LIP-02', 'Zainab Abiola', 'MRN-LSH-10019', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
         ('LAB-LIP-03', 'Samuel Ogundipe', 'MRN-LSH-10020', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
-        ('LAB-LIP-04', 'Folake Adeleke', 'MRN-LSH-10021', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled')
+        ('LAB-LIP-04', 'Folake Adeleke', 'MRN-LSH-10021', 'Lipid Profile Panels', 'Chemical Pathology', 26000, 'unbilled'),
+        -- Compliance Fixtures:
+        -- Real duplicate charge fixture: order ORD-DUP-93401 billed twice (₦55,000 each >= ₦50,000 critical threshold)
+        ('CSO-DUP-01', 'Adewale Adeleke', 'MRN-LSH-10022', 'Comprehensive Metabolic Panel', 'Chemical Pathology', 55000, 'invoiced'),
+        ('CSO-DUP-02', 'Adewale Adeleke', 'MRN-LSH-10022', 'Comprehensive Metabolic Panel', 'Chemical Pathology', 55000, 'invoiced'),
+        -- Real tariff mismatch fixture (Lipid Profile Panels billed at ₦45,000 vs catalogue tariff ₦26,000)
+        ('CSO-TAR-01', 'Folashade Johnson', 'MRN-LSH-10023', 'Lipid Profile Panels', 'Chemical Pathology', 45000, 'invoiced'),
+        -- Real missing pre-auth fixture
+        ('CSO-PRE-01', 'Chukwudi Nnamdi', 'MRN-LSH-10024', 'MRI Lumbar Spine Investigation', 'Radiology', 185000, 'invoiced')
         ON CONFLICT (id) DO NOTHING;
+
+      -- Set order_id, invoice_id, master_service_id, provider_id on compliance fixtures
+      UPDATE clinical_service_orders SET order_id = 'ORD-DUP-93401', invoice_id = 'INV-93401' WHERE id IN ('CSO-DUP-01', 'CSO-DUP-02');
+      UPDATE clinical_service_orders SET order_id = 'ORD-TAR-93402', invoice_id = 'INV-93402', master_service_id = 2, provider_id = 'PRV-LAG-01' WHERE id = 'CSO-TAR-01';
+      UPDATE clinical_service_orders SET order_id = 'ORD-PRE-93403', invoice_id = 'INV-93403' WHERE id = 'CSO-PRE-01';
       `);
     }
 
@@ -1010,17 +1023,24 @@ export async function initializeDatabase() {
     // 8. Seed Invoices if empty
     const invoiceCountRes = await pool.query('SELECT COUNT(*) FROM invoices');
     if (parseInt(invoiceCountRes.rows[0].count, 10) === 0) {
-      console.log('[DB] Seeding 4 foundational invoices...');
+      console.log('[DB] Seeding foundational invoices and compliance fixtures...');
       await pool.query(`
         INSERT INTO invoices (
           id, invoice_number, patient_id, patient_name, patient_mrn, service_description,
           total_amount, formatted_amount, paid_amount, status, status_label,
-          due_date, paid_date, is_inpatient, discharge_status
+          due_date, paid_date, is_inpatient, discharge_status, payer_type, payer_name, plan_name, pre_auth_code
         ) VALUES
-        ('INV-93105', 'INV-93105', 'PAT-1082', 'Taiwo Adeyemi', 'MRN-LSH-10004', 'Pediatric Inpatient Observation', 11500, '₦11,500', 0, 'pending', 'Pending Payment', '2026-09-19', NULL, true, 'awaiting_settlement'),
-        ('INV-92831', 'INV-92831', 'PAT-1094', 'John Umar', 'MRN-LSH-10006', 'Cardiology Consultation & ECG', 25000, '₦25,000', 25000, 'paid', 'Reconciled', '2026-09-17', '2026-09-17', false, NULL),
-        ('INV-93010', 'INV-93010', 'PAT-1102', 'Mariam Bello', 'MRN-LSH-10005', 'Pharmacy Prescription Checkout', 8500, '₦8,500', 8500, 'paid', 'Reconciled', '2026-09-17', '2026-09-17', false, NULL),
-        ('INV-93044', 'INV-93044', 'PAT-1120', 'ABC Diagnostics', 'EXT-ACC-1120', 'Referred Pathology Panel Batch', 12000, '₦12,000', 12000, 'paid', 'Reconciled', '2026-09-17', '2026-09-17', false, NULL)
+        ('INV-93105', 'INV-93105', 'PAT-1082', 'Taiwo Adeyemi', 'MRN-LSH-10004', 'Pediatric Inpatient Observation', 11500, '₦11,500', 0, 'pending', 'Pending Payment', '2026-09-19', NULL, true, 'awaiting_settlement', 'self-pay', NULL, NULL, NULL),
+        ('INV-92831', 'INV-92831', 'PAT-1094', 'John Umar', 'MRN-LSH-10006', 'Cardiology Consultation & ECG', 25000, '₦25,000', 25000, 'paid', 'Reconciled', '2026-09-17', '2026-09-17', false, NULL, 'self-pay', NULL, NULL, NULL),
+        ('INV-93010', 'INV-93010', 'PAT-1102', 'Mariam Bello', 'MRN-LSH-10005', 'Pharmacy Prescription Checkout', 8500, '₦8,500', 8500, 'paid', 'Reconciled', '2026-09-17', '2026-09-17', false, NULL, 'self-pay', NULL, NULL, NULL),
+        ('INV-93044', 'INV-93044', 'PAT-1120', 'ABC Diagnostics', 'EXT-ACC-1120', 'Referred Pathology Panel Batch', 12000, '₦12,000', 12000, 'paid', 'Reconciled', '2026-09-17', '2026-09-17', false, NULL, 'self-pay', NULL, NULL, NULL),
+        -- Compliance Fixtures:
+        -- 1. Real duplicate order fixture (ORD-DUP-93401 billed twice, ₦55k each >= ₦50k critical)
+        ('INV-93401', 'INV-93401', 'PAT-1085', 'Adewale Adeleke', 'MRN-LSH-10022', 'Comprehensive Metabolic Panel (2 orders)', 110000, '₦110,000', 0, 'pending', 'Pending Payment', '2026-09-25', NULL, false, NULL, 'self-pay', NULL, NULL, NULL),
+        -- 2. Real tariff mismatch fixture (Lipid Profile Panels billed ₦45,000 vs catalogue tariff ₦26,000)
+        ('INV-93402', 'INV-93402', 'PAT-1086', 'Folashade Johnson', 'MRN-LSH-10023', 'Lipid Profile Panels', 45000, '₦45,000', 0, 'pending', 'Pending Payment', '2026-09-26', NULL, false, NULL, 'self-pay', NULL, NULL, NULL),
+        -- 3. Real missing pre-auth fixture (Reliance HMO Silver Plan, ₦185,000 > ₦100,000 threshold, no pre-auth code)
+        ('INV-93403', 'INV-93403', 'PAT-1087', 'Chukwudi Nnamdi', 'MRN-LSH-10024', 'MRI Lumbar Spine Investigation', 185000, '₦185,000', 0, 'pending', 'Pending Payment', '2026-09-27', NULL, false, NULL, 'hmo', 'Reliance HMO', 'Silver Plan', NULL)
         ON CONFLICT (id) DO UPDATE SET
           patient_name = EXCLUDED.patient_name,
           patient_mrn = EXCLUDED.patient_mrn,
@@ -1033,7 +1053,11 @@ export async function initializeDatabase() {
           due_date = EXCLUDED.due_date,
           paid_date = EXCLUDED.paid_date,
           is_inpatient = EXCLUDED.is_inpatient,
-          discharge_status = EXCLUDED.discharge_status;
+          discharge_status = EXCLUDED.discharge_status,
+          payer_type = EXCLUDED.payer_type,
+          payer_name = EXCLUDED.payer_name,
+          plan_name = EXCLUDED.plan_name,
+          pre_auth_code = EXCLUDED.pre_auth_code;
       `);
     }
 
@@ -1239,8 +1263,23 @@ export async function initializeDatabase() {
       ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS planned_date DATE;
       ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS urgency VARCHAR(20) DEFAULT 'routine';
       ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS enrollee_id VARCHAR(100);
-      ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS plan_name VARCHAR(100);
       ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS expiry_date DATE;
+
+      -- Append-only audit trail for compliance flag resolutions
+      CREATE TABLE IF NOT EXISTS compliance_resolutions (
+        id SERIAL PRIMARY KEY,
+        invoice_number VARCHAR(50) NOT NULL,
+        rule_code VARCHAR(100),
+        reason TEXT NOT NULL,
+        resolved_by VARCHAR(255) NOT NULL,
+        resolved_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        invoice_updated_at_snapshot TIMESTAMPTZ NOT NULL
+      );
+
+      CREATE INDEX IF NOT EXISTS idx_compliance_resolutions_invoice ON compliance_resolutions(invoice_number);
+
+      ALTER TABLE invoices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+      ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS order_id VARCHAR(50);
     `);
 
     return { initialized: true };

@@ -527,7 +527,7 @@ export const HMODashboard: React.FC = () => {
                             ? (claim.varianceReason || 'Short-paid, no reason recorded')
                             : claim.status === 'remitted' || claim.status === 'paid'
                             ? 'Paid in full'
-                            : (claim.denialReason || (claim.isDisputed ? 'Missing pre-authorization' : 'Routine review'))}
+                            : (claim.denialReason || (claim.isDisputed ? 'Missing pre-authorisation' : 'Routine review'))}
                         </span>
                         {(claim.isDisputed || claim.denialRisk === 'missing-auth') && (
                           <button
@@ -657,7 +657,7 @@ export const HMODashboard: React.FC = () => {
                 </span>
               </div>
               <p className="text-[#475569] leading-relaxed text-[11px]">
-                {selectedClaim.planRule || `${selectedClaim.payer || 'HMO'} Standard Policy · Pre-authorization criteria verified.`}
+                {selectedClaim.planRule || `${selectedClaim.payer || 'HMO'} Standard Policy · Pre-authorisation criteria verified.`}
               </p>
             </div>
 
@@ -715,17 +715,17 @@ export const HMODashboard: React.FC = () => {
               <div className="bg-[#fff1f4] border border-[#ff90b1] p-3.5 rounded-lg text-xs space-y-3 text-[#a5372c]">
                 <div className="font-bold flex items-center gap-1.5 text-sm">
                   <ShieldAlert className="w-4 h-4 text-[#d6006c]" />
-                  Payer Adjudication Flag: {selectedClaim.denialReason || 'Clinical Pre-Authorization Missing'}
+                  Payer Adjudication Flag: {selectedClaim.denialReason || 'Clinical Pre-Authorisation Missing'}
                 </div>
                 <p className="leading-relaxed text-xs">
-                  The payer flagged this claim because pre-authorization documentation was absent or incomplete at submission. As Lagoon Specialist Hospital billing team, you can submit retroactive clinical justification or enter an emergency authorization code to resolve this contest.
+                  The payer flagged this claim because pre-authorisation documentation was absent or incomplete at submission. As Lagoon Specialist Hospital billing team, you can submit retroactive clinical justification or enter an emergency authorization code to resolve this contest.
                 </p>
 
                 <div className="space-y-2 pt-1">
                   <div>
                     <div className="flex items-center justify-between mb-1">
                       <label className="block text-[11px] font-bold text-[#12244D]">
-                        Retroactive Pre-Authorization Code:
+                        Retroactive Pre-Authorisation Code:
                       </label>
                       <button
                         type="button"

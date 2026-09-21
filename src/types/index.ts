@@ -178,25 +178,154 @@ export interface PayerPlanRule {
   isActive: boolean;
 }
 
+export interface LineItemMatchDetails {
+  type: 'line_item';
+  duplicateOrderId: string;
+  duplicateInvoiceNumber?: string;
+  serviceType: string;
+  amount: number;
+  billedAmount: number;
+}
+
+export interface CatalogueMatchDetails {
+  type: 'catalogue';
+  masterServiceId?: number | null;
+  providerId?: string | null;
+  serviceName: string;
+  cataloguePrice: number;
+  billedPrice: number;
+  variance: number;
+}
+
+export interface PreAuthMatchDetails {
+  type: 'preauth';
+  preAuthId: string;
+  status: string;
+  authorizedAmount: number;
+  billedAmount: number;
+  variance: number;
+}
+
+export interface PlanRuleMatchDetails {
+  type: 'plan_rule';
+  payerName: string;
+  planName: string;
+  ruleDescription: string;
+  threshold?: number;
+  expectedCopay?: number;
+  billedCopay?: number;
+}
+
+export interface PatientRecordMatchDetails {
+  type: 'patient_record';
+  patientId?: string;
+  patientMrn?: string;
+  patientName: string;
+  hmoName?: string;
+  policyVerificationStatus?: string;
+}
+
+export interface LeakageRecoveryMatchDetails {
+  type: 'leakage_recovery';
+  batchId: string;
+  orderCount: number;
+  totalBatchAmount: number;
+  constituentOrderIds: string[];
+}
+
+export type MatchingRecordDetails =
+  | LineItemMatchDetails
+  | CatalogueMatchDetails
+  | PreAuthMatchDetails
+  | PlanRuleMatchDetails
+  | PatientRecordMatchDetails
+  | LeakageRecoveryMatchDetails;
+
+export interface ComplianceResolution {
+  id: string | number;
+  invoiceNumber: string;
+  ruleCode?: string;
+  reason: string;
+  resolvedBy: string;
+  resolvedAt: string;
+  invoiceUpdatedAtSnapshot: string;
+}
+
+export interface ComplianceFlag {
+  code: string;
+  name: string;
+  severity: 'critical' | 'warning' | 'info';
+  message: string;
+  lineItemId?: string;
+  lineItemIds?: string[];
+  matchingRecord?: {
+    source: 'clinical_order' | 'catalogue' | 'preauth' | 'plan_rule' | 'patient_record' | 'leakage_batch';
+    id: string;
+    label: string;
+    details: MatchingRecordDetails;
+  };
+  billedAmount?: number;
+  catalogueAmount?: number;
+  approvedAmount?: number;
+  billedCopay?: number;
+  expectedCopay?: number;
+  isResolved?: boolean;
+  resolution?: ComplianceResolution;
+}
+
+export interface ComplianceThreshold {
+  value: number;
+  unit: 'NGN' | 'percent' | 'count' | 'hours';
+}
+
+export interface ComplianceRuleReport {
+  code: string;
+  name: string;
+  description: string;
+  threshold: ComplianceThreshold | null;
+  severity: 'critical' | 'warning' | 'info';
+  invoicesChecked: number;
+  flagsFound: number;
+  resolvedCount: number;
+}
+
 export interface ComplianceFlaggedInvoice {
   invoiceNumber: string;
   patientName: string;
+  patientMrn?: string;
+  payerName?: string;
+  planName?: string;
+  date: string;
   totalAmount: number;
   flagCount: number;
   worstSeverity: 'critical' | 'warning';
-  flags: { code: string; severity: string; message: string }[];
+  flags: ComplianceFlag[];
+  isResolved?: boolean;
+  resolution?: ComplianceResolution;
+  constituentOrders?: Array<{
+    id: string;
+    patientName: string;
+    patientMrn: string;
+    serviceType: string;
+    amount: number;
+  }>;
 }
 
 export interface ComplianceSummary {
   generatedAt: string;
+  auditPeriod: string;
   invoiceCount: number;
   cleanCount: number;
+  unresolvedFlaggedCount: number;
+  totalFlaggedCount: number;
   criticalInvoiceCount: number;
   warningInvoiceCount: number;
   flagCounts: Record<string, number>;
+  rules: ComplianceRuleReport[];
   worstInvoices: ComplianceFlaggedInvoice[];
   preAuth: {
     totalRequests: number;
+    submittedCount: number;
     decidedCount: number;
     approvedCount: number;
     rejectedCount: number;
@@ -497,10 +626,17 @@ export interface LedgerIntegrityStatus {
   rowLevelLocking: boolean;
 }
 
+export interface ComplianceSettings {
+  duplicateCriticalThreshold: number;
+  defaultPreAuthThreshold: number;
+}
+
 export interface SystemSettingsResponse {
   facility: FacilitySettings;
   matching: MatchingSettings;
   channels: PaymentChannelConfig[];
   sync: SyncStatusConfig;
   integrity: LedgerIntegrityStatus;
+  compliance?: ComplianceSettings;
 }
+
