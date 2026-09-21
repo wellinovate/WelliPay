@@ -792,6 +792,7 @@ export async function initializeDatabase() {
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
       ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
       ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS master_service_id INTEGER;
+      ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS order_id VARCHAR(50);
 
       -- Multi-vendor EHR integration (external ingestion API, see docs/multi-vendor-ehr-integration.md)
 
@@ -975,7 +976,7 @@ export async function initializeDatabase() {
 
       -- Set order_id, invoice_id, master_service_id, provider_id on compliance fixtures
       UPDATE clinical_service_orders SET order_id = 'ORD-DUP-93401', invoice_id = 'INV-93401' WHERE id IN ('CSO-DUP-01', 'CSO-DUP-02');
-      UPDATE clinical_service_orders SET order_id = 'ORD-TAR-93402', invoice_id = 'INV-93402', master_service_id = 2, provider_id = 'PRV-LAG-01' WHERE id = 'CSO-TAR-01';
+      UPDATE clinical_service_orders SET order_id = 'ORD-TAR-93402', invoice_id = 'INV-93402', master_service_id = 8, provider_id = 'PRV-LAG-01' WHERE id = 'CSO-TAR-01';
       UPDATE clinical_service_orders SET order_id = 'ORD-PRE-93403', invoice_id = 'INV-93403' WHERE id = 'CSO-PRE-01';
       `);
     }
@@ -1264,6 +1265,7 @@ export async function initializeDatabase() {
       ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS urgency VARCHAR(20) DEFAULT 'routine';
       ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS enrollee_id VARCHAR(100);
       ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS expiry_date DATE;
+      ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS plan_name VARCHAR(150);
 
       -- Append-only audit trail for compliance flag resolutions
       CREATE TABLE IF NOT EXISTS compliance_resolutions (
@@ -1279,7 +1281,6 @@ export async function initializeDatabase() {
       CREATE INDEX IF NOT EXISTS idx_compliance_resolutions_invoice ON compliance_resolutions(invoice_number);
 
       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
-      ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS order_id VARCHAR(50);
     `);
 
     return { initialized: true };

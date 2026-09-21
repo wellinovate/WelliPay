@@ -3139,7 +3139,11 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
 
   const orders = Array.isArray(line_items) && line_items.length > 0
     ? line_items.map((item, idx) => ({
-        id: (item.orderId || item.order_id) || `ORD-${invoiceNumber}-${idx + 1}`,
+        // `id` is always unique per line item — it is this row's own primary
+        // key, so it must never collide even when two line items share one
+        // client-supplied orderId (that's exactly the "same clinical order
+        // billed twice" case duplicate detection needs to see as two rows).
+        id: `ORD-${invoiceNumber}-${idx + 1}`,
         orderId: (item.orderId || item.order_id) || `ORD-${invoiceNumber}-${idx + 1}`,
         patientName: patient_name,
         patientMrn: effectiveMrn,
@@ -3190,10 +3194,10 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
           await pool.query(`
             INSERT INTO clinical_service_orders
               (id, patient_name, patient_mrn, service_type, category, amount, status, performed_at, invoice_id,
-               master_service_id, provider_id)
-            VALUES ($1, $2, $3, $4, $5, $6, 'invoiced', NOW(), $7, $8, $9)
+               master_service_id, provider_id, order_id)
+            VALUES ($1, $2, $3, $4, $5, $6, 'invoiced', NOW(), $7, $8, $9, $10)
             ON CONFLICT (id) DO NOTHING
-          `, [ord.id, ord.patientName, ord.patientMrn, ord.serviceType, 'Laboratory', ord.amount, invoiceNumber, ord.masterServiceId, ord.providerId]);
+          `, [ord.id, ord.patientName, ord.patientMrn, ord.serviceType, 'Laboratory', ord.amount, invoiceNumber, ord.masterServiceId, ord.providerId, ord.orderId]);
         }
       }
 
@@ -3913,6 +3917,27 @@ app.get('/api/compliance/summary', requireAuth, async (req, res) => {
       const invoicesRes = await pool.query(`SELECT * FROM invoices ORDER BY created_at DESC`);
       invoices = invoicesRes.rows;
 
+      // Attach constituent clinical_service_orders to each invoice so downstream
+      // constituentOrders reporting isn't silently empty in live-DB mode.
+      const ordersRes = await pool.query(`
+        SELECT id, order_id AS "orderId", invoice_id AS "invoiceId",
+               service_type AS "serviceType", amount::float AS amount,
+               patient_name AS "patientName", patient_mrn AS "patientMrn"
+        FROM clinical_service_orders
+        WHERE invoice_id IS NOT NULL
+      `);
+      const ordersByInvoiceNumber = {};
+      for (const ord of (ordersRes.rows || [])) {
+        const invId = ord.invoiceId;
+        if (!invId) continue;
+        if (!ordersByInvoiceNumber[invId]) ordersByInvoiceNumber[invId] = [];
+        ordersByInvoiceNumber[invId].push(ord);
+      }
+      for (const invoice of invoices) {
+        const invNum = invoice.invoice_number || invoice.invoiceNumber || invoice.id;
+        invoice.orders = ordersByInvoiceNumber[invNum] || [];
+      }
+
       const preAuthRes = await pool.query(`
         SELECT id, status, created_at, updated_at FROM pre_authorizations
       `);
@@ -4037,7 +4062,7 @@ app.get('/api/compliance/summary', requireAuth, async (req, res) => {
           patientMrn: invoice.patient_mrn || invoice.patientMrn,
           payerName: invoice.payer_name || invoice.payerName || (invoice.payer_type === 'self-pay' ? 'Self-pay' : null),
           planName: invoice.plan_name || invoice.planName,
-          date: (invoice.created_at || invoice.createdAt || new Date().toISOString()).split('T')[0],
+          date: new Date(invoice.created_at || invoice.createdAt || Date.now()).toISOString().split('T')[0],
           totalAmount: Number(invoice.total_amount || invoice.totalAmount || 0),
           flagCount: activeFlags.length,
           worstSeverity: hasUnresolvedCritical ? 'critical' : (hasUnresolvedWarning ? 'warning' : 'info'),
@@ -4204,7 +4229,14 @@ app.post('/api/compliance/invoices/:invoiceNumber/resolve', requireAuth, async (
         INSERT INTO compliance_resolutions (
           invoice_number, rule_code, reason, resolved_by, resolved_at, invoice_updated_at_snapshot
         ) VALUES ($1, $2, $3, $4, $5, $6)
-        RETURNING *
+        RETURNING
+          id,
+          invoice_number, invoice_number AS "invoiceNumber",
+          rule_code, rule_code AS "ruleCode",
+          reason,
+          resolved_by, resolved_by AS "resolvedBy",
+          resolved_at, resolved_at AS "resolvedAt",
+          invoice_updated_at_snapshot, invoice_updated_at_snapshot AS "invoiceUpdatedAtSnapshot"
       `, [invoiceNumber, ruleCode, reason, resolvedBy, resolvedAt, invoiceSnapshot]);
 
       return res.json({
