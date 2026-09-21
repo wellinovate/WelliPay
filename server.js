@@ -1408,17 +1408,167 @@ const PREAUTH_STATUS_LABELS = {
   paid: 'Paid',
 };
 
+const FALLBACK_PREAUTHS = [
+  {
+    id: 'PA-92101',
+    patientId: 'PAT-1002',
+    patientName: 'Emeka Okonkwo',
+    patientMrn: 'MRN-LSH-10402',
+    providerId: 'PRV-LAG-01',
+    providerName: 'Lagoon Specialist Hospital',
+    payerName: 'Reliance HMO',
+    planName: 'Silver Plan',
+    enrolleeId: 'ENR-48201',
+    serviceDescription: 'Appendectomy surgical procedure',
+    diagnosis: 'Acute appendicitis with peritoneal signs',
+    plannedDate: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+    urgency: 'urgent',
+    clinicalJustification: 'Suspected appendicitis with rebound tenderness and localized guarding; ultrasound confirms inflamed appendix (diameter 8.2mm).',
+    documentationNotes: 'Surgical referral note from emergency on-call registrar and pelvic ultrasound report attached.',
+    requestedAmount: 30087,
+    formattedAmount: '₦30,087',
+    approvedAmount: null,
+    status: 'under_review',
+    statusLabel: 'Under Review',
+    authCode: null,
+    rejectionReason: null,
+    invoiceId: null,
+    claimId: 'CLM-4472',
+    expiryDate: null,
+    createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+    updatedAt: new Date(Date.now() - 1 * 86400000).toISOString(),
+  },
+  {
+    id: 'PA-84920',
+    patientId: 'PAT-1005',
+    patientName: 'Kemi Adeleke',
+    patientMrn: 'MRN-LSH-10401',
+    providerId: 'PRV-LAG-01',
+    providerName: 'Lagoon Specialist Hospital',
+    payerName: 'AXA Mansard',
+    planName: 'Gold Plan',
+    enrolleeId: 'ENR-92015',
+    serviceDescription: 'Magnetic Resonance Imaging (MRI) — Lumbar Spine',
+    diagnosis: 'Chronic lumbar radiculopathy unresponsive to conservative therapy',
+    plannedDate: new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0],
+    urgency: 'routine',
+    clinicalJustification: 'Progressive L5-S1 sensory loss and positive straight leg raise. Pre-surgical imaging assessment.',
+    documentationNotes: 'Orthopaedic consultation note and physical therapy discharge summary attached.',
+    requestedAmount: 180000,
+    formattedAmount: '₦180,000',
+    approvedAmount: 165000,
+    status: 'approved',
+    statusLabel: 'Approved',
+    authCode: 'AUTH-AXA-9281',
+    rejectionReason: null,
+    invoiceId: null,
+    claimId: null,
+    expiryDate: new Date(Date.now() + 27 * 86400000).toISOString().split('T')[0],
+    createdAt: new Date(Date.now() - 5 * 86400000).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+  },
+  {
+    id: 'PA-71044',
+    patientId: 'PAT-1008',
+    patientName: 'Babatunde Fashola',
+    patientMrn: 'MRN-LSH-10408',
+    providerId: 'PRV-LAG-01',
+    providerName: 'Lagoon Specialist Hospital',
+    payerName: 'Hygeia HMO',
+    planName: 'Corporate Standard',
+    enrolleeId: 'ENR-71930',
+    serviceDescription: 'Echocardiography (2D Transthoracic)',
+    diagnosis: 'Hypertensive heart disease with grade II diastolic dysfunction',
+    plannedDate: new Date(Date.now() - 10 * 86400000).toISOString().split('T')[0],
+    urgency: 'routine',
+    clinicalJustification: 'Cardiomegaly on chest radiograph; evaluation of ejection fraction.',
+    documentationNotes: 'Cardiology clinic outpatient referral note.',
+    requestedAmount: 65000,
+    formattedAmount: '₦65,000',
+    approvedAmount: 65000,
+    status: 'paid',
+    statusLabel: 'Paid',
+    authCode: 'AUTH-HYG-3810',
+    rejectionReason: null,
+    invoiceId: 'INV-90124',
+    claimId: 'CLM-4468',
+    expiryDate: new Date(Date.now() + 15 * 86400000).toISOString().split('T')[0],
+    createdAt: new Date(Date.now() - 14 * 86400000).toISOString(),
+    updatedAt: new Date(Date.now() - 2 * 86400000).toISOString(),
+  },
+  {
+    id: 'PA-63910',
+    patientId: 'PAT-1011',
+    patientName: 'Amina Yusuf',
+    patientMrn: 'MRN-LSH-10411',
+    providerId: 'PRV-LAG-01',
+    providerName: 'Lagoon Specialist Hospital',
+    payerName: 'Leadway Health',
+    planName: 'Comprehensive Plan',
+    enrolleeId: 'ENR-83921',
+    serviceDescription: 'CT Scan — Abdomen and Pelvis with Contrast',
+    diagnosis: 'Unexplained right lower quadrant mass',
+    plannedDate: new Date(Date.now() - 4 * 86400000).toISOString().split('T')[0],
+    urgency: 'routine',
+    clinicalJustification: 'Mass palpated on clinical examination; diagnostic staging required.',
+    documentationNotes: 'General surgery outpatient note.',
+    requestedAmount: 145000,
+    formattedAmount: '₦145,000',
+    approvedAmount: null,
+    status: 'rejected',
+    statusLabel: 'Rejected',
+    authCode: null,
+    rejectionReason: 'Plan exclusions apply for non-inpatient CT contrast without prior ultrasound triage.',
+    invoiceId: null,
+    claimId: null,
+    expiryDate: null,
+    createdAt: new Date(Date.now() - 6 * 86400000).toISOString(),
+    updatedAt: new Date(Date.now() - 4 * 86400000).toISOString(),
+  },
+];
+
+const FALLBACK_PREAUTH_TIMELINES = {
+  'PA-92101': [
+    { status: 'requested', statusLabel: 'Requested', note: 'Request created', createdAt: new Date(Date.now() - 3 * 86400000).toISOString() },
+    { status: 'submitted', statusLabel: 'Submitted to Payer', note: 'Sent to Reliance HMO portal', createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
+    { status: 'under_review', statusLabel: 'Under Review', note: 'Payer assigned medical adjudicator', createdAt: new Date(Date.now() - 1 * 86400000).toISOString() },
+  ],
+  'PA-84920': [
+    { status: 'requested', statusLabel: 'Requested', note: 'Request created', createdAt: new Date(Date.now() - 5 * 86400000).toISOString() },
+    { status: 'submitted', statusLabel: 'Submitted to Payer', note: 'Electronic submission via API', createdAt: new Date(Date.now() - 4 * 86400000).toISOString() },
+    { status: 'under_review', statusLabel: 'Under Review', note: 'Clinical review ongoing', createdAt: new Date(Date.now() - 3 * 86400000).toISOString() },
+    { status: 'approved', statusLabel: 'Approved', note: 'Approved at ₦165,000. Auth code AUTH-AXA-9281 issued.', createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
+  ],
+  'PA-71044': [
+    { status: 'requested', statusLabel: 'Requested', note: 'Request created', createdAt: new Date(Date.now() - 14 * 86400000).toISOString() },
+    { status: 'approved', statusLabel: 'Approved', note: 'Approved by Hygeia HMO', createdAt: new Date(Date.now() - 12 * 86400000).toISOString() },
+    { status: 'paid', statusLabel: 'Paid', note: 'Remittance reconciled with INV-90124', createdAt: new Date(Date.now() - 2 * 86400000).toISOString() },
+  ],
+  'PA-63910': [
+    { status: 'requested', statusLabel: 'Requested', note: 'Request created', createdAt: new Date(Date.now() - 6 * 86400000).toISOString() },
+    { status: 'rejected', statusLabel: 'Rejected', note: 'Plan exclusions apply for non-inpatient CT contrast without prior ultrasound triage.', createdAt: new Date(Date.now() - 4 * 86400000).toISOString() },
+  ],
+};
+
 // 1. Submit a new pre-authorization request. Starts at 'requested'; the
 // provider (or whatever staff workflow follows) advances it from there via
 // the status-transition endpoint below.
 app.post('/api/preauth-requests', requireAuth, async (req, res) => {
-  const {
-    patient_id, patient_name, patient_mrn,
-    provider_id, provider_name,
-    payer_name, service_description,
-    clinical_justification, documentation_notes,
-    requested_amount,
-  } = req.body;
+  const patient_name = req.body.patient_name || req.body.patientName;
+  const patient_id = req.body.patient_id || req.body.patientId || null;
+  const patient_mrn = req.body.patient_mrn || req.body.patientMrn || null;
+  const provider_id = req.body.provider_id || req.body.providerId || 'PRV-LAG-01';
+  const provider_name = req.body.provider_name || req.body.providerName || 'Lagoon Specialist Hospital';
+  const payer_name = req.body.payer_name || req.body.payerName;
+  const plan_name = req.body.plan_name || req.body.planName || null;
+  const enrollee_id = req.body.enrollee_id || req.body.enrolleeId || null;
+  const service_description = req.body.service_description || req.body.serviceDescription;
+  const diagnosis = req.body.diagnosis || null;
+  const planned_date = req.body.planned_date || req.body.plannedDate || null;
+  const urgency = req.body.urgency || 'routine';
+  const clinical_justification = req.body.clinical_justification || req.body.clinicalJustification || null;
+  const documentation_notes = req.body.documentation_notes || req.body.documentationNotes || null;
+  const requested_amount = req.body.requested_amount != null ? req.body.requested_amount : req.body.requestedAmount;
 
   if (!patient_name || !provider_name || !payer_name || !service_description || requested_amount == null) {
     return res.status(400).json({
@@ -1433,15 +1583,40 @@ app.post('/api/preauth-requests', requireAuth, async (req, res) => {
     if (process.env.NODE_ENV === 'production') {
       return res.status(503).json({ error: 'Database service unavailable in production.' });
     }
-    return res.status(201).json({
-      success: true,
-      preAuth: {
-        id, patientName: patient_name, patientMrn: patient_mrn, providerName: provider_name,
-        payerName: payer_name, serviceDescription: service_description, requestedAmount: Number(requested_amount),
-        formattedAmount, status: 'requested', statusLabel: PREAUTH_STATUS_LABELS.requested,
-      },
-      mode: 'demo',
-    });
+    const newRecord = {
+      id,
+      patientId: patient_id,
+      patientName: patient_name,
+      patientMrn: patient_mrn,
+      providerId: provider_id,
+      providerName: provider_name,
+      payerName: payer_name,
+      planName: plan_name,
+      enrolleeId: enrollee_id,
+      serviceDescription: service_description,
+      diagnosis,
+      plannedDate: planned_date,
+      urgency,
+      clinicalJustification: clinical_justification,
+      documentationNotes: documentation_notes,
+      requestedAmount: Number(requested_amount),
+      formattedAmount,
+      approvedAmount: null,
+      status: 'requested',
+      statusLabel: PREAUTH_STATUS_LABELS.requested,
+      authCode: null,
+      rejectionReason: null,
+      invoiceId: null,
+      claimId: null,
+      expiryDate: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    FALLBACK_PREAUTHS.unshift(newRecord);
+    FALLBACK_PREAUTH_TIMELINES[id] = [
+      { status: 'requested', statusLabel: PREAUTH_STATUS_LABELS.requested, note: 'Request created', createdAt: new Date().toISOString() }
+    ];
+    return res.status(201).json({ success: true, preAuth: newRecord, mode: 'demo' });
   }
 
   const client = await pool.connect();
@@ -1450,22 +1625,36 @@ app.post('/api/preauth-requests', requireAuth, async (req, res) => {
     const result = await client.query(`
       INSERT INTO pre_authorizations
         (id, patient_id, patient_name, patient_mrn, provider_id, provider_name, payer_name,
-         service_description, clinical_justification, documentation_notes, requested_amount, formatted_amount, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'requested')
-      RETURNING *
+         plan_name, enrollee_id, service_description, diagnosis, planned_date, urgency,
+         clinical_justification, documentation_notes, requested_amount, formatted_amount, status)
+      VALUES
+        ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, 'requested')
+      RETURNING
+        id, patient_id as "patientId", patient_name as "patientName", patient_mrn as "patientMrn",
+        provider_id as "providerId", provider_name as "providerName", payer_name as "payerName",
+        plan_name as "planName", enrollee_id as "enrolleeId",
+        service_description as "serviceDescription", diagnosis, planned_date as "plannedDate", urgency,
+        clinical_justification as "clinicalJustification",
+        documentation_notes as "documentationNotes",
+        requested_amount::float as "requestedAmount", formatted_amount as "formattedAmount",
+        approved_amount::float as "approvedAmount", status, auth_code as "authCode",
+        rejection_reason as "rejectionReason", invoice_id as "invoiceId", claim_id as "claimId",
+        expiry_date as "expiryDate",
+        created_at as "createdAt", updated_at as "updatedAt"
     `, [
-      id, patient_id || null, patient_name, patient_mrn || null, provider_id || null, provider_name,
-      payer_name, service_description, clinical_justification || null, documentation_notes || null,
-      Number(requested_amount), formattedAmount,
+      id, patient_id, patient_name, patient_mrn, provider_id, provider_name, payer_name,
+      plan_name, enrollee_id, service_description, diagnosis, planned_date, urgency,
+      clinical_justification, documentation_notes, requested_amount, formattedAmount
     ]);
 
-    await client.query(
-      `INSERT INTO pre_authorization_events (pre_auth_id, status, note) VALUES ($1, 'requested', 'Request created')`,
-      [id]
-    );
+    await client.query(`
+      INSERT INTO pre_authorization_events (pre_auth_id, status, note)
+      VALUES ($1, 'requested', 'Request submitted')
+    `, [id]);
 
     await client.query('COMMIT');
-    return res.status(201).json({ success: true, preAuth: result.rows[0] });
+    const preAuth = { ...result.rows[0], statusLabel: PREAUTH_STATUS_LABELS.requested };
+    return res.status(201).json({ success: true, preAuth });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[API POST /api/preauth-requests] error:', err.message);
@@ -1475,26 +1664,54 @@ app.post('/api/preauth-requests', requireAuth, async (req, res) => {
   }
 });
 
-// 2. List pre-authorization requests (newest first). Client-side filtering
-// by status/payer/provider, same pattern as GET /api/claims.
+// 2. List pre-authorization requests (newest first). Server-side or client-side filtering.
 app.get('/api/preauth-requests', requireAuth, async (req, res) => {
+  const { status, payer } = req.query;
+
   if (!pool) {
-    return res.json({ source: 'fallback', preAuths: [] });
+    let list = [...FALLBACK_PREAUTHS];
+    if (status) {
+      const statuses = status.split(',').map(s => s.trim());
+      list = list.filter(p => statuses.includes(p.status));
+    }
+    if (payer) {
+      list = list.filter(p => p.payerName?.toLowerCase() === payer.toLowerCase());
+    }
+    return res.json({ source: 'fallback', preAuths: list });
   }
 
   try {
+    const where = [];
+    const params = [];
+
+    if (status) {
+      const statuses = status.split(',').map(s => s.trim());
+      params.push(statuses);
+      where.push(`status = ANY($${params.length})`);
+    }
+    if (payer) {
+      params.push(payer);
+      where.push(`LOWER(payer_name) = LOWER($${params.length})`);
+    }
+
+    const whereClause = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
+
     const result = await query(`
       SELECT id, patient_id as "patientId", patient_name as "patientName", patient_mrn as "patientMrn",
              provider_id as "providerId", provider_name as "providerName", payer_name as "payerName",
-             service_description as "serviceDescription", clinical_justification as "clinicalJustification",
+             plan_name as "planName", enrollee_id as "enrolleeId",
+             service_description as "serviceDescription", diagnosis, planned_date as "plannedDate", urgency,
+             clinical_justification as "clinicalJustification",
              documentation_notes as "documentationNotes",
              requested_amount::float as "requestedAmount", formatted_amount as "formattedAmount",
              approved_amount::float as "approvedAmount", status, auth_code as "authCode",
              rejection_reason as "rejectionReason", invoice_id as "invoiceId", claim_id as "claimId",
+             expiry_date as "expiryDate",
              created_at as "createdAt", updated_at as "updatedAt"
       FROM pre_authorizations
+      ${whereClause}
       ORDER BY created_at DESC
-    `);
+    `, params);
     const preAuths = result.rows.map(r => ({ ...r, statusLabel: PREAUTH_STATUS_LABELS[r.status] || r.status }));
     return res.json({ source: 'postgresql', preAuths });
   } catch (err) {
@@ -1507,18 +1724,28 @@ app.get('/api/preauth-requests', requireAuth, async (req, res) => {
 app.get('/api/preauth-requests/:id', requireAuth, async (req, res) => {
   const { id } = req.params;
   if (!pool) {
-    return res.status(404).json({ error: `Pre-authorization ${id} not found.` });
+    const preAuth = FALLBACK_PREAUTHS.find(p => p.id === id);
+    if (!preAuth) {
+      return res.status(404).json({ error: `Pre-authorization ${id} not found.` });
+    }
+    const timeline = FALLBACK_PREAUTH_TIMELINES[id] || [
+      { status: preAuth.status, statusLabel: preAuth.statusLabel, note: 'Recorded in system', createdAt: preAuth.createdAt }
+    ];
+    return res.json({ preAuth, timeline });
   }
 
   try {
     const result = await query(`
       SELECT id, patient_id as "patientId", patient_name as "patientName", patient_mrn as "patientMrn",
              provider_id as "providerId", provider_name as "providerName", payer_name as "payerName",
-             service_description as "serviceDescription", clinical_justification as "clinicalJustification",
+             plan_name as "planName", enrollee_id as "enrolleeId",
+             service_description as "serviceDescription", diagnosis, planned_date as "plannedDate", urgency,
+             clinical_justification as "clinicalJustification",
              documentation_notes as "documentationNotes",
              requested_amount::float as "requestedAmount", formatted_amount as "formattedAmount",
              approved_amount::float as "approvedAmount", status, auth_code as "authCode",
              rejection_reason as "rejectionReason", invoice_id as "invoiceId", claim_id as "claimId",
+             expiry_date as "expiryDate",
              created_at as "createdAt", updated_at as "updatedAt"
       FROM pre_authorizations WHERE id = $1
     `, [id]);
@@ -1550,7 +1777,12 @@ app.get('/api/preauth-requests/:id', requireAuth, async (req, res) => {
 // rejection_reason.
 app.patch('/api/preauth-requests/:id/status', requireAuth, async (req, res) => {
   const { id } = req.params;
-  const { status: nextStatus, note, approved_amount, rejection_reason, auth_code } = req.body;
+  const nextStatus = req.body.status;
+  const note = req.body.note;
+  const approved_amount = req.body.approved_amount != null ? req.body.approved_amount : req.body.approvedAmount;
+  const rejection_reason = req.body.rejection_reason || req.body.rejectionReason;
+  const auth_code = req.body.auth_code || req.body.authCode || req.body.approvalCode;
+  const expiry_date = req.body.expiry_date || req.body.expiryDate;
 
   if (!nextStatus || !PREAUTH_TRANSITIONS[nextStatus]) {
     return res.status(400).json({ error: `Unknown status '${nextStatus}'.` });
@@ -1560,7 +1792,41 @@ app.patch('/api/preauth-requests/:id/status', requireAuth, async (req, res) => {
     if (process.env.NODE_ENV === 'production') {
       return res.status(503).json({ error: 'Database service unavailable in production.' });
     }
-    return res.json({ success: true, id, status: nextStatus, mode: 'demo' });
+    const preAuth = FALLBACK_PREAUTHS.find(p => p.id === id);
+    if (!preAuth) {
+      return res.status(404).json({ error: `Pre-authorization ${id} not found.` });
+    }
+    const currentStatus = preAuth.status;
+    const allowedNext = PREAUTH_TRANSITIONS[currentStatus] || [];
+    if (!allowedNext.includes(nextStatus)) {
+      return res.status(409).json({
+        error: `Cannot move from '${currentStatus}' to '${nextStatus}'. Valid next step(s): ${allowedNext.length ? allowedNext.join(', ') : 'none — this is a terminal state'}.`
+      });
+    }
+    if (nextStatus === 'approved' && approved_amount == null) {
+      return res.status(400).json({ error: 'approved_amount is required to approve a pre-authorization.' });
+    }
+    if (nextStatus === 'rejected' && !rejection_reason) {
+      return res.status(400).json({ error: 'rejection_reason is required to reject a pre-authorization.' });
+    }
+
+    preAuth.status = nextStatus;
+    preAuth.statusLabel = PREAUTH_STATUS_LABELS[nextStatus] || nextStatus;
+    if (nextStatus === 'approved') preAuth.approvedAmount = Number(approved_amount);
+    if (nextStatus === 'rejected') preAuth.rejectionReason = rejection_reason;
+    if (auth_code) preAuth.authCode = auth_code;
+    if (expiry_date) preAuth.expiryDate = expiry_date;
+    preAuth.updatedAt = new Date().toISOString();
+
+    if (!FALLBACK_PREAUTH_TIMELINES[id]) FALLBACK_PREAUTH_TIMELINES[id] = [];
+    FALLBACK_PREAUTH_TIMELINES[id].push({
+      status: nextStatus,
+      statusLabel: PREAUTH_STATUS_LABELS[nextStatus] || nextStatus,
+      note: note || null,
+      createdAt: new Date().toISOString()
+    });
+
+    return res.json({ success: true, preAuth, mode: 'demo' });
   }
 
   const client = await pool.connect();
@@ -1596,9 +1862,10 @@ app.patch('/api/preauth-requests/:id/status', requireAuth, async (req, res) => {
         approved_amount = CASE WHEN $2::text = 'approved' THEN $3 ELSE approved_amount END,
         rejection_reason = CASE WHEN $2::text = 'rejected' THEN $4 ELSE rejection_reason END,
         auth_code = COALESCE($5, auth_code),
+        expiry_date = COALESCE($6, expiry_date),
         updated_at = NOW()
-      WHERE id = $6
-    `, [nextStatus, nextStatus, approved_amount != null ? Number(approved_amount) : null, rejection_reason || null, auth_code || null, id]);
+      WHERE id = $7
+    `, [nextStatus, nextStatus, approved_amount != null ? Number(approved_amount) : null, rejection_reason || null, auth_code || null, expiry_date || null, id]);
 
     await client.query(
       `INSERT INTO pre_authorization_events (pre_auth_id, status, note) VALUES ($1, $2, $3)`,
@@ -1606,9 +1873,22 @@ app.patch('/api/preauth-requests/:id/status', requireAuth, async (req, res) => {
     );
 
     await client.query('COMMIT');
-
-    const updated = await pool.query(`SELECT * FROM pre_authorizations WHERE id = $1`, [id]);
-    return res.json({ success: true, preAuth: updated.rows[0] });
+    const updated = await query(`
+      SELECT id, patient_id as "patientId", patient_name as "patientName", patient_mrn as "patientMrn",
+             provider_id as "providerId", provider_name as "providerName", payer_name as "payerName",
+             plan_name as "planName", enrollee_id as "enrolleeId",
+             service_description as "serviceDescription", diagnosis, planned_date as "plannedDate", urgency,
+             clinical_justification as "clinicalJustification",
+             documentation_notes as "documentationNotes",
+             requested_amount::float as "requestedAmount", formatted_amount as "formattedAmount",
+             approved_amount::float as "approvedAmount", status, auth_code as "authCode",
+             rejection_reason as "rejectionReason", invoice_id as "invoiceId", claim_id as "claimId",
+             expiry_date as "expiryDate",
+             created_at as "createdAt", updated_at as "updatedAt"
+      FROM pre_authorizations WHERE id = $1
+    `, [id]);
+    const preAuth = { ...updated.rows[0], statusLabel: PREAUTH_STATUS_LABELS[updated.rows[0].status] || updated.rows[0].status };
+    return res.json({ success: true, preAuth });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[API PATCH /api/preauth-requests/:id/status] error:', err.message);
@@ -1634,7 +1914,10 @@ app.patch('/api/preauth-requests/:id/link-invoice', requireAuth, async (req, res
     if (process.env.NODE_ENV === 'production') {
       return res.status(503).json({ error: 'Database service unavailable in production.' });
     }
-    return res.json({ success: true, mode: 'demo' });
+    const preAuth = FALLBACK_PREAUTHS.find(p => p.id === id);
+    if (!preAuth) return res.status(404).json({ error: `Pre-authorization ${id} not found.` });
+    preAuth.invoiceId = invoice_number;
+    return res.json({ success: true, preAuthId: id, invoiceNumber: invoice_number, mode: 'demo' });
   }
 
   try {

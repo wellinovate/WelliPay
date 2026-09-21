@@ -35,7 +35,7 @@ const formatDobWithAge = (dobString?: string): string => {
 };
 
 export const PatientsDirectory: React.FC = () => {
-  const { addNotification } = useWelliPay();
+  const { addNotification, openPreAuthWithPrefill } = useWelliPay();
 
   const [patients, setPatients] = useState<Patient[]>([]);
   const [metrics, setMetrics] = useState<PatientDirectoryMetrics>({
@@ -642,6 +642,28 @@ export const PatientsDirectory: React.FC = () => {
                     <span className="text-[10px] text-[#64748b] font-mono block mt-0.5">
                       ID: {dossierData.patient.hmoEnrolleeId}
                     </span>
+                  )}
+                  {dossierData.patient.hmoName && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const pat = dossierData.patient!;
+                        const planMatch = pat.primaryCoverage?.match(/\((.*?)\)/);
+                        setSelectedPatientId(null);
+                        openPreAuthWithPrefill({
+                          patientId: pat.id,
+                          patientName: pat.fullName,
+                          patientMrn: pat.mrn,
+                          payerName: pat.hmoName,
+                          planName: planMatch ? planMatch[1] : undefined,
+                          enrolleeId: pat.hmoEnrolleeId,
+                        });
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-[#0B6B69] hover:underline cursor-pointer mt-1"
+                    >
+                      <ShieldCheck className="w-3 h-3 text-[#0B6B69]" />
+                      <span>Active electronic pre-auth →</span>
+                    </button>
                   )}
                 </div>
               </div>

@@ -27,7 +27,8 @@ export const HMODashboard: React.FC = () => {
     resolveClaimDispute,
     appealClaim,
     refreshClaims,
-    addNotification
+    addNotification,
+    openPreAuthWithPrefill
   } = useWelliPay();
 
   const [showRemittanceModal, setShowRemittanceModal] = useState(false);
@@ -528,6 +529,27 @@ export const HMODashboard: React.FC = () => {
                             ? 'Paid in full'
                             : (claim.denialReason || (claim.isDisputed ? 'Missing pre-authorization' : 'Routine review'))}
                         </span>
+                        {(claim.isDisputed || claim.denialRisk === 'missing-auth') && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openPreAuthWithPrefill({
+                                patientName: claim.patientName,
+                                patientMrn: claim.patientMrn,
+                                payerName: claim.payer,
+                                serviceDescription: claim.diagnosis || 'Clinical procedure',
+                                requestedAmount: claim.amount,
+                                diagnosis: claim.diagnosis,
+                                urgency: 'urgent',
+                                claimId: claim.id
+                              });
+                            }}
+                            className="inline-block text-[10px] font-bold text-[#0B6B69] hover:underline cursor-pointer mt-0.5"
+                          >
+                            Request pre-authorisation →
+                          </button>
+                        )}
                       </div>
                     </td>
 
@@ -701,9 +723,31 @@ export const HMODashboard: React.FC = () => {
 
                 <div className="space-y-2 pt-1">
                   <div>
-                    <label className="block text-[11px] font-bold text-[#12244D] mb-1">
-                      Retroactive Pre-Authorization Code:
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-[11px] font-bold text-[#12244D]">
+                        Retroactive Pre-Authorization Code:
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const clm = selectedClaim;
+                          setSelectedClaim(null);
+                          openPreAuthWithPrefill({
+                            patientName: clm.patientName,
+                            patientMrn: clm.patientMrn,
+                            payerName: clm.payer,
+                            serviceDescription: clm.diagnosis || 'Clinical procedure',
+                            requestedAmount: clm.amount,
+                            diagnosis: clm.diagnosis,
+                            urgency: 'urgent',
+                            claimId: clm.id
+                          });
+                        }}
+                        className="text-[11px] font-bold text-[#0B6B69] hover:underline cursor-pointer"
+                      >
+                        Request pre-authorisation →
+                      </button>
+                    </div>
                     <input
                       type="text"
                       value={appealPreAuth}

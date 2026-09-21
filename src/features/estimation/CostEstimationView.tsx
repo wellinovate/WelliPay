@@ -41,7 +41,7 @@ interface BasketItem {
 }
 
 export const CostEstimationView: React.FC = () => {
-  const { addNotification, setActiveTab } = useWelliPay();
+  const { addNotification, setActiveTab, openPreAuthWithPrefill } = useWelliPay();
 
   // Data states
   const [masterServices, setMasterServices] = useState<MasterService[]>([]);
@@ -1022,16 +1022,37 @@ export const CostEstimationView: React.FC = () => {
 
                 {/* Pre-authorisation Alert Banner */}
                 {hasPreAuthRequired && (
-                  <div className="mt-3 p-3.5 rounded-xl bg-amber-50 border border-amber-300 flex items-start gap-3">
-                    <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <div className="text-xs">
-                      <span className="font-bold text-amber-900">Pre-authorisation code mandatory:</span>{' '}
-                      <span className="text-amber-800 leading-relaxed">
-                        {grossTotal > 100000 
-                          ? `Total estimate of ₦${grossTotal.toLocaleString()} exceeds the ₦100,000 threshold. Authorisation code required prior to service delivery.`
-                          : 'One or more selected investigations exceed the plan pre-authorisation threshold. Authorisation code required.'}
-                      </span>
+                  <div className="mt-3 p-3.5 rounded-xl bg-amber-50 border border-amber-300 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                      <div className="text-xs">
+                        <span className="font-bold text-amber-900">Pre-authorisation code mandatory:</span>{' '}
+                        <span className="text-amber-800 leading-relaxed block">
+                          {grossTotal > 100000 
+                            ? `Total estimate of ₦${grossTotal.toLocaleString()} exceeds the ₦100,000 threshold. Authorisation code required prior to service delivery.`
+                            : 'One or more selected investigations exceed the plan pre-authorisation threshold. Authorisation code required.'}
+                        </span>
+                      </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        openPreAuthWithPrefill({
+                          patientId: selectedPatient?.id,
+                          patientName: selectedPatient?.fullName,
+                          patientMrn: selectedPatient?.mrn,
+                          payerName: selectedPayer,
+                          planName: selectedPlan,
+                          enrolleeId: selectedPatient?.hmoEnrolleeId,
+                          serviceDescription: basket.map(i => i.serviceName).join(', '),
+                          requestedAmount: grossTotal,
+                          urgency: 'routine',
+                        });
+                      }}
+                      className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-800 hover:bg-amber-900 text-white font-semibold text-xs transition-colors shrink-0 shadow-xs cursor-pointer"
+                    >
+                      <span>Request pre-authorisation →</span>
+                    </button>
                   </div>
                 )}
               </div>

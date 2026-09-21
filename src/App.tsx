@@ -9,8 +9,7 @@ import { HMODashboard } from './features/hmo/HMODashboard';
 import { PatientsDirectory } from './features/patients/PatientsDirectory';
 import InvoicesHub from './features/invoices/InvoicesHub';
 import { SettingsView } from './features/settings/SettingsView';
-import { ServiceCatalogueView } from './features/catalogue/ServiceCatalogueView';
-import { CostEstimationView } from './features/estimation/CostEstimationView';
+import { CatalogueAndEstimatorView } from './features/catalogue/CatalogueAndEstimatorView';
 import { PreAuthTracker } from './features/preauth/PreAuthTracker';
 import { PlaceholderView } from './features/common/PlaceholderView';
 import { Login } from './components/Login';
@@ -26,8 +25,7 @@ const AppContent: React.FC = () => {
       {activeTab === 'claims' && <HMODashboard />}
       {activeTab === 'patients' && <PatientsDirectory />}
       {activeTab === 'invoices' && <InvoicesHub />}
-      {activeTab === 'catalogue' && <ServiceCatalogueView />}
-      {activeTab === 'estimation' && <CostEstimationView />}
+      {(activeTab === 'catalogue' || activeTab === 'estimation') && <CatalogueAndEstimatorView />}
       {activeTab === 'preauth' && <PreAuthTracker />}
       {activeTab === 'settings' && <SettingsView />}
     </AppLayout>

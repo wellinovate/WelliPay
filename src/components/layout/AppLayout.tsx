@@ -37,11 +37,10 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     { id: 'dashboard', label: 'Dashboard' },
     { id: 'reconciliation', label: 'Reconciliation', badge: unmatchedCount > 0 ? unmatchedCount : 12 },
     { id: 'claims', label: 'Claims' },
-    { id: 'preauth', label: 'Pre-Auth' },
+    { id: 'preauth', label: 'Pre-authorisations' },
     { id: 'invoices', label: 'Invoices' },
     { id: 'patients', label: 'Patients' },
-    { id: 'catalogue', label: 'Catalogue' },
-    { id: 'estimation', label: 'Estimator' },
+    { id: 'catalogue', label: 'Catalogue & estimator' },
     { id: 'settings', label: 'Settings' },
   ];
 
@@ -86,30 +85,30 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
       {/* Primary Navigation Shell */}
       <header className="border-b border-[#e2e8f0] bg-white/95 backdrop-blur-md sticky top-0 z-30 shadow-subtle">
-        <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="w-full max-w-[1440px] mx-auto px-4 lg:px-6 h-16 flex items-center justify-between gap-2">
           
           {/* Brand & Main Tabs */}
-          <div className="flex items-center gap-6 xl:gap-8 flex-shrink-0">
+          <div className="flex items-center gap-3 lg:gap-5 flex-shrink-0 min-w-0">
             <div 
-              className="flex items-center gap-3 cursor-pointer group py-1 flex-shrink-0" 
+              className="flex items-center gap-2 cursor-pointer group py-1 flex-shrink-0" 
               onClick={() => setActiveTab('reconciliation')}
             >
               <div className="flex-shrink-0">
                 <Logo size="md" variant="horizontal" />
               </div>
-              <span className="hidden xl:inline-block text-[11px] font-sans font-medium text-[#64748b] pl-3 border-l border-[#e2e8f0] whitespace-nowrap flex-shrink-0">
+              <span className="hidden 2xl:inline-block text-[11px] font-sans font-medium text-[#64748b] pl-2.5 border-l border-[#e2e8f0] whitespace-nowrap flex-shrink-0">
                 One bill, every payer.
               </span>
             </div>
 
-            <nav className="flex items-center gap-1 font-sans text-sm h-16">
+            <nav className="flex items-center gap-0.5 font-sans text-xs h-16 overflow-x-auto no-scrollbar">
               {navItems.map((tab) => {
-                const isActive = activeTab === tab.id;
+                const isActive = activeTab === tab.id || (tab.id === 'catalogue' && activeTab === 'estimation');
                 return (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
-                    className={`h-full px-3.5 font-semibold text-xs transition-colors duration-150 flex items-center gap-1.5 border-b-2 cursor-pointer whitespace-nowrap outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#12244D] ${
+                    className={`h-full px-2.5 font-semibold text-xs transition-colors duration-150 flex items-center gap-1.5 border-b-2 cursor-pointer whitespace-nowrap outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#12244D] focus-visible:ring-inset ${
                       isActive
                         ? 'text-[#12244D] border-[#12244D]'
                         : 'text-[#64748b] border-transparent hover:text-[#12244D] hover:border-slate-300'
@@ -128,11 +127,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           </div>
 
           {/* Persona & Facility Switcher (Right) */}
-          <div className="flex items-center gap-3 flex-shrink-0">
+          <div className="flex items-center gap-2.5 flex-shrink-0">
             <button
               onClick={togglePersona}
               title="Click to toggle between Lagoon Hospital (Provider) and Reliance HMO (Payer)"
-              className="group flex items-center gap-2.5 px-3 py-1.5 rounded-lg border border-[#e2e8f0] hover:border-[#0B6B69] bg-white hover:bg-[#F8FAFC] transition-all text-xs font-sans shadow-xs cursor-pointer whitespace-nowrap"
+              className="group flex items-center gap-2 px-2.5 py-1.5 rounded-lg border border-[#e2e8f0] hover:border-[#0B6B69] bg-white hover:bg-[#F8FAFC] transition-all text-xs font-sans shadow-xs cursor-pointer whitespace-nowrap"
             >
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-transform group-hover:scale-105 flex-shrink-0 ${
                 persona === 'provider' 
@@ -143,11 +142,11 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               </div>
 
               <div className="text-left whitespace-nowrap">
-                <div className="font-semibold text-[#12244D] flex items-center gap-1 whitespace-nowrap">
+                <div className="font-semibold text-[#12244D] flex items-center gap-1 whitespace-nowrap text-xs">
                   <span>{persona === 'provider' ? 'Lagoon Specialist Hospital' : 'Reliance HMO'}</span>
                   <ArrowRightLeft className="w-3 h-3 text-[#64748b] group-hover:text-[#0B6B69] transition-colors flex-shrink-0" />
                 </div>
-                <div className="text-[10px] text-[#64748b] whitespace-nowrap">
+                <div className="text-[10px] text-[#64748b] whitespace-nowrap leading-tight">
                   {persona === 'provider' ? 'Healthcare provider view' : 'Payer & claims view'}
                 </div>
               </div>
@@ -157,7 +156,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
               <button
                 onClick={() => logout()}
                 title={`Sign out (${user.email || 'User'})`}
-                className="p-2 rounded-lg border border-[#e2e8f0] hover:border-rose-300 hover:bg-rose-50 text-[#64748b] hover:text-rose-600 transition-colors shadow-xs cursor-pointer"
+                className="p-2 rounded-lg border border-[#e2e8f0] hover:border-rose-300 hover:bg-rose-50 text-[#64748b] hover:text-rose-600 transition-colors shadow-xs cursor-pointer flex-shrink-0"
               >
                 <LogOut className="w-4 h-4" />
               </button>
@@ -167,7 +166,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       </header>
 
       {/* Main Screen Content */}
-      <main className="flex-1 max-w-[1280px] w-full mx-auto px-6 py-4">
+      <main className="flex-1 w-full max-w-[1440px] mx-auto px-4 lg:px-6 py-4">
         {children}
       </main>
     </div>

@@ -101,12 +101,18 @@ export interface PreAuthorization {
   providerId?: string;
   providerName: string;
   payerName: string;
+  planName?: string;
+  enrolleeId?: string;
   serviceDescription: string;
+  diagnosis?: string;
+  plannedDate?: string;
+  urgency?: 'routine' | 'urgent' | 'emergency';
   clinicalJustification?: string;
   documentationNotes?: string;
   requestedAmount: number;
   formattedAmount: string;
   approvedAmount?: number;
+  expiryDate?: string;
   status: PreAuthStatus;
   statusLabel?: string;
   authCode?: string;
@@ -115,6 +121,21 @@ export interface PreAuthorization {
   claimId?: string;
   createdAt: string;
   updatedAt?: string;
+}
+
+export interface PreAuthPrefill {
+  patientId?: string | null;
+  patientName?: string | null;
+  patientMrn?: string | null;
+  payerName?: string | null;
+  planName?: string | null;
+  enrolleeId?: string | null;
+  serviceDescription?: string | null;
+  requestedAmount?: number | null;
+  diagnosis?: string | null;
+  plannedDate?: string | null;
+  urgency?: 'routine' | 'urgent' | 'emergency' | null;
+  claimId?: string | null;
 }
 
 export interface PreAuthEvent {

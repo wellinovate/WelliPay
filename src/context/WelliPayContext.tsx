@@ -7,7 +7,8 @@ import {
   PersonaType,
   NavTab,
   DashboardMetrics,
-  RevenueLeakageSummary
+  RevenueLeakageSummary,
+  PreAuthPrefill
 } from '../types';
 import {
   INITIAL_RECONCILIATION_ITEMS,
@@ -27,6 +28,11 @@ interface WelliPayContextType {
   setActiveTab: (tab: NavTab) => void;
   persona: PersonaType;
   setPersona: (p: PersonaType) => void;
+
+  // Pre-Authorisation Cross-App Prefill
+  preAuthPrefill: PreAuthPrefill | null;
+  openPreAuthWithPrefill: (prefill: PreAuthPrefill) => void;
+  clearPreAuthPrefill: () => void;
 
   // Reconciliation
   reconciliationItems: ReconciliationItem[];
@@ -116,6 +122,16 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     localStorage.setItem('activeTab', activeTab);
   }, [activeTab]);
   const [persona, setPersona] = useState<PersonaType>('provider');
+
+  // Pre-Auth cross-app prefill state
+  const [preAuthPrefill, setPreAuthPrefill] = useState<PreAuthPrefill | null>(null);
+  const openPreAuthWithPrefill = (prefill: PreAuthPrefill) => {
+    setPreAuthPrefill(prefill);
+    setActiveTab('preauth');
+  };
+  const clearPreAuthPrefill = () => {
+    setPreAuthPrefill(null);
+  };
 
   // Reconciliation State
   const [reconciliationItems, setReconciliationItems] = useState<ReconciliationItem[]>(INITIAL_RECONCILIATION_ITEMS);
@@ -594,6 +610,9 @@ export const WelliPayProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         notifications,
         addNotification,
         removeNotification,
+        preAuthPrefill,
+        openPreAuthWithPrefill,
+        clearPreAuthPrefill,
       }}
     >
       {children}

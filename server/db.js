@@ -1234,6 +1234,13 @@ export async function initializeDatabase() {
 
       CREATE INDEX IF NOT EXISTS idx_preauth_events_preauth_id ON pre_authorization_events(pre_auth_id);
       CREATE INDEX IF NOT EXISTS idx_preauth_status ON pre_authorizations(status);
+
+      ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS diagnosis TEXT;
+      ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS planned_date DATE;
+      ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS urgency VARCHAR(20) DEFAULT 'routine';
+      ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS enrollee_id VARCHAR(100);
+      ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS plan_name VARCHAR(100);
+      ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS expiry_date DATE;
     `);
 
     return { initialized: true };
