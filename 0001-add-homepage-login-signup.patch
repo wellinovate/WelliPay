@@ -1,0 +1,724 @@
+From cc03378a71901a89841a8e38f99de6e2530ae480 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 21 Sep 2026 12:35:52 +0000
+Subject: [PATCH] feat(auth): add public homepage and self-serve signup
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+WelliPay previously had no public-facing entry point — any visit
+immediately rendered a bare login form with no way to create an account.
+This adds the pieces to run WelliPay as its own product:
+
+- src/pages/Homepage.tsx: public marketing landing page (hero, feature
+  grid, how-it-works, CTA) shown at "/" for signed-out visitors.
+- src/components/Signup.tsx: self-serve provider signup — collects
+  hospital/clinic name, work email, and password, creates a Firebase
+  Auth account, and signs the user straight in.
+- AuthContext: added a `signup` method (createUserWithEmailAndPassword +
+  displayName) alongside the existing `login`.
+- App.tsx: real routes for "/", "/login", "/signup" that redirect a
+  signed-in visitor straight to the dashboard instead of showing the
+  marketing/auth pages again; unauthenticated visitors hitting an app
+  route are redirected to /login instead of getting Login rendered
+  inline, so the URL always matches what's on screen.
+- Login.tsx: added a link to the new signup page.
+
+Also fixes a real, pre-existing CSS bug this surfaced: index.css set
+h1-h4 heading color in a bare, unlayered rule, which — under Tailwind's
+cascade-layer rules — always wins over any `text-*` color utility
+applied directly to a heading tag, regardless of specificity. That
+silently broke the new homepage's white-on-navy CTA heading, and would
+break any future heading that isn't the default navy. Fixed by moving
+the rule into `@layer base` so utility overrides work as expected.
+
+Verified: tsc --noEmit clean, production build succeeds, and all three
+pages (homepage, login, signup) render correctly at desktop and mobile
+viewports (screenshotted via Playwright against the built app).
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BtycEXkekHWpeoihRnyKkM
+---
+ src/App.tsx                 |  78 +++++++++----
+ src/components/Login.tsx    |  16 ++-
+ src/components/Signup.tsx   | 208 ++++++++++++++++++++++++++++++++++
+ src/context/AuthContext.tsx |  24 +++-
+ src/index.css               |  13 ++-
+ src/pages/Homepage.tsx      | 217 ++++++++++++++++++++++++++++++++++++
+ 6 files changed, 526 insertions(+), 30 deletions(-)
+ create mode 100644 src/components/Signup.tsx
+ create mode 100644 src/pages/Homepage.tsx
+
+diff --git a/src/App.tsx b/src/App.tsx
+index 34b6b15..c757ac9 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -1,5 +1,5 @@
+ import React from 'react';
+-import { BrowserRouter, Routes, Route } from 'react-router-dom';
++import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+ import { WelliPayProvider, useWelliPay } from './context/WelliPayContext';
+ import { useAuth } from './context/AuthContext';
+ import { AppLayout } from './components/layout/AppLayout';
+@@ -14,6 +14,8 @@ import { PreAuthTracker } from './features/preauth/PreAuthTracker';
+ import { ComplianceDashboard } from './features/compliance/ComplianceDashboard';
+ import { PlaceholderView } from './features/common/PlaceholderView';
+ import { Login } from './components/Login';
++import { Signup } from './components/Signup';
++import { Homepage } from './pages/Homepage';
+ import PublicInvoicePay from './pages/PublicInvoicePay';
+ 
+ const AppContent: React.FC = () => {
+@@ -34,32 +36,57 @@ const AppContent: React.FC = () => {
+   );
+ };
+ 
+-const AuthenticatedApp: React.FC = () => {
++const LoadingScreen: React.FC = () => (
++  <div className="flex flex-col items-center justify-center min-h-screen bg-[#F8FAFC]">
++    <div className="flex flex-col items-center gap-3">
++      <img
++        src="/wellipay-mark.png"
++        alt="WelliPay"
++        className="w-12 h-auto object-contain animate-pulse"
++      />
++      <div className="flex items-center gap-2 mt-2">
++        <span className="w-1.5 h-1.5 rounded-full bg-brand-teal animate-ping" />
++        <span className="text-xs font-semibold uppercase tracking-wider text-brand-navy/70 font-mono">
++          Loading WelliPay...
++        </span>
++      </div>
++    </div>
++  </div>
++);
++
++// Public marketing homepage — redirects a signed-in user straight into the
++// app instead of showing the pitch again.
++const HomeRoute: React.FC = () => {
+   const { user, loading } = useAuth();
++  if (loading) return <LoadingScreen />;
++  if (user) return <Navigate to="/dashboard" replace />;
++  return <Homepage />;
++};
+ 
+-  if (loading) {
+-    return (
+-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#F8FAFC]">
+-        <div className="flex flex-col items-center gap-3">
+-          <img 
+-            src="/wellipay-mark.png" 
+-            alt="WelliPay" 
+-            className="w-12 h-auto object-contain animate-pulse" 
+-          />
+-          <div className="flex items-center gap-2 mt-2">
+-            <span className="w-1.5 h-1.5 rounded-full bg-brand-teal animate-ping" />
+-            <span className="text-xs font-semibold uppercase tracking-wider text-brand-navy/70 font-mono">
+-              Loading WelliPay...
+-            </span>
+-          </div>
+-        </div>
+-      </div>
+-    );
+-  }
++// Login/signup routes — signed-in users are bounced into the app rather
++// than shown the auth form again.
++const LoginRoute: React.FC = () => {
++  const { user, loading } = useAuth();
++  if (loading) return <LoadingScreen />;
++  if (user) return <Navigate to="/dashboard" replace />;
++  return <Login />;
++};
++
++const SignupRoute: React.FC = () => {
++  const { user, loading } = useAuth();
++  if (loading) return <LoadingScreen />;
++  if (user) return <Navigate to="/dashboard" replace />;
++  return <Signup />;
++};
++
++// Everything behind auth — an unauthenticated visitor is sent to /login
++// rather than shown the login form inline, so the URL always matches what's
++// on screen.
++const AuthenticatedApp: React.FC = () => {
++  const { user, loading } = useAuth();
+ 
+-  if (!user) {
+-    return <Login />;
+-  }
++  if (loading) return <LoadingScreen />;
++  if (!user) return <Navigate to="/login" replace />;
+ 
+   return (
+     <WelliPayProvider>
+@@ -72,6 +99,9 @@ export function App() {
+   return (
+     <BrowserRouter>
+       <Routes>
++        <Route path="/" element={<HomeRoute />} />
++        <Route path="/login" element={<LoginRoute />} />
++        <Route path="/signup" element={<SignupRoute />} />
+         <Route path="/pay/:invoiceNumber" element={<PublicInvoicePay />} />
+         <Route path="/*" element={<AuthenticatedApp />} />
+       </Routes>
+diff --git a/src/components/Login.tsx b/src/components/Login.tsx
+index 51de844..51f33d7 100644
+--- a/src/components/Login.tsx
++++ b/src/components/Login.tsx
+@@ -1,4 +1,5 @@
+ import React, { useState } from 'react';
++import { useNavigate } from 'react-router-dom';
+ import { useAuth } from '../context/AuthContext';
+ import { Logo } from './ui/Logo';
+ import { ShieldCheck, Lock, Mail, AlertCircle, ArrowRight, Loader2, Zap } from 'lucide-react';
+@@ -30,6 +31,7 @@ function loadDemoLoginSlots(): DemoLoginSlot[] {
+ const DEMO_LOGIN_SLOTS = loadDemoLoginSlots();
+ 
+ export const Login: React.FC = () => {
++  const navigate = useNavigate();
+   const { login } = useAuth();
+   const [email, setEmail] = useState('');
+   const [password, setPassword] = useState('');
+@@ -78,7 +80,7 @@ export const Login: React.FC = () => {
+       <div className="w-full max-w-md">
+         {/* Brand Header with Authentic Logo */}
+         <div className="text-center mb-8 flex flex-col items-center">
+-          <Logo size="lg" variant="full" showTagline={true} className="mb-2" />
++          <Logo size="lg" variant="full" showTagline={true} className="mb-2" onClick={() => navigate('/')} />
+           <p className="text-xs text-[#64748b] mt-1.5 max-w-xs font-sans">
+             Healthcare Financial Operating System & AI Payment Reconciliation
+           </p>
+@@ -192,6 +194,18 @@ export const Login: React.FC = () => {
+             <span>NDPR & HIPAA-compliant encryption standards</span>
+           </div>
+         </div>
++
++        {/* Signup link */}
++        <p className="text-center text-xs text-[#64748b] mt-5">
++          New provider?{' '}
++          <button
++            type="button"
++            onClick={() => navigate('/signup')}
++            className="font-bold text-[#0B6B69] hover:text-[#074C4A] cursor-pointer"
++          >
++            Create an account
++          </button>
++        </p>
+       </div>
+     </div>
+   );
+diff --git a/src/components/Signup.tsx b/src/components/Signup.tsx
+new file mode 100644
+index 0000000..a13688b
+--- /dev/null
++++ b/src/components/Signup.tsx
+@@ -0,0 +1,208 @@
++import React, { useState } from 'react';
++import { useNavigate } from 'react-router-dom';
++import { useAuth } from '../context/AuthContext';
++import { Logo } from './ui/Logo';
++import { ShieldCheck, Lock, Mail, Building2, AlertCircle, ArrowRight, Loader2, CheckCircle2 } from 'lucide-react';
++
++const PASSWORD_MIN_LENGTH = 8;
++
++export const Signup: React.FC = () => {
++  const navigate = useNavigate();
++  const { signup } = useAuth();
++
++  const [organizationName, setOrganizationName] = useState('');
++  const [email, setEmail] = useState('');
++  const [password, setPassword] = useState('');
++  const [confirmPassword, setConfirmPassword] = useState('');
++  const [error, setError] = useState<string | null>(null);
++  const [isSubmitting, setIsSubmitting] = useState(false);
++
++  const handleSubmit = async (e: React.FormEvent) => {
++    e.preventDefault();
++    setError(null);
++
++    if (!organizationName.trim()) {
++      setError('Enter your hospital or clinic name.');
++      return;
++    }
++    if (password.length < PASSWORD_MIN_LENGTH) {
++      setError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters.`);
++      return;
++    }
++    if (password !== confirmPassword) {
++      setError('Passwords do not match.');
++      return;
++    }
++
++    setIsSubmitting(true);
++    try {
++      await signup(email, password, organizationName.trim());
++      // AuthContext's onAuthStateChanged listener picks up the new session
++      // and the router redirects into the app automatically.
++    } catch (err: any) {
++      console.error('Signup error:', err);
++      if (err.code === 'auth/email-already-in-use') {
++        setError('An account already exists with this email. Try signing in instead.');
++      } else if (err.code === 'auth/invalid-email') {
++        setError('Enter a valid work email address.');
++      } else if (err.code === 'auth/weak-password') {
++        setError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters.`);
++      } else {
++        setError(err.message || 'Failed to create your account. Please try again.');
++      }
++      setIsSubmitting(false);
++    }
++  };
++
++  return (
++    <div className="min-h-screen bg-[#f8fafc] flex flex-col justify-center items-center px-4 sm:px-6 py-10 font-sans text-[#0f172a] relative overflow-hidden">
++      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[700px] h-[320px] bg-gradient-to-b from-[#ebf7f6]/80 via-[#f0f4fa]/40 to-transparent blur-3xl pointer-events-none -z-10" />
++
++      <div className="w-full max-w-md">
++        {/* Brand Header */}
++        <div className="text-center mb-8 flex flex-col items-center">
++          <Logo size="lg" variant="full" showTagline={true} className="mb-2" onClick={() => navigate('/')} />
++          <p className="text-xs text-[#64748b] mt-1.5 max-w-xs font-sans">
++            Healthcare Financial Operating System & AI Payment Reconciliation
++          </p>
++        </div>
++
++        {/* Signup Card */}
++        <div className="bg-white border border-[#e2e8f0] rounded-xl shadow-broadsheet p-6 sm:p-8">
++          <div className="border-b border-[#e2e8f0] pb-4 mb-6">
++            <h2 className="font-heading text-lg font-bold text-[#12244D]">
++              Create your provider account
++            </h2>
++            <p className="text-xs text-[#64748b] mt-0.5">
++              For hospital revenue teams and HMO claims adjudicators.
++            </p>
++          </div>
++
++          {error && (
++            <div className="mb-5 p-3 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2">
++              <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
++              <span>{error}</span>
++            </div>
++          )}
++
++          <form onSubmit={handleSubmit} className="space-y-4">
++            <div>
++              <label className="block text-xs font-semibold text-[#334155] mb-1.5">
++                Hospital / Clinic Name
++              </label>
++              <div className="relative">
++                <Building2 className="w-4 h-4 text-[#94a3b8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
++                <input
++                  type="text"
++                  required
++                  value={organizationName}
++                  onChange={(e) => setOrganizationName(e.target.value)}
++                  placeholder="Lagoon Specialist Hospital"
++                  className="w-full pl-9 pr-3 py-2 text-xs font-sans bg-white border border-[#cbd5e1] rounded-lg text-[#0f172a] placeholder-[#94a3b8] focus:outline-none focus:border-[#0B6B69] focus:ring-1 focus:ring-[#0B6B69] transition-all"
++                />
++              </div>
++            </div>
++
++            <div>
++              <label className="block text-xs font-semibold text-[#334155] mb-1.5">
++                Work Email
++              </label>
++              <div className="relative">
++                <Mail className="w-4 h-4 text-[#94a3b8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
++                <input
++                  type="email"
++                  required
++                  value={email}
++                  onChange={(e) => setEmail(e.target.value)}
++                  placeholder="billing@hospital.com"
++                  className="w-full pl-9 pr-3 py-2 text-xs font-sans bg-white border border-[#cbd5e1] rounded-lg text-[#0f172a] placeholder-[#94a3b8] focus:outline-none focus:border-[#0B6B69] focus:ring-1 focus:ring-[#0B6B69] transition-all"
++                />
++              </div>
++            </div>
++
++            <div>
++              <label className="block text-xs font-semibold text-[#334155] mb-1.5">
++                Password
++              </label>
++              <div className="relative">
++                <Lock className="w-4 h-4 text-[#94a3b8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
++                <input
++                  type="password"
++                  required
++                  minLength={PASSWORD_MIN_LENGTH}
++                  value={password}
++                  onChange={(e) => setPassword(e.target.value)}
++                  placeholder="At least 8 characters"
++                  className="w-full pl-9 pr-3 py-2 text-xs font-sans bg-white border border-[#cbd5e1] rounded-lg text-[#0f172a] placeholder-[#94a3b8] focus:outline-none focus:border-[#0B6B69] focus:ring-1 focus:ring-[#0B6B69] transition-all"
++                />
++              </div>
++            </div>
++
++            <div>
++              <label className="block text-xs font-semibold text-[#334155] mb-1.5">
++                Confirm Password
++              </label>
++              <div className="relative">
++                <Lock className="w-4 h-4 text-[#94a3b8] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
++                <input
++                  type="password"
++                  required
++                  value={confirmPassword}
++                  onChange={(e) => setConfirmPassword(e.target.value)}
++                  placeholder="••••••••••••"
++                  className="w-full pl-9 pr-3 py-2 text-xs font-sans bg-white border border-[#cbd5e1] rounded-lg text-[#0f172a] placeholder-[#94a3b8] focus:outline-none focus:border-[#0B6B69] focus:ring-1 focus:ring-[#0B6B69] transition-all"
++                />
++              </div>
++            </div>
++
++            <button
++              type="submit"
++              disabled={isSubmitting}
++              className="w-full mt-2 py-2.5 px-4 rounded-lg text-xs font-bold bg-[#12244D] hover:bg-[#0B1733] text-white transition-all shadow-card flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed group"
++            >
++              {isSubmitting ? (
++                <>
++                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
++                  <span>Creating account...</span>
++                </>
++              ) : (
++                <>
++                  <span>Create account</span>
++                  <ArrowRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5" />
++                </>
++              )}
++            </button>
++          </form>
++
++          <ul className="mt-5 pt-4 border-t border-dashed border-[#e2e8f0] space-y-1.5">
++            {['Automated bill reconciliation', 'HMO claims and pre-auth tracking', 'Compliance and audit engine'].map((f) => (
++              <li key={f} className="flex items-center gap-2 text-[11px] text-[#64748b]">
++                <CheckCircle2 className="w-3.5 h-3.5 text-[#0B6B69] flex-shrink-0" />
++                {f}
++              </li>
++            ))}
++          </ul>
++
++          {/* Security Notice */}
++          <div className="mt-5 pt-4 border-t border-[#e2e8f0] flex items-center justify-center gap-2 text-[11px] text-[#64748b]">
++            <ShieldCheck className="w-3.5 h-3.5 text-[#0B6B69]" />
++            <span>NDPR & HIPAA-compliant encryption standards</span>
++          </div>
++        </div>
++
++        <p className="text-center text-xs text-[#64748b] mt-5">
++          Already have an account?{' '}
++          <button
++            type="button"
++            onClick={() => navigate('/login')}
++            className="font-bold text-[#0B6B69] hover:text-[#074C4A] cursor-pointer"
++          >
++            Sign in
++          </button>
++        </p>
++      </div>
++    </div>
++  );
++};
++
++export default Signup;
+diff --git a/src/context/AuthContext.tsx b/src/context/AuthContext.tsx
+index af27900..f54dc92 100644
+--- a/src/context/AuthContext.tsx
++++ b/src/context/AuthContext.tsx
+@@ -1,5 +1,12 @@
+ import React, { createContext, useContext, useEffect, useState } from 'react';
+-import { onAuthStateChanged, signInWithEmailAndPassword, signOut, User } from 'firebase/auth';
++import {
++  onAuthStateChanged,
++  signInWithEmailAndPassword,
++  createUserWithEmailAndPassword,
++  updateProfile,
++  signOut,
++  User,
++} from 'firebase/auth';
+ import { auth } from '../firebase';
+ 
+ export interface AppUser {
+@@ -12,6 +19,7 @@ interface AuthContextType {
+   user: AppUser | null;
+   loading: boolean;
+   login: (email: string, password: string) => Promise<void>;
++  signup: (email: string, password: string, organizationName: string) => Promise<void>;
+   logout: () => Promise<void>;
+ }
+ 
+@@ -51,13 +59,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
+     });
+   };
+ 
++  const signup = async (email: string, password: string, organizationName: string) => {
++    const cred = await createUserWithEmailAndPassword(auth, email, password);
++    if (organizationName) {
++      await updateProfile(cred.user, { displayName: organizationName });
++    }
++    setUser({
++      uid: cred.user.uid,
++      email: cred.user.email,
++      displayName: organizationName || cred.user.displayName,
++    });
++  };
++
+   const logout = async () => {
+     await signOut(auth);
+     setUser(null);
+   };
+ 
+   return (
+-    <AuthContext.Provider value={{ user, loading, login, logout }}>
++    <AuthContext.Provider value={{ user, loading, login, signup, logout }}>
+       {children}
+     </AuthContext.Provider>
+   );
+diff --git a/src/index.css b/src/index.css
+index 9d98df6..aacc40e 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -31,9 +31,16 @@ body {
+   -webkit-font-smoothing: antialiased;
+ }
+ 
+-h1, h2, h3, h4, .font-heading {
+-  font-family: var(--font-heading);
+-  color: var(--color-brand-navy);
++/* Base layer (not the bare, unlayered rule this used to be) so a Tailwind
++   text-color utility applied directly to an h1-h4 tag can actually override
++   the default navy — an unlayered rule always beats a @layer utilities rule
++   regardless of selector specificity, which silently broke every attempt to
++   set a heading to any other color (e.g. text-white on a dark section). */
++@layer base {
++  h1, h2, h3, h4, .font-heading {
++    font-family: var(--font-heading);
++    color: var(--color-brand-navy);
++  }
+ }
+ 
+ /* Custom scrollbar matching WelliPay look */
+diff --git a/src/pages/Homepage.tsx b/src/pages/Homepage.tsx
+new file mode 100644
+index 0000000..37ae1c2
+--- /dev/null
++++ b/src/pages/Homepage.tsx
+@@ -0,0 +1,217 @@
++import React from 'react';
++import { useNavigate } from 'react-router-dom';
++import { Logo } from '../components/ui/Logo';
++import {
++  ArrowRight,
++  ShieldCheck,
++  ReceiptText,
++  Landmark,
++  FileSearch,
++  ClipboardCheck,
++  Wallet,
++  CheckCircle2,
++} from 'lucide-react';
++
++const FEATURES = [
++  {
++    icon: ReceiptText,
++    title: 'Automated bill reconciliation',
++    description:
++      'Matches bank transfers, HMO remittances, and Paystack payments to invoices automatically, with AI-assisted confidence scoring for anything that needs a human look.',
++  },
++  {
++    icon: ClipboardCheck,
++    title: 'Pre-authorisation tracking',
++    description:
++      'One tracker for every HMO pre-auth request — submission, decision turnaround, approved amounts, and expiry, instead of scattered emails and phone calls.',
++  },
++  {
++    icon: FileSearch,
++    title: 'Compliance and audit engine',
++    description:
++      'Flags duplicate charges, tariff mismatches, missing pre-authorisations, and other billing risks before they reach a payer, with a resolution trail for every flag.',
++  },
++  {
++    icon: Landmark,
++    title: 'HMO claims management',
++    description:
++      'Tracks claims from submission through remittance, matches remittance lines back to invoices, and surfaces rejection and turnaround patterns by payer.',
++  },
++  {
++    icon: Wallet,
++    title: 'Dedicated virtual accounts',
++    description:
++      'Every invoice can carry its own bank transfer account, so payments reconcile themselves the moment they land.',
++  },
++  {
++    icon: ShieldCheck,
++    title: 'Membership and benefit checks',
++    description:
++      'Verifies HMO membership status and remaining annual benefit before a bill goes out, catching self-pay-despite-coverage and copay errors early.',
++  },
++];
++
++const STEPS = [
++  {
++    step: '01',
++    title: 'Connect your billing',
++    description: 'Bring your invoices, HMO claims, and patient records in — or start entering them directly in WelliPay.',
++  },
++  {
++    step: '02',
++    title: 'Let the engine reconcile',
++    description: 'Payments, remittances, and pre-authorisations are matched to invoices automatically, around the clock.',
++  },
++  {
++    step: '03',
++    title: 'Review what needs you',
++    description: 'Only exceptions and flagged items reach your revenue team — everything else clears on its own.',
++  },
++];
++
++export const Homepage: React.FC = () => {
++  const navigate = useNavigate();
++
++  return (
++    <div className="min-h-screen bg-[#f8fafc] font-sans text-[#0f172a]">
++      {/* Nav */}
++      <header className="border-b border-[#e2e8f0] bg-white/80 backdrop-blur-sm sticky top-0 z-30">
++        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
++          <Logo size="sm" variant="full" onClick={() => navigate('/')} />
++          <div className="flex items-center gap-2">
++            <button
++              onClick={() => navigate('/login')}
++              className="text-xs font-semibold text-[#334155] hover:text-[#12244D] px-3 py-2 transition-colors cursor-pointer"
++            >
++              Sign in
++            </button>
++            <button
++              onClick={() => navigate('/signup')}
++              className="text-xs font-bold bg-[#12244D] hover:bg-[#0B1733] text-white px-4 py-2 rounded-lg shadow-card transition-all cursor-pointer flex items-center gap-1.5"
++            >
++              Get started
++              <ArrowRight className="w-3.5 h-3.5" />
++            </button>
++          </div>
++        </div>
++      </header>
++
++      {/* Hero */}
++      <section className="relative overflow-hidden">
++        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[420px] bg-gradient-to-b from-[#ebf7f6]/80 via-[#f0f4fa]/40 to-transparent blur-3xl pointer-events-none -z-10" />
++        <div className="max-w-4xl mx-auto px-4 sm:px-6 pt-16 pb-14 text-center">
++          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#0B6B69] bg-[#EBF7F6] px-3 py-1 rounded-full">
++            Healthcare Financial Operating System
++          </span>
++          <h1 className="font-heading text-3xl sm:text-5xl font-bold text-[#12244D] mt-5 leading-tight">
++            One bill, every payer.
++          </h1>
++          <p className="text-sm sm:text-base text-[#475569] mt-4 max-w-xl mx-auto">
++            WelliPay reconciles patient bills, HMO claims, and bank transfers automatically —
++            so hospital revenue teams spend their time on exceptions, not spreadsheets.
++          </p>
++          <div className="flex items-center justify-center gap-3 mt-8">
++            <button
++              onClick={() => navigate('/signup')}
++              className="text-xs font-bold bg-[#12244D] hover:bg-[#0B1733] text-white px-5 py-3 rounded-lg shadow-card transition-all cursor-pointer flex items-center gap-1.5"
++            >
++              Create your account
++              <ArrowRight className="w-3.5 h-3.5" />
++            </button>
++            <button
++              onClick={() => navigate('/login')}
++              className="text-xs font-bold border border-[#cbd5e1] hover:border-[#12244D] text-[#12244D] px-5 py-3 rounded-lg transition-all cursor-pointer"
++            >
++              Sign in to your portal
++            </button>
++          </div>
++        </div>
++      </section>
++
++      {/* Feature grid */}
++      <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14 border-t border-[#e2e8f0]">
++        <div className="text-center mb-10">
++          <h2 className="font-heading text-2xl font-bold text-[#12244D]">
++            Everything a revenue team needs in one place
++          </h2>
++          <p className="text-sm text-[#64748b] mt-2 max-w-xl mx-auto">
++            Built for hospitals and clinics handling self-pay and HMO billing side by side.
++          </p>
++        </div>
++        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
++          {FEATURES.map((f) => (
++            <div
++              key={f.title}
++              className="bg-white border border-[#e2e8f0] rounded-xl p-5 shadow-subtle hover:shadow-card transition-shadow"
++            >
++              <div className="w-9 h-9 rounded-lg bg-[#EBF7F6] flex items-center justify-center mb-3">
++                <f.icon className="w-4.5 h-4.5 text-[#0B6B69]" />
++              </div>
++              <h3 className="font-heading text-sm font-bold text-[#12244D] mb-1.5">{f.title}</h3>
++              <p className="text-xs text-[#64748b] leading-relaxed">{f.description}</p>
++            </div>
++          ))}
++        </div>
++      </section>
++
++      {/* How it works */}
++      <section className="bg-white border-t border-[#e2e8f0]">
++        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14">
++          <h2 className="font-heading text-2xl font-bold text-[#12244D] text-center mb-10">
++            How WelliPay fits into your billing
++          </h2>
++          <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
++            {STEPS.map((s) => (
++              <div key={s.step}>
++                <span className="font-heading text-3xl font-bold text-[#cbd5e1]">{s.step}</span>
++                <h3 className="font-heading text-sm font-bold text-[#12244D] mt-2 mb-1.5">{s.title}</h3>
++                <p className="text-xs text-[#64748b] leading-relaxed">{s.description}</p>
++              </div>
++            ))}
++          </div>
++        </div>
++      </section>
++
++      {/* Trust strip */}
++      <section className="border-t border-[#e2e8f0]">
++        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
++          {['NDPR compliant', 'HIPAA-aligned encryption', 'Paystack-integrated', 'Multi-HMO support'].map((t) => (
++            <div key={t} className="flex items-center gap-1.5 text-xs font-semibold text-[#334155]">
++              <CheckCircle2 className="w-3.5 h-3.5 text-[#0B6B69]" />
++              {t}
++            </div>
++          ))}
++        </div>
++      </section>
++
++      {/* CTA band */}
++      <section className="bg-[#12244D]">
++        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-14 text-center">
++          <h2 className="font-heading text-2xl font-bold text-white">
++            Ready to stop reconciling bills by hand?
++          </h2>
++          <p className="text-sm text-[#cbd5e1] mt-3">
++            Set up your provider account and start matching payments automatically.
++          </p>
++          <button
++            onClick={() => navigate('/signup')}
++            className="mt-6 text-xs font-bold bg-white hover:bg-[#f1f5f9] text-[#12244D] px-5 py-3 rounded-lg transition-all cursor-pointer inline-flex items-center gap-1.5"
++          >
++            Create your account
++            <ArrowRight className="w-3.5 h-3.5" />
++          </button>
++        </div>
++      </section>
++
++      {/* Footer */}
++      <footer className="border-t border-[#e2e8f0] bg-white">
++        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3">
++          <Logo size="sm" variant="full" />
++          <p className="text-[11px] text-[#94a3b8]">© {new Date().getFullYear()} WelliPay. All rights reserved.</p>
++        </div>
++      </footer>
++    </div>
++  );
++};
++
++export default Homepage;
+-- 
+2.43.0

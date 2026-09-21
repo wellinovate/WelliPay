@@ -1,0 +1,661 @@
+From 8a76d2aa98d22a4e83bcbc3774d04cd2c3321612 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 21 Sep 2026 12:51:50 +0000
+Subject: [PATCH] feat(marketing): redesign homepage, add About and Privacy
+ pages
+
+Redesigns the homepage messaging around problem -> curse -> business
+impact -> insight/solution, and adds two pages that were missing for a
+site people will actually check before signing up:
+
+- src/pages/Homepage.tsx: restructured around what multi-payer billing
+  actually costs a revenue team (hours lost manually cross-checking,
+  poor cash-flow visibility, errors caught too late, claims that go
+  quiet) before presenting the feature set as the fix. Kept the
+  existing feature grid, how-it-works, trust strip, and CTA.
+- src/pages/About.tsx: mission/story plus a core-values section
+  (auditability, built for the real payer mix, exception-based
+  operations, compliance by default). Written to what's actually true
+  today -- built by Wellinovate Limited -- with no invented metrics,
+  team bios, or funding claims.
+- src/pages/Privacy.tsx: a real privacy policy (scope, data collected,
+  use, sharing, security, retention, rights, contact) rather than just
+  a claims badge on the homepage. Security language says "designed to
+  align with HIPAA/NDPR" rather than claiming certification WelliPay
+  doesn't have. Contact email (privacy@wellipay.com) is a placeholder
+  -- needs to point at a real inbox before this goes live.
+- src/components/SiteHeader.tsx / SiteFooter.tsx: shared nav/footer
+  (About, Privacy, sign in, sign up) used by Homepage, About, and
+  Privacy, so adding a page later doesn't mean re-wiring links three
+  places.
+- App.tsx: added /about and /privacy routes.
+
+Verified: tsc --noEmit clean, production build succeeds, and all three
+pages render correctly (screenshotted via Playwright against the built
+app) with no console errors.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BtycEXkekHWpeoihRnyKkM
+---
+ src/App.tsx                   |   4 +
+ src/components/SiteFooter.tsx |  68 ++++++++++++++++
+ src/components/SiteHeader.tsx |  49 ++++++++++++
+ src/pages/About.tsx           | 142 ++++++++++++++++++++++++++++++++++
+ src/pages/Homepage.tsx        | 118 ++++++++++++++++++++--------
+ src/pages/Privacy.tsx         | 139 +++++++++++++++++++++++++++++++++
+ 6 files changed, 486 insertions(+), 34 deletions(-)
+ create mode 100644 src/components/SiteFooter.tsx
+ create mode 100644 src/components/SiteHeader.tsx
+ create mode 100644 src/pages/About.tsx
+ create mode 100644 src/pages/Privacy.tsx
+
+diff --git a/src/App.tsx b/src/App.tsx
+index c757ac9..0da69c4 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -16,6 +16,8 @@ import { PlaceholderView } from './features/common/PlaceholderView';
+ import { Login } from './components/Login';
+ import { Signup } from './components/Signup';
+ import { Homepage } from './pages/Homepage';
++import { About } from './pages/About';
++import { Privacy } from './pages/Privacy';
+ import PublicInvoicePay from './pages/PublicInvoicePay';
+ 
+ const AppContent: React.FC = () => {
+@@ -102,6 +104,8 @@ export function App() {
+         <Route path="/" element={<HomeRoute />} />
+         <Route path="/login" element={<LoginRoute />} />
+         <Route path="/signup" element={<SignupRoute />} />
++        <Route path="/about" element={<About />} />
++        <Route path="/privacy" element={<Privacy />} />
+         <Route path="/pay/:invoiceNumber" element={<PublicInvoicePay />} />
+         <Route path="/*" element={<AuthenticatedApp />} />
+       </Routes>
+diff --git a/src/components/SiteFooter.tsx b/src/components/SiteFooter.tsx
+new file mode 100644
+index 0000000..045f988
+--- /dev/null
++++ b/src/components/SiteFooter.tsx
+@@ -0,0 +1,68 @@
++import React from 'react';
++import { useNavigate } from 'react-router-dom';
++import { Logo } from './ui/Logo';
++
++const LINK_COLUMNS: { heading: string; links: { label: string; to: string }[] }[] = [
++  {
++    heading: 'Product',
++    links: [
++      { label: 'Home', to: '/' },
++      { label: 'Sign in', to: '/login' },
++      { label: 'Create account', to: '/signup' },
++    ],
++  },
++  {
++    heading: 'Company',
++    links: [
++      { label: 'About us', to: '/about' },
++      { label: 'Privacy policy', to: '/privacy' },
++    ],
++  },
++];
++
++export const SiteFooter: React.FC = () => {
++  const navigate = useNavigate();
++
++  return (
++    <footer className="border-t border-[#e2e8f0] bg-white">
++      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
++        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-8">
++          <div>
++            <Logo size="sm" variant="full" onClick={() => navigate('/')} />
++            <p className="text-xs text-[#64748b] mt-3 max-w-xs">
++              A product of Wellinovate Limited, built for hospitals and clinics managing self-pay
++              and HMO billing side by side.
++            </p>
++          </div>
++          <div className="flex flex-wrap gap-x-12 gap-y-6">
++            {LINK_COLUMNS.map((col) => (
++              <div key={col.heading}>
++                <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#94a3b8] mb-2.5">
++                  {col.heading}
++                </h4>
++                <ul className="space-y-1.5">
++                  {col.links.map((l) => (
++                    <li key={l.label}>
++                      <button
++                        onClick={() => navigate(l.to)}
++                        className="text-xs text-[#334155] hover:text-[#0B6B69] transition-colors cursor-pointer"
++                      >
++                        {l.label}
++                      </button>
++                    </li>
++                  ))}
++                </ul>
++              </div>
++            ))}
++          </div>
++        </div>
++        <div className="border-t border-[#e2e8f0] mt-8 pt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
++          <p className="text-[11px] text-[#94a3b8]">© {new Date().getFullYear()} WelliPay. All rights reserved.</p>
++          <p className="text-[11px] text-[#94a3b8]">A Wellinovate Limited product</p>
++        </div>
++      </div>
++    </footer>
++  );
++};
++
++export default SiteFooter;
+diff --git a/src/components/SiteHeader.tsx b/src/components/SiteHeader.tsx
+new file mode 100644
+index 0000000..d69ab3c
+--- /dev/null
++++ b/src/components/SiteHeader.tsx
+@@ -0,0 +1,49 @@
++import React from 'react';
++import { useNavigate } from 'react-router-dom';
++import { ArrowRight } from 'lucide-react';
++import { Logo } from './ui/Logo';
++
++const NAV_LINKS = [
++  { label: 'About', to: '/about' },
++  { label: 'Privacy', to: '/privacy' },
++];
++
++export const SiteHeader: React.FC = () => {
++  const navigate = useNavigate();
++
++  return (
++    <header className="border-b border-[#e2e8f0] bg-white/80 backdrop-blur-sm sticky top-0 z-30">
++      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
++        <Logo size="sm" variant="full" onClick={() => navigate('/')} />
++        <nav className="hidden sm:flex items-center gap-1">
++          {NAV_LINKS.map((l) => (
++            <button
++              key={l.to}
++              onClick={() => navigate(l.to)}
++              className="text-xs font-semibold text-[#334155] hover:text-[#12244D] px-3 py-2 transition-colors cursor-pointer"
++            >
++              {l.label}
++            </button>
++          ))}
++        </nav>
++        <div className="flex items-center gap-2">
++          <button
++            onClick={() => navigate('/login')}
++            className="text-xs font-semibold text-[#334155] hover:text-[#12244D] px-3 py-2 transition-colors cursor-pointer"
++          >
++            Sign in
++          </button>
++          <button
++            onClick={() => navigate('/signup')}
++            className="text-xs font-bold bg-[#12244D] hover:bg-[#0B1733] text-white px-4 py-2 rounded-lg shadow-card transition-all cursor-pointer flex items-center gap-1.5"
++          >
++            Get started
++            <ArrowRight className="w-3.5 h-3.5" />
++          </button>
++        </div>
++      </div>
++    </header>
++  );
++};
++
++export default SiteHeader;
+diff --git a/src/pages/About.tsx b/src/pages/About.tsx
+new file mode 100644
+index 0000000..874f8fd
+--- /dev/null
++++ b/src/pages/About.tsx
+@@ -0,0 +1,142 @@
++import React from 'react';
++import { useNavigate } from 'react-router-dom';
++import { SiteHeader } from '../components/SiteHeader';
++import { SiteFooter } from '../components/SiteFooter';
++import { ArrowRight, ShieldCheck, Layers, Eye, Gauge, ScrollText } from 'lucide-react';
++
++const CORE_VALUES = [
++  {
++    icon: Eye,
++    title: 'Auditability over black boxes',
++    description:
++      'Every flag WelliPay raises links to the specific record it disagrees with. Nothing is automated in a way that can’t be traced back and checked by a person.',
++  },
++  {
++    icon: Layers,
++    title: 'Built for the real payer mix',
++    description:
++      'Hospitals bill self-pay patients and several HMOs at once, through different channels. WelliPay is designed around that mix, not a single simplified case.',
++  },
++  {
++    icon: Gauge,
++    title: 'Exception-based, not busywork',
++    description:
++      'Routine matching should be invisible. A revenue team’s time should go to the handful of invoices that actually need judgment.',
++  },
++  {
++    icon: ShieldCheck,
++    title: 'Compliance by default',
++    description:
++      'Duplicate charges, tariff mismatches, and missing pre-authorisations are flagged before they reach a payer — not discovered later in a dispute.',
++  },
++];
++
++export const About: React.FC = () => {
++  const navigate = useNavigate();
++
++  return (
++    <div className="min-h-screen bg-[#f8fafc] font-sans text-[#0f172a]">
++      <SiteHeader />
++
++      {/* Hero */}
++      <section className="relative overflow-hidden">
++        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[380px] bg-gradient-to-b from-[#ebf7f6]/80 via-[#f0f4fa]/40 to-transparent blur-3xl pointer-events-none -z-10" />
++        <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-16 pb-14 text-center">
++          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#0B6B69] bg-[#EBF7F6] px-3 py-1 rounded-full">
++            About WelliPay
++          </span>
++          <h1 className="font-heading text-3xl sm:text-4xl font-bold text-[#12244D] mt-5 leading-tight">
++            Reconciliation software for hospitals that bill more than one payer
++          </h1>
++          <p className="text-sm sm:text-base text-[#475569] mt-4 max-w-xl mx-auto">
++            WelliPay is built by Wellinovate Limited, a Nigerian health-technology company
++            building digital health infrastructure for emerging markets.
++          </p>
++        </div>
++      </section>
++
++      {/* Mission / story */}
++      <section className="max-w-3xl mx-auto px-4 sm:px-6 py-14 border-t border-[#e2e8f0]">
++        <h2 className="font-heading text-xl font-bold text-[#12244D] mb-4">Why we built this</h2>
++        <div className="space-y-4 text-sm text-[#475569] leading-relaxed">
++          <p>
++            Wellinovate builds clinical and financial infrastructure for hospitals and clinics —
++            starting with WelliRecord, a patient-owned health records platform. Working closely
++            with hospital teams on that problem surfaced a second one sitting right next to it:
++            billing reconciliation across self-pay patients and multiple HMOs was still done by
++            hand, invoice by invoice, payer by payer.
++          </p>
++          <p>
++            WelliPay exists to close that gap — one system that reconciles patient bills, HMO
++            claims, and bank transfers automatically, and gives a revenue team a single, auditable
++            place to work from instead of a spreadsheet stitched together from several sources.
++          </p>
++          <p>
++            It's built and operated as its own product, with its own accounts and its own team
++            workflows, so a hospital or clinic can adopt it independently of any other Wellinovate
++            system.
++          </p>
++        </div>
++      </section>
++
++      {/* Core values */}
++      <section className="bg-white border-t border-[#e2e8f0]">
++        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-14">
++          <div className="text-center mb-10">
++            <h2 className="font-heading text-2xl font-bold text-[#12244D]">Core values</h2>
++            <p className="text-sm text-[#64748b] mt-2 max-w-xl mx-auto">
++              What we hold ourselves to when we design how WelliPay handles money and clinical
++              billing data.
++            </p>
++          </div>
++          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
++            {CORE_VALUES.map((v) => (
++              <div key={v.title} className="flex gap-3.5 border border-[#e2e8f0] rounded-xl p-5">
++                <div className="w-9 h-9 rounded-lg bg-[#EBF7F6] flex items-center justify-center flex-shrink-0">
++                  <v.icon className="w-4.5 h-4.5 text-[#0B6B69]" />
++                </div>
++                <div>
++                  <h3 className="font-heading text-sm font-bold text-[#12244D] mb-1">{v.title}</h3>
++                  <p className="text-xs text-[#64748b] leading-relaxed">{v.description}</p>
++                </div>
++              </div>
++            ))}
++          </div>
++        </div>
++      </section>
++
++      {/* Parent company note */}
++      <section className="max-w-3xl mx-auto px-4 sm:px-6 py-14 border-t border-[#e2e8f0] text-center">
++        <ScrollText className="w-6 h-6 text-[#0B6B69] mx-auto mb-3" />
++        <h2 className="font-heading text-lg font-bold text-[#12244D] mb-2">Part of the Wellinovate family</h2>
++        <p className="text-sm text-[#64748b] max-w-xl mx-auto">
++          WelliPay is one of several health-technology products built by Wellinovate Limited,
++          alongside WelliRecord, the company's flagship patient records platform. Each product is
++          built and run independently, sharing an underlying commitment to accurate, auditable
++          healthcare infrastructure.
++        </p>
++      </section>
++
++      {/* CTA */}
++      <section className="bg-[#12244D]">
++        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-14 text-center">
++          <h2 className="font-heading text-2xl font-bold text-white">See it on your own billing</h2>
++          <p className="text-sm text-[#cbd5e1] mt-3">
++            Create a provider account and start reconciling your invoices today.
++          </p>
++          <button
++            onClick={() => navigate('/signup')}
++            className="mt-6 text-xs font-bold bg-white hover:bg-[#f1f5f9] text-[#12244D] px-5 py-3 rounded-lg transition-all cursor-pointer inline-flex items-center gap-1.5"
++          >
++            Create your account
++            <ArrowRight className="w-3.5 h-3.5" />
++          </button>
++        </div>
++      </section>
++
++      <SiteFooter />
++    </div>
++  );
++};
++
++export default About;
+diff --git a/src/pages/Homepage.tsx b/src/pages/Homepage.tsx
+index 37ae1c2..eeb9e31 100644
+--- a/src/pages/Homepage.tsx
++++ b/src/pages/Homepage.tsx
+@@ -1,6 +1,7 @@
+ import React from 'react';
+ import { useNavigate } from 'react-router-dom';
+-import { Logo } from '../components/ui/Logo';
++import { SiteHeader } from '../components/SiteHeader';
++import { SiteFooter } from '../components/SiteFooter';
+ import {
+   ArrowRight,
+   ShieldCheck,
+@@ -10,6 +11,10 @@ import {
+   ClipboardCheck,
+   Wallet,
+   CheckCircle2,
++  AlertTriangle,
++  Clock,
++  TrendingDown,
++  Search,
+ } from 'lucide-react';
+ 
+ const FEATURES = [
+@@ -69,32 +74,35 @@ const STEPS = [
+   },
+ ];
+ 
++const COST_POINTS = [
++  {
++    icon: Clock,
++    title: 'Hours lost every week',
++    description: 'Revenue staff manually cross-check bank statements, HMO remittance sheets, and invoice logs line by line.',
++  },
++  {
++    icon: TrendingDown,
++    title: 'Cash flow you can’t see',
++    description: 'Without a live reconciled view, it’s unclear which invoices are actually paid until someone chases it down.',
++  },
++  {
++    icon: AlertTriangle,
++    title: 'Errors that surface too late',
++    description: 'Duplicate charges and tariff mismatches are often only caught when a payer disputes them — after the damage is done.',
++  },
++  {
++    icon: Search,
++    title: 'Claims that go quiet',
++    description: 'Pre-authorisation requests and HMO claims sit in inboxes with no single tracker for status or turnaround.',
++  },
++];
++
+ export const Homepage: React.FC = () => {
+   const navigate = useNavigate();
+ 
+   return (
+     <div className="min-h-screen bg-[#f8fafc] font-sans text-[#0f172a]">
+-      {/* Nav */}
+-      <header className="border-b border-[#e2e8f0] bg-white/80 backdrop-blur-sm sticky top-0 z-30">
+-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+-          <Logo size="sm" variant="full" onClick={() => navigate('/')} />
+-          <div className="flex items-center gap-2">
+-            <button
+-              onClick={() => navigate('/login')}
+-              className="text-xs font-semibold text-[#334155] hover:text-[#12244D] px-3 py-2 transition-colors cursor-pointer"
+-            >
+-              Sign in
+-            </button>
+-            <button
+-              onClick={() => navigate('/signup')}
+-              className="text-xs font-bold bg-[#12244D] hover:bg-[#0B1733] text-white px-4 py-2 rounded-lg shadow-card transition-all cursor-pointer flex items-center gap-1.5"
+-            >
+-              Get started
+-              <ArrowRight className="w-3.5 h-3.5" />
+-            </button>
+-          </div>
+-        </div>
+-      </header>
++      <SiteHeader />
+ 
+       {/* Hero */}
+       <section className="relative overflow-hidden">
+@@ -128,14 +136,62 @@ export const Homepage: React.FC = () => {
+         </div>
+       </section>
+ 
+-      {/* Feature grid */}
++      {/* Problem */}
++      <section className="max-w-5xl mx-auto px-4 sm:px-6 py-14 border-t border-[#e2e8f0]">
++        <div className="text-center mb-10">
++          <span className="text-[11px] font-bold uppercase tracking-wider text-[#94a3b8]">The problem</span>
++          <h2 className="font-heading text-2xl font-bold text-[#12244D] mt-2">
++            Hospital billing runs through too many payers to reconcile by hand
++          </h2>
++          <p className="text-sm text-[#64748b] mt-3 max-w-2xl mx-auto">
++            A single hospital bills self-pay patients, several HMOs, and receives payment by bank
++            transfer, POS, and dedicated account — each with its own paperwork and its own pace.
++            Matching all of it back to the right invoice is still, for most revenue teams, a
++            manual job.
++          </p>
++        </div>
++
++        {/* The curse — what that manual process actually costs */}
++        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
++          {COST_POINTS.map((c) => (
++            <div key={c.title} className="flex gap-3.5 bg-white border border-[#e2e8f0] rounded-xl p-5">
++              <div className="w-9 h-9 rounded-lg bg-rose-50 flex items-center justify-center flex-shrink-0">
++                <c.icon className="w-4.5 h-4.5 text-rose-600" />
++              </div>
++              <div>
++                <h3 className="font-heading text-sm font-bold text-[#12244D] mb-1">{c.title}</h3>
++                <p className="text-xs text-[#64748b] leading-relaxed">{c.description}</p>
++              </div>
++            </div>
++          ))}
++        </div>
++      </section>
++
++      {/* Business impact */}
++      <section className="bg-[#12244D]">
++        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-14 text-center">
++          <span className="text-[11px] font-bold uppercase tracking-wider text-[#7ea3c9]">The business impact</span>
++          <h2 className="font-heading text-2xl font-bold text-white mt-2">
++            Every hour spent matching payments is an hour not spent on patients or growth
++          </h2>
++          <p className="text-sm text-[#cbd5e1] mt-3 max-w-2xl mx-auto">
++            Delayed reconciliation delays visibility into real cash position. Unresolved HMO
++            claims tie up revenue that's already been earned. And billing errors caught late —
++            by a payer, or an auditor — cost more to fix than they would have cost to prevent.
++          </p>
++        </div>
++      </section>
++
++      {/* Insight / solution — feature grid */}
+       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14 border-t border-[#e2e8f0]">
+         <div className="text-center mb-10">
+-          <h2 className="font-heading text-2xl font-bold text-[#12244D]">
+-            Everything a revenue team needs in one place
++          <span className="text-[11px] font-bold uppercase tracking-wider text-[#0B6B69]">The insight</span>
++          <h2 className="font-heading text-2xl font-bold text-[#12244D] mt-2">
++            Automate the matching, surface only the exceptions
+           </h2>
+-          <p className="text-sm text-[#64748b] mt-2 max-w-xl mx-auto">
+-            Built for hospitals and clinics handling self-pay and HMO billing side by side.
++          <p className="text-sm text-[#64748b] mt-3 max-w-xl mx-auto">
++            WelliPay reconciles routine payments on its own and puts everything a revenue team
++            needs to manage the rest in one place.
+           </p>
+         </div>
+         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+@@ -203,13 +259,7 @@ export const Homepage: React.FC = () => {
+         </div>
+       </section>
+ 
+-      {/* Footer */}
+-      <footer className="border-t border-[#e2e8f0] bg-white">
+-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+-          <Logo size="sm" variant="full" />
+-          <p className="text-[11px] text-[#94a3b8]">© {new Date().getFullYear()} WelliPay. All rights reserved.</p>
+-        </div>
+-      </footer>
++      <SiteFooter />
+     </div>
+   );
+ };
+diff --git a/src/pages/Privacy.tsx b/src/pages/Privacy.tsx
+new file mode 100644
+index 0000000..3c3a0ca
+--- /dev/null
++++ b/src/pages/Privacy.tsx
+@@ -0,0 +1,139 @@
++import React from 'react';
++import { SiteHeader } from '../components/SiteHeader';
++import { SiteFooter } from '../components/SiteFooter';
++
++const SECTIONS: { heading: string; body: React.ReactNode }[] = [
++  {
++    heading: '1. Scope',
++    body: (
++      <p>
++        This policy covers the WelliPay web application and API — used by hospital and clinic
++        staff, billing teams, and HMO claims adjudicators (collectively, "providers") — and the
++        public invoice payment pages WelliPay generates for patients. It does not cover other
++        Wellinovate Limited products, which maintain their own privacy notices.
++      </p>
++    ),
++  },
++  {
++    heading: '2. What we collect',
++    body: (
++      <ul className="list-disc pl-5 space-y-1.5">
++        <li>Account information: name, work email, organization name, and authentication credentials.</li>
++        <li>
++          Billing and clinical-service data entered by a provider: patient names, MRNs, invoices,
++          line items, payer and plan information, HMO claims, and pre-authorisation requests.
++        </li>
++        <li>Payment and reconciliation data: bank transfer references, Paystack transaction records, and dedicated virtual account activity.</li>
++        <li>Usage data: access logs and basic diagnostic information needed to operate and secure the service.</li>
++      </ul>
++    ),
++  },
++  {
++    heading: '3. How we use it',
++    body: (
++      <p>
++        Data is used to operate WelliPay: matching payments to invoices, tracking HMO claims and
++        pre-authorisations, flagging billing compliance issues, and providing account access and
++        support. We do not use provider or patient billing data to train third-party AI models,
++        and we do not sell it.
++      </p>
++    ),
++  },
++  {
++    heading: '4. Who we share it with',
++    body: (
++      <p>
++        Data is shared only as needed to run the service: with the payer or HMO a provider is
++        billing (as instructed by that provider), and with the infrastructure providers WelliPay
++        runs on for authentication, hosting, and payment processing. We do not sell provider or
++        patient data to third parties for marketing or any other purpose.
++      </p>
++    ),
++  },
++  {
++    heading: '5. Security',
++    body: (
++      <p>
++        Data in transit is encrypted, and access to provider accounts is protected by
++        authenticated sessions. Our practices are designed to align with HIPAA and NDPR security
++        expectations for healthcare and financial data; this describes our security approach and
++        is not a claim of formal certification under either framework.
++      </p>
++    ),
++  },
++  {
++    heading: '6. Data retention',
++    body: (
++      <p>
++        Billing and reconciliation records are retained for as long as an account is active, and
++        for a reasonable period after closure to meet standard financial record-keeping practice.
++        A provider can request deletion of their organization's data using the contact details
++        below, subject to any records we are legally required to keep.
++      </p>
++    ),
++  },
++  {
++    heading: '7. Your rights',
++    body: (
++      <p>
++        Depending on your location, you may have rights under the Nigeria Data Protection Act
++        (NDPA) or other applicable law to access, correct, or request deletion of personal data
++        held about you. To exercise these rights, contact us using the details below.
++      </p>
++    ),
++  },
++  {
++    heading: '8. Changes to this policy',
++    body: (
++      <p>
++        We may update this policy as WelliPay's features change. Material changes will be
++        reflected here with an updated date.
++      </p>
++    ),
++  },
++  {
++    heading: '9. Contact',
++    body: (
++      <p>
++        Questions about this policy or a data request can be sent to{' '}
++        <a href="mailto:privacy@wellipay.com" className="text-[#0B6B69] font-semibold hover:underline">
++          privacy@wellipay.com
++        </a>
++        .
++      </p>
++    ),
++  },
++];
++
++export const Privacy: React.FC = () => {
++  return (
++    <div className="min-h-screen bg-[#f8fafc] font-sans text-[#0f172a]">
++      <SiteHeader />
++
++      <section className="max-w-3xl mx-auto px-4 sm:px-6 pt-14 pb-6">
++        <h1 className="font-heading text-3xl font-bold text-[#12244D]">Privacy policy</h1>
++        <p className="text-xs text-[#94a3b8] mt-2">Last updated: September 2026</p>
++        <p className="text-sm text-[#475569] mt-4">
++          This policy explains what data WelliPay collects, how it's used, and how it's protected.
++          It applies to hospital and clinic staff using the WelliPay portal and to patients using
++          a WelliPay-generated invoice payment page.
++        </p>
++      </section>
++
++      <section className="max-w-3xl mx-auto px-4 sm:px-6 pb-16">
++        <div className="bg-white border border-[#e2e8f0] rounded-xl divide-y divide-[#e2e8f0]">
++          {SECTIONS.map((s) => (
++            <div key={s.heading} className="p-6">
++              <h2 className="font-heading text-sm font-bold text-[#12244D] mb-2.5">{s.heading}</h2>
++              <div className="text-xs text-[#475569] leading-relaxed">{s.body}</div>
++            </div>
++          ))}
++        </div>
++      </section>
++
++      <SiteFooter />
++    </div>
++  );
++};
++
++export default Privacy;
+-- 
+2.43.0

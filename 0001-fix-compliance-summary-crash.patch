@@ -1,0 +1,170 @@
+From c4b0251a0c4a18f0f773fe37364dccd743345596 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 21 Sep 2026 12:11:29 +0000
+Subject: [PATCH] fix(schema): fix production compliance-summary crash and 4
+ related bugs
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Root cause of the live outage ("Failed to compute compliance summary"):
+initializeDatabase() threw column "order_id" does not exist because the
+ALTER TABLE adding it ran after an UPDATE that already needed it, aborting
+schema init before pre_authorizations was ever created.
+
+- server/db.js: move the order_id ALTER TABLE before the seed UPDATE that
+  references it; add the missing pre_authorizations.plan_name column
+  (server.js selects/inserts it on every pre-auth request); correct the
+  INV-93402 seed fixture's master_service_id (was pointing at an
+  unrelated, unpriced catalogue entry instead of the Lipid Profile Panel
+  the test fixture assumes).
+- server.js:
+  - POST /api/invoices: clinical_service_orders.id was set to the
+    client-supplied orderId, so two line items sharing one orderId
+    collided on ON CONFLICT (id) DO NOTHING and only one row was ever
+    persisted, and order_id itself was never in the INSERT's column
+    list — both defeated duplicate-charge detection. id is now always
+    unique per line item; order_id is persisted separately.
+  - GET /api/compliance/summary: fixed a crash calling .split() on a
+    Date object (pg returns TIMESTAMPTZ as Date, not string); populated
+    invoice.orders from clinical_service_orders so constituentOrders
+    isn't silently empty in live-DB mode; aliased the resolve endpoint's
+    RETURNING columns to camelCase so resolution.resolvedBy is no longer
+    undefined in live-DB mode.
+
+Verified against a fresh Postgres database: schema initializes cleanly
+(seedComplete:true), all test suites pass (directory catalogue, cost
+estimation, benefit gaps, bill audit, compliance summary, pre-auth
+overhaul, DVA transfer, DVA per-invoice), tsc --noEmit clean, production
+build succeeds.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BtycEXkekHWpeoihRnyKkM
+---
+ server.js    | 44 ++++++++++++++++++++++++++++++++++++++------
+ server/db.js |  5 +++--
+ 2 files changed, 41 insertions(+), 8 deletions(-)
+
+diff --git a/server.js b/server.js
+index 037bc9f..4e69e7a 100644
+--- a/server.js
++++ b/server.js
+@@ -3139,7 +3139,11 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
+ 
+   const orders = Array.isArray(line_items) && line_items.length > 0
+     ? line_items.map((item, idx) => ({
+-        id: (item.orderId || item.order_id) || `ORD-${invoiceNumber}-${idx + 1}`,
++        // `id` is always unique per line item — it is this row's own primary
++        // key, so it must never collide even when two line items share one
++        // client-supplied orderId (that's exactly the "same clinical order
++        // billed twice" case duplicate detection needs to see as two rows).
++        id: `ORD-${invoiceNumber}-${idx + 1}`,
+         orderId: (item.orderId || item.order_id) || `ORD-${invoiceNumber}-${idx + 1}`,
+         patientName: patient_name,
+         patientMrn: effectiveMrn,
+@@ -3190,10 +3194,10 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
+           await pool.query(`
+             INSERT INTO clinical_service_orders
+               (id, patient_name, patient_mrn, service_type, category, amount, status, performed_at, invoice_id,
+-               master_service_id, provider_id)
+-            VALUES ($1, $2, $3, $4, $5, $6, 'invoiced', NOW(), $7, $8, $9)
++               master_service_id, provider_id, order_id)
++            VALUES ($1, $2, $3, $4, $5, $6, 'invoiced', NOW(), $7, $8, $9, $10)
+             ON CONFLICT (id) DO NOTHING
+-          `, [ord.id, ord.patientName, ord.patientMrn, ord.serviceType, 'Laboratory', ord.amount, invoiceNumber, ord.masterServiceId, ord.providerId]);
++          `, [ord.id, ord.patientName, ord.patientMrn, ord.serviceType, 'Laboratory', ord.amount, invoiceNumber, ord.masterServiceId, ord.providerId, ord.orderId]);
+         }
+       }
+ 
+@@ -3913,6 +3917,27 @@ app.get('/api/compliance/summary', requireAuth, async (req, res) => {
+       const invoicesRes = await pool.query(`SELECT * FROM invoices ORDER BY created_at DESC`);
+       invoices = invoicesRes.rows;
+ 
++      // Attach constituent clinical_service_orders to each invoice so downstream
++      // constituentOrders reporting isn't silently empty in live-DB mode.
++      const ordersRes = await pool.query(`
++        SELECT id, order_id AS "orderId", invoice_id AS "invoiceId",
++               service_type AS "serviceType", amount::float AS amount,
++               patient_name AS "patientName", patient_mrn AS "patientMrn"
++        FROM clinical_service_orders
++        WHERE invoice_id IS NOT NULL
++      `);
++      const ordersByInvoiceNumber = {};
++      for (const ord of (ordersRes.rows || [])) {
++        const invId = ord.invoiceId;
++        if (!invId) continue;
++        if (!ordersByInvoiceNumber[invId]) ordersByInvoiceNumber[invId] = [];
++        ordersByInvoiceNumber[invId].push(ord);
++      }
++      for (const invoice of invoices) {
++        const invNum = invoice.invoice_number || invoice.invoiceNumber || invoice.id;
++        invoice.orders = ordersByInvoiceNumber[invNum] || [];
++      }
++
+       const preAuthRes = await pool.query(`
+         SELECT id, status, created_at, updated_at FROM pre_authorizations
+       `);
+@@ -4037,7 +4062,7 @@ app.get('/api/compliance/summary', requireAuth, async (req, res) => {
+           patientMrn: invoice.patient_mrn || invoice.patientMrn,
+           payerName: invoice.payer_name || invoice.payerName || (invoice.payer_type === 'self-pay' ? 'Self-pay' : null),
+           planName: invoice.plan_name || invoice.planName,
+-          date: (invoice.created_at || invoice.createdAt || new Date().toISOString()).split('T')[0],
++          date: new Date(invoice.created_at || invoice.createdAt || Date.now()).toISOString().split('T')[0],
+           totalAmount: Number(invoice.total_amount || invoice.totalAmount || 0),
+           flagCount: activeFlags.length,
+           worstSeverity: hasUnresolvedCritical ? 'critical' : (hasUnresolvedWarning ? 'warning' : 'info'),
+@@ -4204,7 +4229,14 @@ app.post('/api/compliance/invoices/:invoiceNumber/resolve', requireAuth, async (
+         INSERT INTO compliance_resolutions (
+           invoice_number, rule_code, reason, resolved_by, resolved_at, invoice_updated_at_snapshot
+         ) VALUES ($1, $2, $3, $4, $5, $6)
+-        RETURNING *
++        RETURNING
++          id,
++          invoice_number, invoice_number AS "invoiceNumber",
++          rule_code, rule_code AS "ruleCode",
++          reason,
++          resolved_by, resolved_by AS "resolvedBy",
++          resolved_at, resolved_at AS "resolvedAt",
++          invoice_updated_at_snapshot, invoice_updated_at_snapshot AS "invoiceUpdatedAtSnapshot"
+       `, [invoiceNumber, ruleCode, reason, resolvedBy, resolvedAt, invoiceSnapshot]);
+ 
+       return res.json({
+diff --git a/server/db.js b/server/db.js
+index 55a1239..93032db 100644
+--- a/server/db.js
++++ b/server/db.js
+@@ -792,6 +792,7 @@ export async function initializeDatabase() {
+       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
+       ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
+       ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS master_service_id INTEGER;
++      ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS order_id VARCHAR(50);
+ 
+       -- Multi-vendor EHR integration (external ingestion API, see docs/multi-vendor-ehr-integration.md)
+ 
+@@ -975,7 +976,7 @@ export async function initializeDatabase() {
+ 
+       -- Set order_id, invoice_id, master_service_id, provider_id on compliance fixtures
+       UPDATE clinical_service_orders SET order_id = 'ORD-DUP-93401', invoice_id = 'INV-93401' WHERE id IN ('CSO-DUP-01', 'CSO-DUP-02');
+-      UPDATE clinical_service_orders SET order_id = 'ORD-TAR-93402', invoice_id = 'INV-93402', master_service_id = 2, provider_id = 'PRV-LAG-01' WHERE id = 'CSO-TAR-01';
++      UPDATE clinical_service_orders SET order_id = 'ORD-TAR-93402', invoice_id = 'INV-93402', master_service_id = 8, provider_id = 'PRV-LAG-01' WHERE id = 'CSO-TAR-01';
+       UPDATE clinical_service_orders SET order_id = 'ORD-PRE-93403', invoice_id = 'INV-93403' WHERE id = 'CSO-PRE-01';
+       `);
+     }
+@@ -1264,6 +1265,7 @@ export async function initializeDatabase() {
+       ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS urgency VARCHAR(20) DEFAULT 'routine';
+       ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS enrollee_id VARCHAR(100);
+       ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS expiry_date DATE;
++      ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS plan_name VARCHAR(150);
+ 
+       -- Append-only audit trail for compliance flag resolutions
+       CREATE TABLE IF NOT EXISTS compliance_resolutions (
+@@ -1279,7 +1281,6 @@ export async function initializeDatabase() {
+       CREATE INDEX IF NOT EXISTS idx_compliance_resolutions_invoice ON compliance_resolutions(invoice_number);
+ 
+       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+-      ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS order_id VARCHAR(50);
+     `);
+ 
+     return { initialized: true };
+-- 
+2.43.0
