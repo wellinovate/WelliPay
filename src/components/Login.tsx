@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Logo } from './ui/Logo';
 import { ShieldCheck, Lock, Mail, AlertCircle, ArrowRight, Loader2, Zap } from 'lucide-react';
@@ -30,6 +31,7 @@ function loadDemoLoginSlots(): DemoLoginSlot[] {
 const DEMO_LOGIN_SLOTS = loadDemoLoginSlots();
 
 export const Login: React.FC = () => {
+  const navigate = useNavigate();
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -78,7 +80,7 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-md">
         {/* Brand Header with Authentic Logo */}
         <div className="text-center mb-8 flex flex-col items-center">
-          <Logo size="lg" variant="full" showTagline={true} className="mb-2" />
+          <Logo size="lg" variant="full" showTagline={true} className="mb-2" onClick={() => navigate('/')} />
           <p className="text-xs text-[#64748b] mt-1.5 max-w-xs font-sans">
             Healthcare Financial Operating System & AI Payment Reconciliation
           </p>
@@ -192,6 +194,18 @@ export const Login: React.FC = () => {
             <span>NDPR & HIPAA-compliant encryption standards</span>
           </div>
         </div>
+
+        {/* Signup link */}
+        <p className="text-center text-xs text-[#64748b] mt-5">
+          New provider?{' '}
+          <button
+            type="button"
+            onClick={() => navigate('/signup')}
+            className="font-bold text-[#0B6B69] hover:text-[#074C4A] cursor-pointer"
+          >
+            Create an account
+          </button>
+        </p>
       </div>
     </div>
   );

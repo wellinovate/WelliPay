@@ -31,9 +31,16 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-h1, h2, h3, h4, .font-heading {
-  font-family: var(--font-heading);
-  color: var(--color-brand-navy);
+/* Base layer (not the bare, unlayered rule this used to be) so a Tailwind
+   text-color utility applied directly to an h1-h4 tag can actually override
+   the default navy — an unlayered rule always beats a @layer utilities rule
+   regardless of selector specificity, which silently broke every attempt to
+   set a heading to any other color (e.g. text-white on a dark section). */
+@layer base {
+  h1, h2, h3, h4, .font-heading {
+    font-family: var(--font-heading);
+    color: var(--color-brand-navy);
+  }
 }
 
 /* Custom scrollbar matching WelliPay look */
