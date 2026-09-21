@@ -1,5 +1,5 @@
 import { auth } from '../firebase';
-import { CostEstimate, PayerPlanRule, BenefitCheckRequest, BenefitCheckResult, BenefitUsage } from '../types';
+import { CostEstimate, PayerPlanRule, BenefitUsage } from '../types';
 
 export class EstimateError extends Error {
   statusCode: number;
@@ -74,39 +74,6 @@ export async function getPayerPlans(payerName?: string): Promise<PayerPlanRule[]
     throw new EstimateError(data.error || 'Failed to fetch payer plans.', res.status);
   }
   return data.plans as PayerPlanRule[];
-}
-
-/**
- * Reusable HMO Benefit Check & Copay Calculation
- * Combines provider pricing (from Phase 1 foundation) with payer plan coverage rules,
- * pre-auth thresholds, and copay math with zero duplicated logic.
- */
-export async function checkBenefitCoverage(
-  params: BenefitCheckRequest
-): Promise<BenefitCheckResult> {
-  const { providerId, masterServiceId, payerName, planName, patientId } = params;
-  if (!providerId || !masterServiceId || !payerName || !planName) {
-    throw new EstimateError('providerId, masterServiceId, payerName, and planName are required.', 400);
-  }
-
-  const headers = await getAuthHeaders();
-  let url = `/api/benefit-check?providerId=${encodeURIComponent(providerId)}&masterServiceId=${masterServiceId}&payerName=${encodeURIComponent(payerName)}&planName=${encodeURIComponent(planName)}`;
-  if (patientId) {
-    url += `&patientId=${encodeURIComponent(patientId)}`;
-  }
-
-  const res = await fetch(url, { headers });
-  const data = await res.json().catch(() => ({}));
-
-  if (!res.ok) {
-    throw new EstimateError(data.error || 'Failed to check benefit coverage.', res.status);
-  }
-
-  if (!data.benefitCheck) {
-    throw new EstimateError('Invalid benefit check response received from server.', 500);
-  }
-
-  return data.benefitCheck as BenefitCheckResult;
 }
 
 /**

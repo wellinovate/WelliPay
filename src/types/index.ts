@@ -147,7 +147,7 @@ export interface PreAuthEvent {
 
 export type PersonaType = 'provider' | 'hmo';
 
-export type NavTab = 'dashboard' | 'reconciliation' | 'claims' | 'invoices' | 'patients' | 'catalogue' | 'estimation' | 'settings' | 'preauth';
+export type NavTab = 'dashboard' | 'reconciliation' | 'claims' | 'invoices' | 'patients' | 'catalogue' | 'estimation' | 'settings' | 'preauth' | 'compliance';
 
 export interface CostEstimate {
   price: number;
@@ -178,6 +178,34 @@ export interface PayerPlanRule {
   isActive: boolean;
 }
 
+export interface ComplianceFlaggedInvoice {
+  invoiceNumber: string;
+  patientName: string;
+  totalAmount: number;
+  flagCount: number;
+  worstSeverity: 'critical' | 'warning';
+  flags: { code: string; severity: string; message: string }[];
+}
+
+export interface ComplianceSummary {
+  generatedAt: string;
+  invoiceCount: number;
+  cleanCount: number;
+  criticalInvoiceCount: number;
+  warningInvoiceCount: number;
+  flagCounts: Record<string, number>;
+  worstInvoices: ComplianceFlaggedInvoice[];
+  preAuth: {
+    totalRequests: number;
+    decidedCount: number;
+    approvedCount: number;
+    rejectedCount: number;
+    rejectionRate: number | null;
+    avgTurnaroundHours: number | null;
+  };
+  note: string;
+}
+
 export interface BenefitUsage {
   patientId: string;
   payerName: string;
@@ -185,36 +213,6 @@ export interface BenefitUsage {
   annualLimit: number | null;
   usedThisYear: number;
   remaining: number | null;
-  note: string;
-}
-
-export interface BenefitCheckRequest {
-  providerId: string;
-  masterServiceId: number;
-  payerName: string;
-  planName: string;
-  patientId?: string;
-}
-
-export interface BenefitCheckResult {
-  status: 'covered' | 'out_of_network' | 'excluded';
-  isCovered: boolean;
-  isNetworkAccepted: boolean;
-  price: number;
-  copayPercentage: number;
-  patientCopayAmount: number;
-  hmoCoverageAmount: number;
-  preAuthRequired: boolean;
-  preAuthThreshold: number | null;
-  serviceName: string;
-  serviceCode: string;
-  department: string;
-  turnaroundTime: string;
-  providerId: string;
-  providerName: string;
-  payerName: string;
-  planName: string;
-  patientId: string | null;
   note: string;
 }
 

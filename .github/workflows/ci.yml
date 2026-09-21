@@ -76,7 +76,10 @@ jobs:
       - run: node scripts/verify_cross_system_invariants.js
       - run: node scripts/test_directory_catalogue.js
       - run: node scripts/test_cost_estimation.js
-      - run: node scripts/test_benefit_check.js
+      - run: node scripts/test_compliance_summary.js
+      - run: node scripts/test_preauth_overhaul.js
+      - run: node scripts/test_bill_audit.js
+      - run: node scripts/test_benefit_gaps.js
 
       - name: Server log (on failure)
         if: failure()

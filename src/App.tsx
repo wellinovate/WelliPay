@@ -11,6 +11,7 @@ import InvoicesHub from './features/invoices/InvoicesHub';
 import { SettingsView } from './features/settings/SettingsView';
 import { CatalogueAndEstimatorView } from './features/catalogue/CatalogueAndEstimatorView';
 import { PreAuthTracker } from './features/preauth/PreAuthTracker';
+import { ComplianceDashboard } from './features/compliance/ComplianceDashboard';
 import { PlaceholderView } from './features/common/PlaceholderView';
 import { Login } from './components/Login';
 import PublicInvoicePay from './pages/PublicInvoicePay';
@@ -27,6 +28,7 @@ const AppContent: React.FC = () => {
       {activeTab === 'invoices' && <InvoicesHub />}
       {(activeTab === 'catalogue' || activeTab === 'estimation') && <CatalogueAndEstimatorView />}
       {activeTab === 'preauth' && <PreAuthTracker />}
+      {activeTab === 'compliance' && <ComplianceDashboard />}
       {activeTab === 'settings' && <SettingsView />}
     </AppLayout>
   );

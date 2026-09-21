@@ -3213,6 +3213,8 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
     payer_type: payer_type || 'self-pay',
     payerName: payer_name,
     payer_name: payer_name,
+    planName: plan_name || null,
+    plan_name: plan_name || null,
     policyNumber: policy_number,
     policy_number: policy_number,
     copayAmount: copay_amount ? Number(copay_amount) : undefined,
@@ -3241,20 +3243,16 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
 // independent — one being unavailable (e.g. no catalogue link on an older
 // line item) doesn't block the others from running.
 // ==========================================
-app.get('/api/invoices/:invoiceNumber/audit', requireAuth, async (req, res) => {
-  const { invoiceNumber } = req.params;
+// Runs the same 7 checks as the per-invoice endpoint below, extracted so the
+// Provider Compliance Dashboard (GET /api/compliance/summary) can run them
+// across every invoice and aggregate the result, without a second copy of
+// this logic drifting out of sync with the per-invoice version.
+async function computeInvoiceAuditFlags(invoice) {
+  const invoiceNumber = invoice.invoice_number || invoice.invoiceNumber || invoice.id;
+  const flags = [];
 
-  if (!pool) {
-    return res.status(503).json({ error: 'Bill audit requires a database connection.' });
-  }
-
-  try {
-    const invRes = await pool.query(`SELECT * FROM invoices WHERE invoice_number = $1`, [invoiceNumber]);
-    if (invRes.rows.length === 0) {
-      return res.status(404).json({ error: `Invoice ${invoiceNumber} not found.` });
-    }
-    const invoice = invRes.rows[0];
-
+  let lineItems = [];
+  if (pool) {
     const lineItemsRes = await pool.query(`
       SELECT cso.id, cso.service_type as "serviceType", cso.amount::float as amount,
              cso.master_service_id as "masterServiceId", cso.provider_id as "providerId",
@@ -3265,160 +3263,259 @@ app.get('/api/invoices/:invoiceNumber/audit', requireAuth, async (req, res) => {
       WHERE cso.invoice_id = $1
       ORDER BY cso.performed_at ASC
     `, [invoiceNumber]);
-    const lineItems = lineItemsRes.rows;
+    lineItems = lineItemsRes.rows;
+  } else {
+    const rawItems = invoice.line_items || invoice.lineItems || invoice.orders || [];
+    lineItems = rawItems.map((item, idx) => {
+      const msId = item.masterServiceId != null ? item.masterServiceId : (item.master_service_id != null ? item.master_service_id : null);
+      const prvId = item.providerId || item.provider_id;
+      const catEntry = (msId != null && prvId)
+        ? MOCK_PROVIDER_CATALOGUE_STATE.find(c => c.provider_id === prvId && Number(c.master_service_id) === Number(msId))
+        : null;
+      const msdEntry = msId != null
+        ? MOCK_MASTER_DIRECTORY_STATE.find(m => Number(m.id) === Number(msId))
+        : null;
+      return {
+        id: item.id || `item-${idx + 1}`,
+        serviceType: item.serviceType || item.service_type || item.description || 'Clinical Service',
+        amount: Number(item.amount != null ? item.amount : (item.totalAmount != null ? item.totalAmount : item.unitPrice || 0)),
+        masterServiceId: msId != null ? Number(msId) : null,
+        providerId: prvId || null,
+        cataloguePrice: catEntry ? Number(catEntry.price) : null,
+        catalogueServiceName: msdEntry ? (msdEntry.serviceName || msdEntry.service_name) : null,
+      };
+    });
+  }
 
-    const flags = [];
-
-    // 1 & 2. Price-vs-catalogue check, per line item — only possible where the
-    // line item carries a real catalogue link (see the POST /api/invoices
-    // comment on masterServiceId/providerId for why many won't).
-    for (const item of lineItems) {
-      if (item.masterServiceId == null || item.providerId == null) {
-        flags.push({
-          code: 'tariff_unknown',
-          severity: 'info',
-          lineItemId: item.id,
-          message: `"${item.serviceType}" isn't linked to a catalogue tariff, so its price can't be checked against the published rate.`,
-        });
-        continue;
-      }
-      if (item.cataloguePrice == null) {
-        flags.push({
-          code: 'tariff_unknown',
-          severity: 'info',
-          lineItemId: item.id,
-          message: `"${item.serviceType}" references a catalogue entry that no longer exists.`,
-        });
-        continue;
-      }
-      const billed = Number(item.amount);
-      const catalogue = Number(item.cataloguePrice);
-      if (Math.abs(billed - catalogue) > 0.01) {
-        flags.push({
-          code: 'price_mismatch',
-          severity: 'warning',
-          lineItemId: item.id,
-          message: `"${item.catalogueServiceName || item.serviceType}" billed at ₦${billed.toLocaleString()}, but the published tariff is ₦${catalogue.toLocaleString()}.`,
-          billedAmount: billed,
-          catalogueAmount: catalogue,
-        });
-      }
+  // 1 & 2. Price-vs-catalogue check, per line item — only possible where the
+  // line item carries a real catalogue link (see the POST /api/invoices
+  // comment on masterServiceId/providerId for why many won't).
+  for (const item of lineItems) {
+    if (item.masterServiceId == null || item.providerId == null) {
+      flags.push({
+        code: 'tariff_unknown',
+        severity: 'info',
+        lineItemId: item.id,
+        message: `"${item.serviceType}" isn't linked to a catalogue tariff, so its price can't be checked against the published rate.`,
+      });
+      continue;
     }
-
-    // 3. Duplicate line items — same catalogue service (or, lacking that, the
-    // same free-text description) billed more than once on this invoice.
-    const seen = new Map();
-    for (const item of lineItems) {
-      const key = item.masterServiceId != null ? `msd:${item.masterServiceId}` : `text:${item.serviceType.toLowerCase()}`;
-      if (!seen.has(key)) { seen.set(key, []); }
-      seen.get(key).push(item);
+    if (item.cataloguePrice == null) {
+      flags.push({
+        code: 'tariff_unknown',
+        severity: 'info',
+        lineItemId: item.id,
+        message: `"${item.serviceType}" references a catalogue entry that no longer exists.`,
+      });
+      continue;
     }
-    for (const [, group] of seen) {
-      if (group.length > 1) {
-        flags.push({
-          code: 'duplicate_charge',
-          severity: 'warning',
-          lineItemIds: group.map(g => g.id),
-          message: `"${group[0].catalogueServiceName || group[0].serviceType}" appears ${group.length} times on this invoice.`,
-        });
-      }
+    const billed = Number(item.amount);
+    const catalogue = Number(item.cataloguePrice);
+    if (Math.abs(billed - catalogue) > 0.01) {
+      flags.push({
+        code: 'price_mismatch',
+        severity: 'warning',
+        lineItemId: item.id,
+        message: `"${item.catalogueServiceName || item.serviceType}" billed at ₦${billed.toLocaleString()}, but the published tariff is ₦${catalogue.toLocaleString()}.`,
+        billedAmount: billed,
+        catalogueAmount: catalogue,
+      });
     }
+  }
 
-    // 4 & 5. Payer plan rule checks (pre-auth threshold, copay percentage) —
-    // only possible when the invoice recorded which HMO plan applied.
-    let planRule = null;
-    if (invoice.payer_type === 'hmo' && invoice.payer_name && invoice.plan_name) {
+  // 3. Duplicate line items — same catalogue service (or, lacking that, the
+  // same free-text description) billed more than once on this invoice.
+  const seen = new Map();
+  for (const item of lineItems) {
+    const key = item.masterServiceId != null ? `msd:${item.masterServiceId}` : `text:${(item.serviceType || '').toLowerCase()}`;
+    if (!seen.has(key)) { seen.set(key, []); }
+    seen.get(key).push(item);
+  }
+  for (const [, group] of seen) {
+    if (group.length > 1) {
+      flags.push({
+        code: 'duplicate_charge',
+        severity: 'warning',
+        lineItemIds: group.map(g => g.id),
+        message: `"${group[0].catalogueServiceName || group[0].serviceType}" appears ${group.length} times on this invoice.`,
+      });
+    }
+  }
+
+  // 4 & 5. Payer plan rule checks (pre-auth threshold, copay percentage) —
+  // only possible when the invoice recorded which HMO plan applied.
+  const payerType = invoice.payer_type || invoice.payerType;
+  const payerName = invoice.payer_name || invoice.payerName;
+  const planName = invoice.plan_name || invoice.planName;
+  let planRule = null;
+  if (payerType === 'hmo' && payerName && planName) {
+    if (pool) {
       const ruleRes = await pool.query(
         `SELECT copay_percentage::float as "copayPercentage", preauth_threshold::float as "preauthThreshold"
          FROM payer_plan_rules WHERE payer_name = $1 AND plan_name = $2 AND is_active = true`,
-        [invoice.payer_name, invoice.plan_name]
+        [payerName, planName]
       );
       planRule = ruleRes.rows[0] || null;
-    }
-
-    if (planRule) {
-      const totalAmount = Number(invoice.total_amount);
-
-      if (planRule.preauthThreshold != null && totalAmount > Number(planRule.preauthThreshold) && !invoice.pre_auth_code) {
-        flags.push({
-          code: 'missing_preauth',
-          severity: 'critical',
-          message: `This bill (₦${totalAmount.toLocaleString()}) exceeds ${invoice.payer_name}'s pre-authorization threshold of ₦${Number(planRule.preauthThreshold).toLocaleString()} for the ${invoice.plan_name} plan, but no pre-authorization code is on file.`,
-        });
-      }
-
-      if (invoice.copay_amount != null && planRule.copayPercentage != null) {
-        const expectedCopay = Number((totalAmount * (Number(planRule.copayPercentage) / 100)).toFixed(2));
-        const actualCopay = Number(invoice.copay_amount);
-        if (Math.abs(actualCopay - expectedCopay) > 1) {
-          flags.push({
-            code: 'copay_exceeds_plan_rule',
-            severity: actualCopay > expectedCopay ? 'critical' : 'info',
-            message: `Patient copay is ₦${actualCopay.toLocaleString()}, but the ${invoice.plan_name} plan's ${planRule.copayPercentage}% copay rule works out to ₦${expectedCopay.toLocaleString()}.`,
-            billedCopay: actualCopay,
-            expectedCopay,
-          });
-        }
-      }
-    }
-
-    // 6. Patient has known insurance on file, but this bill was billed self-pay.
-    if (invoice.payer_type === 'self-pay' && invoice.patient_id) {
-      const patientRes = await pool.query(
-        `SELECT hmo_name as "hmoName" FROM patients WHERE id = $1`, [invoice.patient_id]
+    } else {
+      const rule = MOCK_PAYER_PLAN_RULES_STATE.find(
+        r => r.payer_name.toLowerCase() === payerName.toLowerCase() &&
+             r.plan_name.toLowerCase() === planName.toLowerCase() &&
+             r.is_active
       );
-      const hmoName = patientRes.rows[0]?.hmoName;
-      if (hmoName) {
+      if (rule) {
+        planRule = {
+          copayPercentage: Number(rule.copay_percentage),
+          preauthThreshold: rule.preauth_threshold != null ? Number(rule.preauth_threshold) : null,
+        };
+      }
+    }
+  }
+
+  if (planRule) {
+    const totalAmount = Number(invoice.total_amount || invoice.totalAmount || 0);
+    const preAuthCode = invoice.pre_auth_code || invoice.preAuthCode;
+    if (planRule.preauthThreshold != null && totalAmount > Number(planRule.preauthThreshold) && !preAuthCode) {
+      flags.push({
+        code: 'missing_preauth',
+        severity: 'critical',
+        message: `This bill (₦${totalAmount.toLocaleString()}) exceeds ${payerName}'s pre-authorization threshold of ₦${Number(planRule.preauthThreshold).toLocaleString()} for the ${planName} plan, but no pre-authorization code is on file.`,
+      });
+    }
+
+    const copayAmount = invoice.copay_amount != null ? invoice.copay_amount : invoice.copayAmount;
+    if (copayAmount != null && planRule.copayPercentage != null) {
+      const expectedCopay = Number((totalAmount * (Number(planRule.copayPercentage) / 100)).toFixed(2));
+      const actualCopay = Number(copayAmount);
+      if (Math.abs(actualCopay - expectedCopay) > 1) {
         flags.push({
-          code: 'billed_self_pay_despite_coverage',
-          severity: 'warning',
-          message: `This patient has ${hmoName} on file, but this bill was billed as self-pay.`,
+          code: 'copay_exceeds_plan_rule',
+          severity: actualCopay > expectedCopay ? 'critical' : 'info',
+          message: `Patient copay is ₦${actualCopay.toLocaleString()}, but the ${planName} plan's ${planRule.copayPercentage}% copay rule works out to ₦${expectedCopay.toLocaleString()}.`,
+          billedCopay: actualCopay,
+          expectedCopay,
         });
       }
     }
+  }
 
-    // 6b. Billed as HMO-covered, but the patient's HMO membership wasn't on
-    // record as verified at audit time (policy_verification_status). Doesn't
-    // re-check eligibility with the payer — there's no live feed for that —
-    // just surfaces WelliPay's own recorded status so a claim isn't submitted
-    // for cover the front desk never actually confirmed was current.
-    if (invoice.payer_type === 'hmo' && invoice.patient_id) {
+  // 6. Patient has known insurance on file, but this bill was billed self-pay.
+  const patientId = invoice.patient_id || invoice.patientId;
+  const patientMrn = invoice.patient_mrn || invoice.patientMrn;
+  if (payerType === 'self-pay' && (patientId || patientMrn)) {
+    let hmoName = null;
+    if (pool && patientId) {
+      const patientRes = await pool.query(
+        `SELECT hmo_name as "hmoName" FROM patients WHERE id = $1`, [patientId]
+      );
+      hmoName = patientRes.rows[0]?.hmoName;
+    } else {
+      const patient = FALLBACK_PATIENTS.find(p => (patientId && p.id === patientId) || (patientMrn && p.mrn === patientMrn));
+      hmoName = patient?.hmoName;
+    }
+    if (hmoName) {
+      flags.push({
+        code: 'billed_self_pay_despite_coverage',
+        severity: 'warning',
+        message: `This patient has ${hmoName} on file, but this bill was billed as self-pay.`,
+      });
+    }
+  }
+
+  // 6b. Billed as HMO-covered, but the patient's HMO membership wasn't on
+  // record as verified at audit time (policy_verification_status). Doesn't
+  // re-check eligibility with the payer — there's no live feed for that —
+  // just surfaces WelliPay's own recorded status so a claim isn't submitted
+  // for cover the front desk never actually confirmed was current.
+  if (payerType === 'hmo' && (patientId || patientMrn)) {
+    let membership = null;
+    if (pool && patientId) {
       const membershipRes = await pool.query(
         `SELECT policy_verification_status as "policyVerificationStatus",
                 policy_verification_label as "policyVerificationLabel"
          FROM patients WHERE id = $1`,
-        [invoice.patient_id]
+        [patientId]
       );
-      const membership = membershipRes.rows[0];
-      if (membership && membership.policyVerificationStatus && membership.policyVerificationStatus !== 'verified') {
-        flags.push({
-          code: 'membership_not_verified',
-          severity: membership.policyVerificationStatus === 'expired' ? 'critical' : 'warning',
-          message: membership.policyVerificationStatus === 'expired'
-            ? `This patient's ${invoice.payer_name} membership is on file as expired${membership.policyVerificationLabel ? ` (${membership.policyVerificationLabel})` : ''}, but this bill was billed as HMO-covered.`
-            : `This patient's ${invoice.payer_name} membership was never verified before this bill was billed as HMO-covered.`,
-        });
+      membership = membershipRes.rows[0];
+    } else {
+      const patient = FALLBACK_PATIENTS.find(p => (patientId && p.id === patientId) || (patientMrn && p.mrn === patientMrn));
+      if (patient) {
+        membership = {
+          policyVerificationStatus: patient.policyVerificationStatus,
+          policyVerificationLabel: patient.policyVerificationLabel,
+        };
+      }
+    }
+    if (membership && membership.policyVerificationStatus && membership.policyVerificationStatus !== 'verified') {
+      flags.push({
+        code: 'membership_not_verified',
+        severity: membership.policyVerificationStatus === 'expired' ? 'critical' : 'warning',
+        message: membership.policyVerificationStatus === 'expired'
+          ? `This patient's ${payerName} membership is on file as expired${membership.policyVerificationLabel ? ` (${membership.policyVerificationLabel})` : ''}, but this bill was billed as HMO-covered.`
+          : `This patient's ${payerName} membership was never verified before this bill was billed as HMO-covered.`,
+      });
+    }
+  }
+
+  // 7. Linked pre-authorization's approved amount differs from what was billed.
+  let preAuthMatch = null;
+  const invId = invoice.id || invoiceNumber;
+  if (pool) {
+    const preAuthRes = await pool.query(
+      `SELECT id, approved_amount::float as "approvedAmount" FROM pre_authorizations WHERE invoice_id = $1`,
+      [invId]
+    );
+    if (preAuthRes.rows.length > 0) {
+      preAuthMatch = preAuthRes.rows[0];
+    }
+  } else {
+    const pa = FALLBACK_PREAUTHS.find(p => p.invoice_id === invId || p.invoice_id === invoiceNumber || p.invoiceId === invId || p.invoiceId === invoiceNumber);
+    if (pa) {
+      preAuthMatch = {
+        id: pa.id,
+        approvedAmount: pa.approved_amount != null ? Number(pa.approved_amount) : (pa.approvedAmount != null ? Number(pa.approvedAmount) : null),
+      };
+    }
+  }
+  if (preAuthMatch && preAuthMatch.approvedAmount != null) {
+    const approved = Number(preAuthMatch.approvedAmount);
+    const billed = Number(invoice.total_amount || invoice.totalAmount || 0);
+    if (Math.abs(approved - billed) > 0.01) {
+      flags.push({
+        code: 'authorized_amount_mismatch',
+        severity: 'critical',
+        message: `${preAuthMatch.id} was approved for ₦${approved.toLocaleString()}, but this invoice bills ₦${billed.toLocaleString()}.`,
+        approvedAmount: approved,
+        billedAmount: billed,
+      });
+    }
+  }
+
+  return flags;
+}
+
+app.get('/api/invoices/:invoiceNumber/audit', requireAuth, async (req, res) => {
+  const { invoiceNumber } = req.params;
+
+  try {
+    let invoice = null;
+    if (pool) {
+      const invRes = await pool.query(`SELECT * FROM invoices WHERE invoice_number = $1`, [invoiceNumber]);
+      if (invRes.rows.length === 0) {
+        return res.status(404).json({ error: `Invoice ${invoiceNumber} not found.` });
+      }
+      invoice = invRes.rows[0];
+    } else {
+      invoice = FALLBACK_INVOICES.find(
+        i => (i.invoice_number && i.invoice_number.toUpperCase() === invoiceNumber.toUpperCase()) ||
+             (i.invoiceNumber && i.invoiceNumber.toUpperCase() === invoiceNumber.toUpperCase()) ||
+             (i.id && i.id.toUpperCase() === invoiceNumber.toUpperCase())
+      );
+      if (!invoice) {
+        return res.status(404).json({ error: `Invoice ${invoiceNumber} not found.` });
       }
     }
 
-    // 7. Linked pre-authorization's approved amount differs from what was billed.
-    const preAuthRes = await pool.query(
-      `SELECT id, approved_amount::float as "approvedAmount" FROM pre_authorizations WHERE invoice_id = $1`,
-      [invoice.id]
-    );
-    if (preAuthRes.rows.length > 0 && preAuthRes.rows[0].approvedAmount != null) {
-      const approved = Number(preAuthRes.rows[0].approvedAmount);
-      const billed = Number(invoice.total_amount);
-      if (Math.abs(approved - billed) > 0.01) {
-        flags.push({
-          code: 'authorized_amount_mismatch',
-          severity: 'critical',
-          message: `${preAuthRes.rows[0].id} was approved for ₦${approved.toLocaleString()}, but this invoice bills ₦${billed.toLocaleString()}.`,
-          approvedAmount: approved,
-          billedAmount: billed,
-        });
-      }
-    }
+    const flags = await computeInvoiceAuditFlags(invoice);
 
     return res.json({
       invoiceNumber,
@@ -3429,6 +3526,113 @@ app.get('/api/invoices/:invoiceNumber/audit', requireAuth, async (req, res) => {
   } catch (err) {
     console.error('[API GET /api/invoices/:invoiceNumber/audit] error:', err.message);
     return res.status(500).json({ error: 'Failed to audit invoice.' });
+  }
+});
+
+// ==========================================
+// Provider Compliance Dashboard (Phase 1, partial)
+// Aggregates the Patient Bill Audit's checks across every invoice, plus
+// pre-authorization approval/rejection and turnaround stats, into a
+// provider-level summary. This is everything computable from WelliPay's own
+// records; the parts that need a patient-facing dispute intake (Phase 2's
+// "Report a Billing/Insurance Issue") — such as patient-reported complaint
+// volume or resolution time — are deliberately out of scope here.
+// ==========================================
+app.get('/api/compliance/summary', requireAuth, async (req, res) => {
+  try {
+    let invoices = [];
+    let preAuths = [];
+
+    if (pool) {
+      const invoicesRes = await pool.query(`SELECT * FROM invoices ORDER BY created_at DESC`);
+      invoices = invoicesRes.rows;
+
+      const preAuthRes = await pool.query(`
+        SELECT id, status, created_at, updated_at FROM pre_authorizations
+      `);
+      preAuths = preAuthRes.rows;
+    } else {
+      invoices = [...FALLBACK_INVOICES];
+      preAuths = FALLBACK_PREAUTHS.map(p => ({
+        id: p.id,
+        status: p.status,
+        created_at: p.created_at || p.createdAt || p.requested_at || new Date().toISOString(),
+        updated_at: p.updated_at || p.updatedAt || p.created_at || p.createdAt || new Date().toISOString(),
+      }));
+    }
+
+    const flagCounts = {};
+    const flagsByInvoice = [];
+    let cleanCount = 0;
+    let criticalInvoiceCount = 0;
+    let warningInvoiceCount = 0;
+
+    for (const invoice of invoices) {
+      const flags = await computeInvoiceAuditFlags(invoice);
+      for (const f of flags) {
+        flagCounts[f.code] = (flagCounts[f.code] || 0) + 1;
+      }
+      const hasCritical = flags.some(f => f.severity === 'critical');
+      const hasWarning = flags.some(f => f.severity === 'warning');
+      if (hasCritical) criticalInvoiceCount++;
+      else if (hasWarning) warningInvoiceCount++;
+      if (flags.every(f => f.severity === 'info')) cleanCount++;
+
+      if (hasCritical || hasWarning) {
+        flagsByInvoice.push({
+          invoiceNumber: invoice.invoice_number || invoice.invoiceNumber || invoice.id,
+          patientName: invoice.patient_name || invoice.patientName,
+          totalAmount: Number(invoice.total_amount || invoice.totalAmount || 0),
+          flagCount: flags.filter(f => f.severity !== 'info').length,
+          worstSeverity: hasCritical ? 'critical' : 'warning',
+          flags: flags.filter(f => f.severity !== 'info').map(f => ({ code: f.code, severity: f.severity, message: f.message })),
+        });
+      }
+    }
+
+    // Sort worst-first (critical before warning), then by flag count.
+    flagsByInvoice.sort((a, b) => {
+      if (a.worstSeverity !== b.worstSeverity) return a.worstSeverity === 'critical' ? -1 : 1;
+      return b.flagCount - a.flagCount;
+    });
+
+    // Pre-authorization approval/rejection and turnaround stats.
+    const decided = preAuths.filter(p => p.status === 'approved' || p.status === 'rejected');
+    const approved = preAuths.filter(p => p.status === 'approved');
+    const rejected = preAuths.filter(p => p.status === 'rejected');
+
+    let avgTurnaroundHours = null;
+    if (decided.length > 0) {
+      const totalHours = decided.reduce((sum, p) => {
+        const start = new Date(p.created_at || Date.now()).getTime();
+        const end = new Date(p.updated_at || Date.now()).getTime();
+        const hours = (end - start) / (1000 * 60 * 60);
+        return sum + Math.max(0, hours);
+      }, 0);
+      avgTurnaroundHours = Number((totalHours / decided.length).toFixed(1));
+    }
+
+    return res.json({
+      generatedAt: new Date().toISOString(),
+      invoiceCount: invoices.length,
+      cleanCount,
+      criticalInvoiceCount,
+      warningInvoiceCount,
+      flagCounts,
+      worstInvoices: flagsByInvoice.slice(0, 25),
+      preAuth: {
+        totalRequests: preAuths.length,
+        decidedCount: decided.length,
+        approvedCount: approved.length,
+        rejectedCount: rejected.length,
+        rejectionRate: decided.length > 0 ? Number(((rejected.length / decided.length) * 100).toFixed(1)) : null,
+        avgTurnaroundHours,
+      },
+      note: 'Computed from WelliPay\'s own invoice, catalogue, and pre-authorization records — not a live feed from any payer.',
+    });
+  } catch (err) {
+    console.error('[API GET /api/compliance/summary] error:', err.message);
+    return res.status(500).json({ error: 'Failed to compute compliance summary.' });
   }
 });
 
@@ -4426,26 +4630,50 @@ app.get('/api/patients/:patientId/benefit-usage', requireAuth, async (req, res) 
   if (!payerName || !planName) {
     return res.status(400).json({ error: 'payerName and planName are required.' });
   }
-  if (!pool) {
-    return res.status(503).json({ error: 'Benefit usage requires a database connection.' });
-  }
 
   try {
-    const ruleRes = await pool.query(
-      `SELECT annual_benefit_limit::float as "annualBenefitLimit"
-       FROM payer_plan_rules WHERE payer_name = $1 AND plan_name = $2 AND is_active = true`,
-      [payerName, planName]
-    );
-    const annualLimit = ruleRes.rows[0]?.annualBenefitLimit ?? null;
+    let annualLimit = null;
+    let usedThisYear = 0;
 
-    const usageRes = await pool.query(
-      `SELECT COALESCE(SUM(claim_amount), 0)::float as "usedThisYear"
-       FROM invoices
-       WHERE patient_id = $1 AND payer_name = $2 AND plan_name = $3
-         AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW())`,
-      [patientId, payerName, planName]
-    );
-    const usedThisYear = Number(usageRes.rows[0]?.usedThisYear || 0);
+    if (pool) {
+      const ruleRes = await pool.query(
+        `SELECT annual_benefit_limit::float as "annualBenefitLimit"
+         FROM payer_plan_rules WHERE payer_name = $1 AND plan_name = $2 AND is_active = true`,
+        [payerName, planName]
+      );
+      annualLimit = ruleRes.rows[0]?.annualBenefitLimit ?? null;
+
+      const usageRes = await pool.query(
+        `SELECT COALESCE(SUM(claim_amount), 0)::float as "usedThisYear"
+         FROM invoices
+         WHERE patient_id = $1 AND payer_name = $2 AND plan_name = $3
+           AND EXTRACT(YEAR FROM created_at) = EXTRACT(YEAR FROM NOW())`,
+        [patientId, payerName, planName]
+      );
+      usedThisYear = Number(usageRes.rows[0]?.usedThisYear || 0);
+    } else {
+      const rule = MOCK_PAYER_PLAN_RULES_STATE.find(
+        r => r.payer_name.toLowerCase() === payerName.toLowerCase() &&
+             r.plan_name.toLowerCase() === planName.toLowerCase() &&
+             r.is_active
+      );
+      annualLimit = rule?.annual_benefit_limit != null ? Number(rule.annual_benefit_limit) : null;
+
+      const currentYear = new Date().getFullYear();
+      usedThisYear = FALLBACK_INVOICES
+        .filter(i => {
+          const invPid = i.patient_id || i.patientId;
+          const invPayer = i.payer_name || i.payerName;
+          const invPlan = i.plan_name || i.planName;
+          const invYear = new Date(i.created_at || i.createdAt || Date.now()).getFullYear();
+          return String(invPid) === String(patientId) &&
+                 invPayer?.toLowerCase() === payerName.toLowerCase() &&
+                 invPlan?.toLowerCase() === planName.toLowerCase() &&
+                 invYear === currentYear;
+        })
+        .reduce((sum, i) => sum + Number(i.claim_amount || i.claimAmount || 0), 0);
+    }
+
     const remaining = annualLimit != null ? Math.max(0, annualLimit - usedThisYear) : null;
 
     return res.json({
@@ -4459,216 +4687,6 @@ app.get('/api/patients/:patientId/benefit-usage', requireAuth, async (req, res) 
     console.error('[API GET /api/patients/:patientId/benefit-usage] error:', err.message);
     return res.status(500).json({ error: 'Failed to compute benefit usage.' });
   }
-});
-
-// 10. HMO Benefit Check & Copay Calculation Engine (Reuses Phase 1 Price Lookup)
-app.get('/api/benefit-check', requireAuth, async (req, res) => {
-  const { providerId, masterServiceId, payerName, planName, patientId } = req.query;
-
-  if (!providerId || !masterServiceId || !payerName || !planName) {
-    return res.status(400).json({
-      error: 'providerId, masterServiceId, payerName, and planName are required.'
-    });
-  }
-
-  let tariffItem = null;
-  let planRule = null;
-  let providerName = providerId;
-
-  if (pool) {
-    try {
-      // 1. Fetch provider tariff and service details
-      const tariffRes = await query(`
-        SELECT
-          pc.price::float as price, pc.turnaround_time as "turnaroundTime", pc.hmo_accepted as "hmoAccepted",
-          pc.is_published as "isPublished",
-          msd.service_name as "serviceName", msd.department, msd.service_code as "serviceCode",
-          p.name as "providerName"
-        FROM provider_catalogue pc
-        JOIN master_service_directory msd ON msd.id = pc.master_service_id
-        JOIN providers p ON p.id = pc.provider_id
-        WHERE pc.provider_id = $1 AND pc.master_service_id = $2
-      `, [providerId, masterServiceId]);
-
-      if (tariffRes.rows.length === 0) {
-        return res.status(404).json({ error: 'This provider does not offer that service, or has not priced it yet.' });
-      }
-      if (!tariffRes.rows[0].isPublished) {
-        return res.status(409).json({ error: 'This service is not yet published live by the provider.' });
-      }
-      tariffItem = tariffRes.rows[0];
-      providerName = tariffItem.providerName;
-
-      // 2. Fetch payer plan rule
-      const ruleRes = await query(`
-        SELECT
-          id, payer_name as "payerName", plan_name as "planName",
-          copay_percentage::float as "copayPercentage",
-          preauth_threshold::float as "preauthThreshold",
-          deductible::float as deductible,
-          covered_categories as "coveredCategories",
-          excluded_services as "excludedServices",
-          is_active as "isActive"
-        FROM payer_plan_rules
-        WHERE payer_name = $1 AND plan_name = $2 AND is_active = true
-      `, [payerName, planName]);
-
-      if (ruleRes.rows.length === 0) {
-        return res.status(404).json({ error: `Plan rule not found for ${payerName} - ${planName}.` });
-      }
-      planRule = ruleRes.rows[0];
-    } catch (err) {
-      console.error('[API /api/benefit-check] error:', err.message);
-      return res.status(500).json({ error: 'Failed to process benefit check.' });
-    }
-  } else {
-    // In-Memory Fallback
-    const catItem = MOCK_PROVIDER_CATALOGUE_STATE.find(
-      c => c.provider_id === providerId && c.master_service_id === Number(masterServiceId)
-    );
-    if (!catItem) {
-      return res.status(404).json({ error: 'This provider does not offer that service, or has not priced it yet.' });
-    }
-    if (!catItem.is_published) {
-      return res.status(409).json({ error: 'This service is not yet published live by the provider.' });
-    }
-
-    const master = MOCK_MASTER_DIRECTORY_STATE.find(m => m.id === Number(masterServiceId));
-    const prv = MOCK_PROVIDERS_STATE.find(p => p.id === providerId);
-    providerName = prv?.name || providerId;
-
-    tariffItem = {
-      price: Number(catItem.price),
-      turnaroundTime: catItem.turnaround_time,
-      hmoAccepted: catItem.hmo_accepted || [],
-      isPublished: catItem.is_published,
-      serviceName: master ? master.service_name : 'Diagnostic Service',
-      department: master ? master.department : 'Laboratory',
-      serviceCode: master ? master.service_code : 'LAB',
-      providerName
-    };
-
-    const rule = MOCK_PAYER_PLAN_RULES_STATE.find(
-      r => r.payer_name.toLowerCase() === payerName.toLowerCase() && r.plan_name.toLowerCase() === planName.toLowerCase() && r.is_active
-    );
-    if (!rule) {
-      return res.status(404).json({ error: `Plan rule not found for ${payerName} - ${planName}.` });
-    }
-
-    planRule = {
-      payerName: rule.payer_name,
-      planName: rule.plan_name,
-      copayPercentage: Number(rule.copay_percentage),
-      preauthThreshold: rule.preauth_threshold ? Number(rule.preauth_threshold) : null,
-      deductible: Number(rule.deductible || 0),
-      coveredCategories: rule.covered_categories,
-      excludedServices: rule.excluded_services || []
-    };
-  }
-
-  const price = tariffItem.price;
-  const isNetworkAccepted = Array.isArray(tariffItem.hmoAccepted) && tariffItem.hmoAccepted.some(
-    h => h.toLowerCase() === payerName.toLowerCase()
-  );
-
-  // Check Excluded Services
-  const isExplicitlyExcluded = Array.isArray(planRule.excludedServices) && planRule.excludedServices.some(
-    s => s.toLowerCase() === tariffItem.serviceName.toLowerCase() || tariffItem.serviceName.toLowerCase().includes(s.toLowerCase())
-  );
-
-  // Check Covered Categories
-  const isDepartmentCovered = !planRule.coveredCategories || (
-    Array.isArray(planRule.coveredCategories) && planRule.coveredCategories.some(
-      c => c.toLowerCase() === tariffItem.department.toLowerCase()
-    )
-  );
-
-  // Scenario 1: Out of Network Provider
-  if (!isNetworkAccepted) {
-    return res.json({
-      benefitCheck: {
-        status: 'out_of_network',
-        isCovered: false,
-        isNetworkAccepted: false,
-        price,
-        copayPercentage: 100,
-        patientCopayAmount: price,
-        hmoCoverageAmount: 0,
-        preAuthRequired: false,
-        preAuthThreshold: planRule.preauthThreshold,
-        serviceName: tariffItem.serviceName,
-        serviceCode: tariffItem.serviceCode,
-        department: tariffItem.department,
-        turnaroundTime: tariffItem.turnaroundTime,
-        providerId,
-        providerName,
-        payerName,
-        planName,
-        patientId: patientId || null,
-        note: `${payerName} is not accepted by ${providerName}. 100% direct patient self-pay tariff applies unless out-of-network emergency authorization is pre-cleared.`
-      }
-    });
-  }
-
-  // Scenario 2: Service Excluded from Plan
-  if (isExplicitlyExcluded || !isDepartmentCovered) {
-    return res.json({
-      benefitCheck: {
-        status: 'excluded',
-        isCovered: false,
-        isNetworkAccepted: true,
-        price,
-        copayPercentage: 100,
-        patientCopayAmount: price,
-        hmoCoverageAmount: 0,
-        preAuthRequired: false,
-        preAuthThreshold: planRule.preauthThreshold,
-        serviceName: tariffItem.serviceName,
-        serviceCode: tariffItem.serviceCode,
-        department: tariffItem.department,
-        turnaroundTime: tariffItem.turnaroundTime,
-        providerId,
-        providerName,
-        payerName,
-        planName,
-        patientId: patientId || null,
-        note: `${tariffItem.serviceName} is excluded under ${payerName} ${planName} policy terms. Patient is responsible for 100% of tariff.`
-      }
-    });
-  }
-
-  // Scenario 3: Covered Service (Standard Copay Math)
-  const copayPercentage = Number(planRule.copayPercentage);
-  const patientCopayAmount = Math.round(price * (copayPercentage / 100));
-  const hmoCoverageAmount = price - patientCopayAmount;
-  const preAuthRequired = Boolean(planRule.preauthThreshold !== null && price >= Number(planRule.preauthThreshold));
-  const note = preAuthRequired
-    ? `Pre-authorization required: procedure tariff of ₦${price.toLocaleString()} meets or exceeds the plan threshold of ₦${Number(planRule.preauthThreshold).toLocaleString()}. Obtain pre-auth code prior to order.`
-    : `Standard pre-cleared benefit: Enrollee copay of ₦${patientCopayAmount.toLocaleString()} (${copayPercentage}%) payable at cashier desk. Remainder (₦${hmoCoverageAmount.toLocaleString()}) submitted as HMO receivable.`;
-
-  return res.json({
-    benefitCheck: {
-      status: 'covered',
-      isCovered: true,
-      isNetworkAccepted: true,
-      price,
-      copayPercentage,
-      patientCopayAmount,
-      hmoCoverageAmount,
-      preAuthRequired,
-      preAuthThreshold: planRule.preauthThreshold,
-      serviceName: tariffItem.serviceName,
-      serviceCode: tariffItem.serviceCode,
-      department: tariffItem.department,
-      turnaroundTime: tariffItem.turnaroundTime,
-      providerId,
-      providerName,
-      payerName,
-      planName,
-      patientId: patientId || null,
-      note
-    }
-  });
 });
 
 // ==========================================
