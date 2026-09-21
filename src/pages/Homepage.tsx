@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Logo } from '../components/ui/Logo';
+import { SiteHeader } from '../components/SiteHeader';
+import { SiteFooter } from '../components/SiteFooter';
 import {
   ArrowRight,
   ShieldCheck,
@@ -10,6 +11,10 @@ import {
   ClipboardCheck,
   Wallet,
   CheckCircle2,
+  AlertTriangle,
+  Clock,
+  TrendingDown,
+  Search,
 } from 'lucide-react';
 
 const FEATURES = [
@@ -69,32 +74,35 @@ const STEPS = [
   },
 ];
 
+const COST_POINTS = [
+  {
+    icon: Clock,
+    title: 'Hours lost every week',
+    description: 'Revenue staff manually cross-check bank statements, HMO remittance sheets, and invoice logs line by line.',
+  },
+  {
+    icon: TrendingDown,
+    title: 'Cash flow you can’t see',
+    description: 'Without a live reconciled view, it’s unclear which invoices are actually paid until someone chases it down.',
+  },
+  {
+    icon: AlertTriangle,
+    title: 'Errors that surface too late',
+    description: 'Duplicate charges and tariff mismatches are often only caught when a payer disputes them — after the damage is done.',
+  },
+  {
+    icon: Search,
+    title: 'Claims that go quiet',
+    description: 'Pre-authorisation requests and HMO claims sit in inboxes with no single tracker for status or turnaround.',
+  },
+];
+
 export const Homepage: React.FC = () => {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-[#f8fafc] font-sans text-[#0f172a]">
-      {/* Nav */}
-      <header className="border-b border-[#e2e8f0] bg-white/80 backdrop-blur-sm sticky top-0 z-30">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Logo size="sm" variant="full" onClick={() => navigate('/')} />
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate('/login')}
-              className="text-xs font-semibold text-[#334155] hover:text-[#12244D] px-3 py-2 transition-colors cursor-pointer"
-            >
-              Sign in
-            </button>
-            <button
-              onClick={() => navigate('/signup')}
-              className="text-xs font-bold bg-[#12244D] hover:bg-[#0B1733] text-white px-4 py-2 rounded-lg shadow-card transition-all cursor-pointer flex items-center gap-1.5"
-            >
-              Get started
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        </div>
-      </header>
+      <SiteHeader />
 
       {/* Hero */}
       <section className="relative overflow-hidden">
@@ -128,14 +136,62 @@ export const Homepage: React.FC = () => {
         </div>
       </section>
 
-      {/* Feature grid */}
+      {/* Problem */}
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 py-14 border-t border-[#e2e8f0]">
+        <div className="text-center mb-10">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[#94a3b8]">The problem</span>
+          <h2 className="font-heading text-2xl font-bold text-[#12244D] mt-2">
+            Hospital billing runs through too many payers to reconcile by hand
+          </h2>
+          <p className="text-sm text-[#64748b] mt-3 max-w-2xl mx-auto">
+            A single hospital bills self-pay patients, several HMOs, and receives payment by bank
+            transfer, POS, and dedicated account — each with its own paperwork and its own pace.
+            Matching all of it back to the right invoice is still, for most revenue teams, a
+            manual job.
+          </p>
+        </div>
+
+        {/* The curse — what that manual process actually costs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          {COST_POINTS.map((c) => (
+            <div key={c.title} className="flex gap-3.5 bg-white border border-[#e2e8f0] rounded-xl p-5">
+              <div className="w-9 h-9 rounded-lg bg-rose-50 flex items-center justify-center flex-shrink-0">
+                <c.icon className="w-4.5 h-4.5 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="font-heading text-sm font-bold text-[#12244D] mb-1">{c.title}</h3>
+                <p className="text-xs text-[#64748b] leading-relaxed">{c.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Business impact */}
+      <section className="bg-[#12244D]">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-14 text-center">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[#7ea3c9]">The business impact</span>
+          <h2 className="font-heading text-2xl font-bold text-white mt-2">
+            Every hour spent matching payments is an hour not spent on patients or growth
+          </h2>
+          <p className="text-sm text-[#cbd5e1] mt-3 max-w-2xl mx-auto">
+            Delayed reconciliation delays visibility into real cash position. Unresolved HMO
+            claims tie up revenue that's already been earned. And billing errors caught late —
+            by a payer, or an auditor — cost more to fix than they would have cost to prevent.
+          </p>
+        </div>
+      </section>
+
+      {/* Insight / solution — feature grid */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 py-14 border-t border-[#e2e8f0]">
         <div className="text-center mb-10">
-          <h2 className="font-heading text-2xl font-bold text-[#12244D]">
-            Everything a revenue team needs in one place
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[#0B6B69]">The insight</span>
+          <h2 className="font-heading text-2xl font-bold text-[#12244D] mt-2">
+            Automate the matching, surface only the exceptions
           </h2>
-          <p className="text-sm text-[#64748b] mt-2 max-w-xl mx-auto">
-            Built for hospitals and clinics handling self-pay and HMO billing side by side.
+          <p className="text-sm text-[#64748b] mt-3 max-w-xl mx-auto">
+            WelliPay reconciles routine payments on its own and puts everything a revenue team
+            needs to manage the rest in one place.
           </p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -203,13 +259,7 @@ export const Homepage: React.FC = () => {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-[#e2e8f0] bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <Logo size="sm" variant="full" />
-          <p className="text-[11px] text-[#94a3b8]">© {new Date().getFullYear()} WelliPay. All rights reserved.</p>
-        </div>
-      </footer>
+      <SiteFooter />
     </div>
   );
 };

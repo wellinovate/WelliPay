@@ -16,6 +16,8 @@ import { PlaceholderView } from './features/common/PlaceholderView';
 import { Login } from './components/Login';
 import { Signup } from './components/Signup';
 import { Homepage } from './pages/Homepage';
+import { About } from './pages/About';
+import { Privacy } from './pages/Privacy';
 import PublicInvoicePay from './pages/PublicInvoicePay';
 
 const AppContent: React.FC = () => {
@@ -102,6 +104,8 @@ export function App() {
         <Route path="/" element={<HomeRoute />} />
         <Route path="/login" element={<LoginRoute />} />
         <Route path="/signup" element={<SignupRoute />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="/pay/:invoiceNumber" element={<PublicInvoicePay />} />
         <Route path="/*" element={<AuthenticatedApp />} />
       </Routes>
