@@ -3542,18 +3542,19 @@ async function computeInvoiceAuditFlags(invoice, precomputedOrderMap = null) {
     }
   }
 
-  // 2. Duplicate order check keyed strictly on order ID across all invoices.
-  // An order billed twice across invoices or within an invoice is a duplicate charge.
+  // 2. Duplicate order check keyed strictly on order ID across all invoices,
+  // and intra-invoice duplicate detection by masterServiceId for items without a shared orderId.
   const orderMap = precomputedOrderMap || await getAllBilledOrdersMap();
   const flaggedOrderIds = new Set();
+  const flaggedMasterServiceIds = new Set();
 
   for (const item of lineItems) {
     const orderId = item.orderId || item.id;
-    if (!orderId || flaggedOrderIds.has(orderId)) continue;
+    if (orderId && flaggedOrderIds.has(orderId)) continue;
 
-    const occurrences = orderMap.get(orderId) || [];
+    const occurrences = orderId ? (orderMap.get(orderId) || []) : [];
     if (occurrences.length > 1) {
-      flaggedOrderIds.add(orderId);
+      if (orderId) flaggedOrderIds.add(orderId);
       const otherOcc = occurrences.find(o => o.invoiceNumber !== invoiceNumber) || occurrences.find(o => o !== occurrences[0]);
       const isCrossInvoice = Boolean(otherOcc && otherOcc.invoiceNumber !== invoiceNumber);
       const otherInvoiceNumber = otherOcc ? otherOcc.invoiceNumber : invoiceNumber;
@@ -3565,11 +3566,15 @@ async function computeInvoiceAuditFlags(invoice, precomputedOrderMap = null) {
         ? `Clinical order ${orderId} ("${item.serviceType}") is billed on this invoice and was also billed on ${otherInvoiceNumber}.`
         : `Clinical order ${orderId} ("${item.serviceType}") appears ${occurrences.length} times on this invoice.`;
 
+      const lineItemIds = occurrences.map(o => o.lineItemId).filter(Boolean);
+      if (item.id && !lineItemIds.includes(item.id)) lineItemIds.unshift(item.id);
+
       flags.push({
         code: 'duplicate_charge',
         name: 'Duplicate charge',
         severity,
         lineItemId: item.id,
+        lineItemIds: lineItemIds.length >= 2 ? lineItemIds : [item.id],
         orderId,
         message,
         billedAmount: itemAmt,
@@ -3588,6 +3593,55 @@ async function computeInvoiceAuditFlags(invoice, precomputedOrderMap = null) {
         }
       });
     }
+  }
+
+  // 2b. Intra-invoice duplicate detection by masterServiceId.
+  // Catches the case where the same catalogue service is billed multiple times
+  // on a single invoice without a shared clinical order ID (e.g. a new invoice
+  // created via the UI that hasn't been assigned clinical order tokens yet).
+  const byMasterServiceId = new Map();
+  for (const item of lineItems) {
+    if (item.masterServiceId == null) continue;
+    const key = `${item.masterServiceId}:${item.providerId || ''}`;
+    if (!byMasterServiceId.has(key)) byMasterServiceId.set(key, []);
+    byMasterServiceId.get(key).push(item);
+  }
+  for (const [, items] of byMasterServiceId) {
+    if (items.length < 2) continue;
+    const msId = items[0].masterServiceId;
+    if (flaggedMasterServiceIds.has(msId)) continue;
+    // Skip if already caught by the orderId cross-invoice loop
+    const alreadyFlagged = items.some(it => flaggedOrderIds.has(it.orderId || it.id));
+    if (alreadyFlagged) continue;
+    flaggedMasterServiceIds.add(msId);
+
+    const totalBilled = items.reduce((s, it) => s + Number(it.amount || 0), 0);
+    const criticalThreshold = SETTINGS_STATE.compliance?.duplicateCriticalThreshold || 50000;
+    const severity = totalBilled >= criticalThreshold ? 'critical' : 'warning';
+    const serviceName = items[0].catalogueServiceName || items[0].serviceType;
+
+    flags.push({
+      code: 'duplicate_charge',
+      name: 'Duplicate charge',
+      severity,
+      lineItemId: items[0].id,
+      lineItemIds: items.map(it => it.id),
+      masterServiceId: msId,
+      message: `"${serviceName}" is billed ${items.length} times on this invoice — one charge is expected.`,
+      billedAmount: totalBilled,
+      matchingRecord: {
+        source: 'catalogue',
+        id: `CAT-DUPE-${msId}`,
+        label: `${serviceName} billed ×${items.length} on same invoice`,
+        details: {
+          type: 'line_item',
+          masterServiceId: msId,
+          occurrences: items.length,
+          serviceType: serviceName,
+          billedAmount: totalBilled,
+        }
+      }
+    });
   }
 
   // 3 & 4. Payer plan rule checks (pre-auth threshold, copay percentage)

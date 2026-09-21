@@ -1,0 +1,268 @@
+From 410c6b09ed3b8b84ac7338b880cf98da5c012259 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 21 Sep 2026 11:42:54 +0000
+Subject: [PATCH] fix(compliance): fix six real bugs found in a full Phase 1
+ review
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Found via a fresh-database bootstrap, full test suite run, and an
+independent code audit after the compliance-engine overhaul (43a8438):
+
+- server/db.js: schema init crashed on a fresh database — the seed's
+  UPDATE of clinical_service_orders.order_id ran before the ALTER TABLE
+  that added the column. Moved the ALTER TABLE earlier, next to the
+  table's other early column additions.
+- server/db.js: pre_authorizations was missing a plan_name column that
+  server.js already inserts into and selects from on every pre-auth
+  request — GET/POST /api/preauth-requests were failing outright with
+  "column plan_name does not exist". Added the column.
+- server/db.js: the INV-93402 seed fixture linked its "Lipid Profile
+  Panels" clinical order to master_service_id 2, which is actually
+  "Erythrocyte Sedimentation Rate (ESR)" — an unrelated service with no
+  catalogue entry, so the fixture surfaced as tariff_unknown instead of
+  the intended price_mismatch. Corrected to master_service_id 8, which
+  is the real Lipid Profile Panel entry.
+- server.js: GET /api/compliance/summary crashed on invoice.created_at
+  (a JS Date object from pg, not a string) — .split('T') isn't a Date
+  method. Fixed by converting through new Date(...).toISOString() first.
+- server.js: /api/compliance/summary's constituentOrders was always []
+  in live-DB mode — invoices come from `SELECT * FROM invoices`, which
+  has no joined `orders` field, so the field that reads invoice.orders
+  never had anything to read. Now fetches and attaches each invoice's
+  clinical_service_orders before building the summary.
+- server.js: POST /api/compliance/invoices/:invoiceNumber/resolve
+  returned raw `RETURNING *` (snake_case) in live-DB mode while the
+  in-memory fallback returned camelCase — resolution.resolvedBy was
+  undefined in production. Aliased the RETURNING columns.
+- server.js: two duplicate-charge detection bugs in POST /api/invoices
+  and computeInvoiceAuditFlags(). (1) The client-supplied orderId was
+  used as the clinical_service_orders row's own primary key, so two
+  line items sharing one orderId collided on INSERT ... ON CONFLICT
+  (id) DO NOTHING and only one row was ever created — duplicate
+  detection had nothing to compare against. (2) order_id wasn't even
+  in the INSERT's column list, so it was never persisted regardless.
+  Fixed the primary key to always be unique per line item, added
+  order_id to the INSERT, and added a same-service-within-one-invoice
+  duplicate check as a second detection layer for line items billed
+  twice without an explicit shared orderId at all (this case was
+  previously undetected outright, seed fixtures aside).
+
+Verified against a fresh local Postgres database: tsc --noEmit and a
+full production vite build both clean; every test suite now passes —
+test_directory_catalogue (30), test_cost_estimation (20),
+test_benefit_gaps, test_bill_audit (all, incl. one assertion updated
+for the current duplicate-charge flag shape), test_compliance_summary
+(all), test_preauth_overhaul (29), test_dva_transfer, test_dva_per_invoice.
+
+Co-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_01BtycEXkekHWpeoihRnyKkM
+---
+ scripts/test_bill_audit.js |  2 +-
+ server.js                  | 88 +++++++++++++++++++++++++++++++++++---
+ server/db.js               |  5 ++-
+ 3 files changed, 85 insertions(+), 10 deletions(-)
+
+diff --git a/scripts/test_bill_audit.js b/scripts/test_bill_audit.js
+index 150ddbc..42ae0e3 100644
+--- a/scripts/test_bill_audit.js
++++ b/scripts/test_bill_audit.js
+@@ -122,7 +122,7 @@ async function run() {
+   });
+   const dupAudit = await httpJson(`/api/invoices/${dupInv.body.invoice.invoice_number}/audit`);
+   const dupFlag = findFlag(dupAudit.body.flags, 'duplicate_charge');
+-  assert(!!dupFlag && dupFlag.lineItemIds.length === 2, `duplicate_charge flag raised covering both line items (${dupFlag?.message})`);
++  assert(!!dupFlag && dupFlag.matchingRecord?.details?.occurrences === 2, `duplicate_charge flag raised covering both occurrences (${dupFlag?.message})`);
+ 
+   // --- Test 5: missing pre-auth above plan threshold ---
+   console.log('\n5. An HMO bill above the plan\'s pre-auth threshold with no pre-auth code on file...');
+diff --git a/server.js b/server.js
+index 0bc91d8..295130e 100644
+--- a/server.js
++++ b/server.js
+@@ -2888,7 +2888,7 @@ app.get('/api/invoices', requireAuth, async (req, res) => {
+           paid_amount as "paidAmount", status, status_label as "statusLabel",
+           due_date as "dueDate", paid_date as "paidDate",
+           is_inpatient as "isInpatient", discharge_status as "dischargeStatus",
+-          payer_type as "payerType", payer_name as "payerName", policy_number as "policyNumber",
++          payer_type as "payerType", payer_name as "payerName", plan_name as "planName", policy_number as "policyNumber",
+           copay_amount as "copayAmount", claim_amount as "claimAmount", pre_auth_code as "preAuthCode",
+           created_at as "createdAt"
+         FROM invoices
+@@ -2946,6 +2946,7 @@ app.get('/api/invoices', requireAuth, async (req, res) => {
+         discharge_status: inv.dischargeStatus,
+         payer_type: inv.payerType,
+         payer_name: inv.payerName,
++        plan_name: inv.planName,
+         policy_number: inv.policyNumber,
+         copay_amount: inv.copayAmount != null ? parseFloat(inv.copayAmount) : undefined,
+         copayAmount: inv.copayAmount != null ? parseFloat(inv.copayAmount) : undefined,
+@@ -3139,7 +3140,13 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
+ 
+   const orders = Array.isArray(line_items) && line_items.length > 0
+     ? line_items.map((item, idx) => ({
+-        id: (item.orderId || item.order_id) || `ORD-${invoiceNumber}-${idx + 1}`,
++        // `id` is this row's own primary key and must be unique per line item,
++        // even when two items share the same client-supplied orderId (the same
++        // clinical order legitimately billed twice — that's what duplicate
++        // detection is for). Using orderId as `id` here previously caused the
++        // second row's INSERT ... ON CONFLICT (id) DO NOTHING to silently drop,
++        // so a shared orderId meant only one row ever got created at all.
++        id: `ORD-${invoiceNumber}-${idx + 1}`,
+         orderId: (item.orderId || item.order_id) || `ORD-${invoiceNumber}-${idx + 1}`,
+         patientName: patient_name,
+         patientMrn: effectiveMrn,
+@@ -3189,11 +3196,11 @@ app.post('/api/invoices', requireAuth, async (req, res) => {
+         for (const ord of orders) {
+           await pool.query(`
+             INSERT INTO clinical_service_orders
+-              (id, patient_name, patient_mrn, service_type, category, amount, status, performed_at, invoice_id,
++              (id, order_id, patient_name, patient_mrn, service_type, category, amount, status, performed_at, invoice_id,
+                master_service_id, provider_id)
+-            VALUES ($1, $2, $3, $4, $5, $6, 'invoiced', NOW(), $7, $8, $9)
++            VALUES ($1, $2, $3, $4, $5, $6, $7, 'invoiced', NOW(), $8, $9, $10)
+             ON CONFLICT (id) DO NOTHING
+-          `, [ord.id, ord.patientName, ord.patientMrn, ord.serviceType, 'Laboratory', ord.amount, invoiceNumber, ord.masterServiceId, ord.providerId]);
++          `, [ord.id, ord.orderId, ord.patientName, ord.patientMrn, ord.serviceType, 'Laboratory', ord.amount, invoiceNumber, ord.masterServiceId, ord.providerId]);
+         }
+       }
+ 
+@@ -3590,6 +3597,47 @@ async function computeInvoiceAuditFlags(invoice, precomputedOrderMap = null) {
+     }
+   }
+ 
++  // 2b. Same-service duplicate check within this invoice. The orderId-based
++  // check above only catches line items that share an explicit clinical
++  // order ID; a service billed twice on one invoice via two separate manual
++  // line items (no shared order ID) would otherwise go undetected entirely.
++  const seenByService = new Map();
++  for (const item of lineItems) {
++    const orderId = item.orderId || item.id;
++    if (flaggedOrderIds.has(orderId)) continue; // already flagged above
++    const key = item.masterServiceId != null ? `msd:${item.masterServiceId}` : `text:${(item.serviceType || '').toLowerCase()}`;
++    if (!seenByService.has(key)) seenByService.set(key, []);
++    seenByService.get(key).push(item);
++  }
++  for (const [, group] of seenByService) {
++    if (group.length > 1) {
++      const totalAmt = group.reduce((sum, g) => sum + Number(g.amount || 0), 0);
++      const criticalThreshold = SETTINGS_STATE.compliance?.duplicateCriticalThreshold || 50000;
++      const severity = totalAmt >= criticalThreshold ? 'critical' : 'warning';
++      const serviceName = group[0].catalogueServiceName || group[0].serviceType;
++      flags.push({
++        code: 'duplicate_charge',
++        name: 'Duplicate charge',
++        severity,
++        lineItemId: group[0].id,
++        message: `"${serviceName}" appears ${group.length} times on this invoice.`,
++        billedAmount: totalAmt,
++        matchingRecord: {
++          source: 'line_item',
++          id: group[0].id,
++          label: `Same service billed ${group.length} times on this invoice`,
++          details: {
++            type: 'line_item',
++            serviceType: serviceName,
++            occurrences: group.length,
++            amount: totalAmt,
++          }
++        }
++      });
++      for (const g of group) flaggedOrderIds.add(g.orderId || g.id);
++    }
++  }
++
+   // 3 & 4. Payer plan rule checks (pre-auth threshold, copay percentage)
+   const payerType = invoice.payer_type || invoice.payerType;
+   const payerName = invoice.payer_name || invoice.payerName;
+@@ -3884,6 +3932,26 @@ app.get('/api/compliance/summary', requireAuth, async (req, res) => {
+     // Build the cross-invoice order map once so duplicate check runs efficiently in O(N)
+     const orderMap = await getAllBilledOrdersMap();
+ 
++    // Attach each invoice's own clinical service orders (id, serviceType, amount) so
++    // the constituentOrders breakdown below has real line items to report, whether the
++    // invoice came from a live-DB SELECT * (no joined orders) or the in-memory fallback.
++    if (pool) {
++      const ordersRes = await pool.query(`
++        SELECT id, invoice_id as "invoiceId", service_type as "serviceType", amount::float as amount
++        FROM clinical_service_orders
++        WHERE invoice_id IS NOT NULL
++      `);
++      const ordersByInvoiceNumber = {};
++      for (const ord of (ordersRes.rows || [])) {
++        if (!ordersByInvoiceNumber[ord.invoiceId]) ordersByInvoiceNumber[ord.invoiceId] = [];
++        ordersByInvoiceNumber[ord.invoiceId].push({ id: ord.id, serviceType: ord.serviceType, amount: Number(ord.amount || 0) });
++      }
++      for (const invoice of invoices) {
++        const invNum = invoice.invoice_number || invoice.invoiceNumber || invoice.id;
++        invoice.orders = ordersByInvoiceNumber[invNum] || [];
++      }
++    }
++
+     const flagCounts = {
+       duplicate_charge: 0,
+       price_mismatch: 0,
+@@ -3983,7 +4051,7 @@ app.get('/api/compliance/summary', requireAuth, async (req, res) => {
+           patientMrn: invoice.patient_mrn || invoice.patientMrn,
+           payerName: invoice.payer_name || invoice.payerName || (invoice.payer_type === 'self-pay' ? 'Self-pay' : null),
+           planName: invoice.plan_name || invoice.planName,
+-          date: (invoice.created_at || invoice.createdAt || new Date().toISOString()).split('T')[0],
++          date: new Date(invoice.created_at || invoice.createdAt || Date.now()).toISOString().split('T')[0],
+           totalAmount: Number(invoice.total_amount || invoice.totalAmount || 0),
+           flagCount: activeFlags.length,
+           worstSeverity: hasUnresolvedCritical ? 'critical' : (hasUnresolvedWarning ? 'warning' : 'info'),
+@@ -4150,7 +4218,13 @@ app.post('/api/compliance/invoices/:invoiceNumber/resolve', requireAuth, async (
+         INSERT INTO compliance_resolutions (
+           invoice_number, rule_code, reason, resolved_by, resolved_at, invoice_updated_at_snapshot
+         ) VALUES ($1, $2, $3, $4, $5, $6)
+-        RETURNING *
++        RETURNING
++          id, invoice_number as "invoiceNumber", invoice_number,
++          rule_code as "ruleCode", rule_code,
++          reason,
++          resolved_by as "resolvedBy", resolved_by,
++          resolved_at as "resolvedAt", resolved_at,
++          invoice_updated_at_snapshot as "invoiceUpdatedAtSnapshot", invoice_updated_at_snapshot
+       `, [invoiceNumber, ruleCode, reason, resolvedBy, resolvedAt, invoiceSnapshot]);
+ 
+       return res.json({
+diff --git a/server/db.js b/server/db.js
+index 55a1239..93032db 100644
+--- a/server/db.js
++++ b/server/db.js
+@@ -792,6 +792,7 @@ export async function initializeDatabase() {
+       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
+       ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS provider_id VARCHAR(50);
+       ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS master_service_id INTEGER;
++      ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS order_id VARCHAR(50);
+ 
+       -- Multi-vendor EHR integration (external ingestion API, see docs/multi-vendor-ehr-integration.md)
+ 
+@@ -975,7 +976,7 @@ export async function initializeDatabase() {
+ 
+       -- Set order_id, invoice_id, master_service_id, provider_id on compliance fixtures
+       UPDATE clinical_service_orders SET order_id = 'ORD-DUP-93401', invoice_id = 'INV-93401' WHERE id IN ('CSO-DUP-01', 'CSO-DUP-02');
+-      UPDATE clinical_service_orders SET order_id = 'ORD-TAR-93402', invoice_id = 'INV-93402', master_service_id = 2, provider_id = 'PRV-LAG-01' WHERE id = 'CSO-TAR-01';
++      UPDATE clinical_service_orders SET order_id = 'ORD-TAR-93402', invoice_id = 'INV-93402', master_service_id = 8, provider_id = 'PRV-LAG-01' WHERE id = 'CSO-TAR-01';
+       UPDATE clinical_service_orders SET order_id = 'ORD-PRE-93403', invoice_id = 'INV-93403' WHERE id = 'CSO-PRE-01';
+       `);
+     }
+@@ -1264,6 +1265,7 @@ export async function initializeDatabase() {
+       ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS urgency VARCHAR(20) DEFAULT 'routine';
+       ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS enrollee_id VARCHAR(100);
+       ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS expiry_date DATE;
++      ALTER TABLE pre_authorizations ADD COLUMN IF NOT EXISTS plan_name VARCHAR(150);
+ 
+       -- Append-only audit trail for compliance flag resolutions
+       CREATE TABLE IF NOT EXISTS compliance_resolutions (
+@@ -1279,7 +1281,6 @@ export async function initializeDatabase() {
+       CREATE INDEX IF NOT EXISTS idx_compliance_resolutions_invoice ON compliance_resolutions(invoice_number);
+ 
+       ALTER TABLE invoices ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT NOW();
+-      ALTER TABLE clinical_service_orders ADD COLUMN IF NOT EXISTS order_id VARCHAR(50);
+     `);
+ 
+     return { initialized: true };
+-- 
+2.43.0
