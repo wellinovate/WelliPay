@@ -3383,25 +3383,66 @@ ${s.deleteStage === 'confirming' ? `<div class="sticky-cta" style="display:flex;
           </button>
         </div>
 
-        <!-- Option 2: SMS Token -->
+        <!-- Option 2: Multi-Channel Dispatch Hub (No Smartphone) -->
         <div class="fallback-option-card">
           <div class="fallback-opt-title">
-            <span>💬</span>
-            <span>2. Toll-Free Offline SMS Token</span>
+            <span>📡</span>
+            <span>2. Multi-Channel Offline Dispatch Hub</span>
           </div>
-          <div style="font-size:12px;opacity:.8;margin:4px 0">
-            Works on any 2G feature phone ("palasa" / torchlight phone). Exit code sent automatically upon clearance:
+          <div style="font-size:12px;color:#475569;margin:4px 0 8px;line-height:1.4">
+            When patient does not have a smartphone or phone battery is flat, dispatch digital clearance codes through these 4 independent channels:
           </div>
-          <div style="background:#fff;border:1px solid #ddd;border-radius:6px;padding:8px;font-size:11px;margin:6px 0;line-height:1.4">
-            <div>📱 <strong>Patient Phone:</strong> +234 803 123 4567 <span style="color:#1e7e48;font-weight:600">✓ Delivered</span></div>
-            <div>👥 <strong>Next-of-Kin:</strong> Fatima Umar (Wife) +234 802 345 6789 <span style="color:#1e7e48;font-weight:600">✓ Delivered</span></div>
-            <div style="margin-top:4px;font-family:ui-monospace,monospace;font-size:12px;color:var(--color-accent-800)">
-              SMS text: "WELLIPASS CLEARED: Jay Umar (LAG-4401) cleared to exit. Code: EXIT-7749"
+
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <!-- Channel A: SMS OTP -->
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:11.5px;font-weight:700">📱 A. SMS OTP & Exit PIN (2G Phone)</span>
+                <span style="font-size:10px;color:#166534;font-weight:700;background:#dcfce7;padding:1px 5px;border-radius:4px">✓ Live Ready</span>
+              </div>
+              <div style="font-size:10.5px;color:#64748b;margin:2px 0 6px">Recipient: <strong>+234 803 123 4567</strong> (Works on torchlight phones)</div>
+              <button class="btn btn-ghost" id="btn-wp-send-sms-otp" style="font-size:10.5px;padding:4px 8px;border:1px solid var(--color-divider);width:100%">
+                📲 Send SMS OTP to Patient Phone
+              </button>
+            </div>
+
+            <!-- Channel B: Email Clearance Slip -->
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:11.5px;font-weight:700">📧 B. Official Clearance Email & PDF</span>
+                <span style="font-size:10px;color:#166534;font-weight:700;background:#dcfce7;padding:1px 5px;border-radius:4px">✓ Digital Seal</span>
+              </div>
+              <div style="font-size:10.5px;color:#64748b;margin:2px 0 6px">Recipient: <strong>j.umar@email.ng</strong> (Full summary & clearance PDF)</div>
+              <button class="btn btn-ghost" id="btn-wp-send-email" style="font-size:10.5px;padding:4px 8px;border:1px solid var(--color-divider);width:100%">
+                📧 Send Official Clearance Email
+              </button>
+            </div>
+
+            <!-- Channel C: WhatsApp Notification -->
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:6px;padding:8px 10px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:11.5px;font-weight:700">💬 C. Patient WhatsApp Gate Pass</span>
+                <span style="font-size:10px;color:#166534;font-weight:700;background:#dcfce7;padding:1px 5px;border-radius:4px">✓ Bot Active</span>
+              </div>
+              <div style="font-size:10.5px;color:#64748b;margin:2px 0 6px">Recipient: <strong>+234 803 123 4567</strong> (Interactive QR & exit instructions)</div>
+              <button class="btn btn-ghost" id="btn-wp-send-wa" style="font-size:10.5px;padding:4px 8px;border:1px solid var(--color-divider);width:100%">
+                💬 Send WhatsApp Clearance Pass
+              </button>
+            </div>
+
+            <!-- Channel D: Next-of-Kin Phone Direct Alert -->
+            <div style="background:#fefce8;border:1px solid #fef08a;border-radius:6px;padding:8px 10px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:11.5px;font-weight:700;color:#854d0e">👥 D. Next-of-Kin (NOK) Direct Alert</span>
+                <span style="font-size:10px;color:#854d0e;font-weight:700;background:#fef9c3;padding:1px 5px;border-radius:4px">Primary Contact</span>
+              </div>
+              <div style="font-size:10.5px;color:#713f12;margin:2px 0 4px">Contact: <strong>Fatima Umar (Wife) · +234 802 345 6789</strong></div>
+              <div style="font-size:10px;color:#854d0e;margin-bottom:6px">Sends Exit PIN (EXIT-7749) via SMS + WhatsApp so family picking up the patient has the code ready.</div>
+              <button class="btn btn-primary" id="btn-wp-send-nok" style="font-size:10.5px;padding:5px 8px;width:100%;background:#ca8a04;border-color:#a16207">
+                👥 Send Exit Code to Next-of-Kin (+234 802 345 6789)
+              </button>
             </div>
           </div>
-          <button class="btn btn-ghost" id="btn-wp-resend-sms" style="font-size:11px;padding:4px 8px;border:1px solid var(--color-divider)">
-            📲 Resend SMS to Patient & Next-of-Kin
-          </button>
         </div>
 
         <!-- Option 3: Guard Terminal Lookup -->
@@ -4030,15 +4071,62 @@ ${s.deleteStage === 'confirming' ? `<div class="sticky-cta" style="display:flex;
         <span style="${isJayCleared ? 'color:#0088b0;font-weight:600' : 'opacity:.5'}">4. Gate Exit</span>
       </div>
 
-      <!-- Bedside Cashier Settlement Request -->
-      <div class="bedside-banner">
-        <div>
-          <div style="font-size:12px;font-weight:700;color:#8a6400">🛏️ Too weak to walk down to Room 102?</div>
-          <div style="font-size:11px;opacity:.8;margin-top:2px">Request bedside settlement — settle from your bed or an attendant will visit Ward 3B.</div>
+      <!-- Bedside Cashier Settlement Request (For Inpatients Unable to Walk) -->
+      <div class="bedside-dispatch-card ${s.deskBedsideRequested ? 'active' : ''}">
+        <div style="display:flex;align-items:flex-start;gap:10px">
+          <div class="bedside-icon-box">${s.deskBedsideRequested ? '💳' : '🛏️'}</div>
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <span class="bedside-kicker">IN-PATIENT BEDSIDE BILLING</span>
+              ${s.deskBedsideRequested ? '<span class="bedside-pulse-tag">🟢 POS EN ROUTE (~4 MINS)</span>' : ''}
+            </div>
+            <div style="font-size:13px;font-weight:700;color:#1e293b;margin-top:2px">
+              ${s.deskBedsideRequested ? 'Cashier Bringing Mobile POS to Your Bed' : 'Request Mobile POS to Hospital Bed'}
+            </div>
+            <div style="font-size:11px;color:#475569;margin-top:2px;line-height:1.4">
+              ${s.deskBedsideRequested 
+                ? 'Attendant Mohammed Bello is en route from Room 102 to Ward 3B with a Verifone 4G POS terminal. Settle by card swipe, cash, or transfer from your bed.'
+                : 'Too weak, elderly, post-surgery, or in pain to walk down to Cashier Room 102? An attendant will bring a wireless card POS directly to Bed 12.'}
+            </div>
+          </div>
         </div>
-        <button class="btn ${s.deskBedsideRequested ? 'btn-secondary' : 'btn-primary'}" id="btn-desk-request-bedside" style="font-size:11px;padding:6px 10px;white-space:nowrap">
-          ${s.deskBedsideRequested ? '✓ Bedside Requested' : (t.requestBedside || 'Request Bedside')}
-        </button>
+
+        <!-- Bedside Specs Box -->
+        <div class="bedside-details-box">
+          <div style="display:flex;justify-content:space-between"><span>📍 Patient Bed:</span><strong>Surgical Ward 3B · Bed 12</strong></div>
+          <div style="display:flex;justify-content:space-between"><span>🩺 Mobility Status:</span><strong>Post-Surgery / Unable to Walk</strong></div>
+          <div style="display:flex;justify-content:space-between"><span>📟 POS Device:</span><strong>Verifone V240m Wireless 4G POS</strong></div>
+          <div style="display:flex;justify-content:space-between"><span>💰 Amount Due:</span><strong style="color:${isJayCleared ? '#166534' : '#d6006c'}">${isJayCleared ? '₦0 (Cleared)' : '₦4,650 Co-Pay'}</strong></div>
+        </div>
+
+        ${!s.deskBedsideRequested ? `
+          <button class="btn btn-primary btn-block" id="btn-desk-request-bedside" style="margin-top:10px;font-size:11.5px">
+            💳 Request Cashier to Bring POS to Bed 12
+          </button>
+        ` : `
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:6px">
+            ${!isJayCleared ? `
+              <button class="btn btn-primary btn-block" id="btn-desk-simulate-pos-swipe" style="font-size:11.5px;background:#15803d;border-color:#166534">
+                💳 Simulate Bedside Card Swipe / Chip POS (₦4,650)
+              </button>
+            ` : `
+              <div style="background:#dcfce7;border:1px solid #86efac;border-radius:6px;padding:8px;text-align:center;font-size:11px;font-weight:700;color:#166534">
+                ✓ Bedside POS Settled (Thermal Slip #WP-POS-9921) · WelliPass Unlocked
+              </div>
+            `}
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-ghost" id="btn-desk-call-attendant" style="flex:1;font-size:10.5px;border:1px solid var(--color-divider);background:#fff">
+                📞 Call Sister Chinyere
+              </button>
+              <button class="btn btn-ghost" id="btn-desk-wa-attendant" style="flex:1;font-size:10.5px;border:1px solid var(--color-divider);background:#fff">
+                💬 WhatsApp Nurse
+              </button>
+              <button class="btn btn-ghost" id="btn-desk-cancel-bedside" style="font-size:10.5px;border:1px solid #fecaca;background:#fef2f2;color:#991b1b">
+                ✕ Cancel
+              </button>
+            </div>
+          </div>
+        `}
       </div>
 
       <!-- Out-of-Pocket Co-Pay Settlement Card -->
@@ -4769,9 +4857,54 @@ ${s.deleteStage === 'confirming' ? `<div class="sticky-cta" style="display:flex;
       s.toastMsg = 'Exit gate pass validated. Safe travels!'; this._render();
       setTimeout(() => { s.toastMsg = ''; this._render(); }, 3000);
     });
-    // WelliPass Offline Fallback & Thermal Slip
+    // WelliPass Offline Fallback & Multi-Channel Dispatch
     on('btn-toggle-fallback-drawer', 'click', () => {
       s.welliPassFallbackOpen = !s.welliPassFallbackOpen; this._render();
+    });
+    on('btn-wp-send-sms-otp', 'click', () => {
+      s.toastMsg = "SMS OTP & Exit PIN (EXIT-7749) dispatched to 0803 123 4567";
+      this._render();
+      setTimeout(() => { s.toastMsg = ""; this._render(); }, 3500);
+    });
+    on('btn-wp-send-email', 'click', () => {
+      s.toastMsg = "Official Clearance Certificate & Gate PDF emailed to j.umar@email.ng";
+      this._render();
+      setTimeout(() => { s.toastMsg = ""; this._render(); }, 3500);
+    });
+    on('btn-wp-send-wa', 'click', () => {
+      s.toastMsg = "WelliPass verified clearance pass sent via WhatsApp to +234 803 123 4567";
+      this._render();
+      setTimeout(() => { s.toastMsg = ""; this._render(); }, 3500);
+    });
+    on('btn-wp-send-nok', 'click', () => {
+      s.toastMsg = "Exit code EXIT-7749 sent via SMS & WhatsApp to Next-of-Kin Fatima Umar (+234 802 345 6789)";
+      this._render();
+      setTimeout(() => { s.toastMsg = ""; this._render(); }, 4000);
+    });
+
+    // Bedside Mobile POS Actions
+    on('btn-desk-simulate-pos-swipe', 'click', () => {
+      const jay = s.providerDesk.liveQueue.find(q => q.welliRecordId === "LAG-4401");
+      if (jay) { jay.status = "cleared"; jay.pspAmount = 0; }
+      s.toastMsg = "Bedside POS Payment Approved (Slip #WP-POS-9921) · WelliPass Unlocked!";
+      this._render();
+      setTimeout(() => { s.toastMsg = ""; this._render(); }, 4000);
+    });
+    on('btn-desk-call-attendant', 'click', () => {
+      s.toastMsg = "Calling Billing Officer Sister Chinyere at Room 102 (+234 803 123 4567)...";
+      this._render();
+      setTimeout(() => { s.toastMsg = ""; this._render(); }, 3000);
+    });
+    on('btn-desk-wa-attendant', 'click', () => {
+      s.toastMsg = "Opening WhatsApp message to Surgical Ward 3B Charge Nurse...";
+      this._render();
+      setTimeout(() => { s.toastMsg = ""; this._render(); }, 3000);
+    });
+    on('btn-desk-cancel-bedside', 'click', () => {
+      s.deskBedsideRequested = false;
+      s.toastMsg = "Bedside mobile POS request cancelled.";
+      this._render();
+      setTimeout(() => { s.toastMsg = ""; this._render(); }, 3000);
     });
     on('btn-wp-view-thermal-slip', 'click', () => {
       s.thermalSlipModal = {
