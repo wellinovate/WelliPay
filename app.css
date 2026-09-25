@@ -1292,3 +1292,340 @@ textarea.input { resize: vertical; min-height: 90px; }
   border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 12px 14px; margin: 12px 0;
 }
 
+
+
+/* ── Device Switcher in Toolbar & Sidebar ───────────────────── */
+.device-switch-group {
+  display: flex;
+  background: var(--color-surface-alt, #e9eaec);
+  padding: 2px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+}
+.device-switch-btn {
+  border: none;
+  background: transparent;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  transition: all 0.15s ease;
+}
+.device-switch-btn:hover {
+  color: var(--color-text);
+}
+.device-switch-btn.active {
+  background: var(--color-surface);
+  color: var(--color-accent-700, #0088b0);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.wp-rail-simulator-card {
+  margin: 10px 14px 14px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px;
+}
+.rail-sim-title {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #79d6f0;
+  margin-bottom: 6px;
+}
+.rail-sim-switch {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.rail-sim-btn {
+  flex: 1;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(0,0,0,0.25);
+  color: #d1d5db;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.rail-sim-btn:hover {
+  background: rgba(255,255,255,0.12);
+  color: #fff;
+}
+.rail-sim-btn.active {
+  background: #0088b0;
+  border-color: #38bdf8;
+  color: #fff;
+  font-weight: 700;
+}
+.rail-safe-toggle {
+  width: 100%;
+  border: 1px solid rgba(255,255,255,0.22);
+  background: rgba(0,0,0,0.3);
+  color: #f3f4f6;
+  font-size: 10.5px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.rail-safe-toggle:hover {
+  background: rgba(255,255,255,0.14);
+}
+.rail-safe-toggle.active {
+  background: rgba(255, 140, 0, 0.25);
+  border-color: #ff8c00;
+  color: #ffb866;
+  font-weight: 700;
+}
+
+/* ── iPhone 11 Native Frame Styles ─────────────────────────── */
+.iphone11-frame {
+  width: 414px;
+  height: 896px;
+  background: #141517;
+  border-radius: 54px;
+  padding: 12px;
+  box-shadow:
+    0 0 0 2px #34373d,
+    0 0 0 5px #0a0b0d,
+    0 24px 80px rgba(0,0,0,0.5),
+    0 8px 24px rgba(0,0,0,0.35);
+  position: relative;
+  flex: none;
+  box-sizing: border-box;
+}
+
+/* iPhone 11 Tactile Side Buttons */
+.iphone-mute-switch {
+  position: absolute;
+  left: -5px;
+  top: 108px;
+  width: 4px;
+  height: 28px;
+  background: #282a2f;
+  border-radius: 3px 0 0 3px;
+}
+.iphone-vol-up {
+  position: absolute;
+  left: -5px;
+  top: 154px;
+  width: 4px;
+  height: 52px;
+  background: #282a2f;
+  border-radius: 3px 0 0 3px;
+}
+.iphone-vol-down {
+  position: absolute;
+  left: -5px;
+  top: 218px;
+  width: 4px;
+  height: 52px;
+  background: #282a2f;
+  border-radius: 3px 0 0 3px;
+}
+.iphone-power-btn {
+  position: absolute;
+  right: -5px;
+  top: 168px;
+  width: 4px;
+  height: 74px;
+  background: #282a2f;
+  border-radius: 0 3px 3px 0;
+}
+
+.iphone-screen {
+  width: 100%;
+  height: 100%;
+  border-radius: 42px;
+  overflow: hidden;
+  background: var(--color-bg);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+/* iPhone 11 Notch Status Bar */
+.iphone-notch-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 20px;
+  height: 48px;
+  flex: none;
+  z-index: 30;
+  background: var(--color-bg);
+  position: relative;
+  box-sizing: border-box;
+}
+.iphone-notch-left {
+  width: 60px;
+  display: flex;
+  align-items: center;
+}
+.iphone-time {
+  font-size: 14px;
+  font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  letter-spacing: -0.02em;
+  color: var(--color-text);
+}
+.iphone-notch-cutout {
+  width: 172px;
+  height: 30px;
+  background: #000;
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  margin-top: -18px;
+}
+.iphone-speaker-slit {
+  width: 44px;
+  height: 3.5px;
+  background: #22242a;
+  border-radius: 2px;
+  position: absolute;
+  top: 6px;
+}
+.iphone-camera-lens {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #17324c 0%, #03060c 75%);
+  position: absolute;
+  right: 28px;
+  top: 9px;
+  box-shadow: inset 0 0 1px 1px rgba(255,255,255,0.12);
+}
+.iphone-notch-right {
+  width: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+}
+.iphone-cell-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 10px;
+}
+.iphone-cell-bars span {
+  width: 2.5px;
+  background: var(--color-text);
+  border-radius: 0.5px;
+}
+.iphone-cell-bars span:nth-child(1) { height: 3px; }
+.iphone-cell-bars span:nth-child(2) { height: 5px; }
+.iphone-cell-bars span:nth-child(3) { height: 7.5px; }
+.iphone-cell-bars span:nth-child(4) { height: 10px; }
+
+.iphone-battery-icon {
+  width: 22px;
+  height: 11.5px;
+  border: 1.5px solid var(--color-text);
+  border-radius: 3.5px;
+  padding: 1px;
+  display: flex;
+  align-items: center;
+  position: relative;
+  box-sizing: border-box;
+}
+.iphone-battery-icon::after {
+  content: "";
+  position: absolute;
+  right: -3px;
+  top: 2.5px;
+  bottom: 2.5px;
+  width: 1.5px;
+  background: var(--color-text);
+  border-radius: 0 1px 1px 0;
+}
+.iphone-battery-fill {
+  height: 100%;
+  background: var(--color-text);
+  border-radius: 1.5px;
+}
+
+/* iPhone 11 Home Indicator */
+.iphone-home-bar {
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  flex: none;
+  z-index: 30;
+}
+.iphone-home-indicator {
+  width: 134px;
+  height: 5px;
+  background: var(--color-text);
+  border-radius: 3px;
+  opacity: 0.28;
+  transition: opacity 0.2s, background 0.2s;
+}
+.iphone-home-indicator:hover {
+  opacity: 0.6;
+}
+
+/* ── Upgraded Side Area View & Gutter Guides ───────────────── */
+.safe-area-zone-sides {
+  position: absolute;
+  top: 48px;
+  bottom: 34px;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+  display: flex;
+  justify-content: space-between;
+}
+.safe-area-side-gutter {
+  width: 16px;
+  height: 100%;
+  position: relative;
+  background: repeating-linear-gradient(
+    -45deg,
+    rgba(255, 140, 0, 0.08),
+    rgba(255, 140, 0, 0.08) 6px,
+    rgba(255, 140, 0, 0.16) 6px,
+    rgba(255, 140, 0, 0.16) 12px
+  );
+  box-sizing: border-box;
+}
+.safe-area-gutter-left {
+  border-right: 2px dashed #ff8c00;
+}
+.safe-area-gutter-right {
+  border-left: 2px dashed #ff8c00;
+}
+.safe-area-gutter-label {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  white-space: nowrap;
+  font-size: 8px;
+  font-weight: 800;
+  color: #b35900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.safe-area-center-box {
+  flex: 1;
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 10px;
+}

@@ -1419,6 +1419,7 @@ class WelliPayApp {
       deskBedsideRequested: false,
       deskEodReportModal: false,
       showSafeArea: false,
+      deviceView: 'iphone11',
     };
   }
 
@@ -1665,52 +1666,131 @@ class WelliPayApp {
 
   _html() {
     const s = this.state;
+    const isIphone = s.deviceView !== 'android';
     return `
 <div class="wp-shell">
   ${this._htmlRail()}
   <div class="wp-stage">
     <div class="wp-toolbar">
-      <span class="wp-toolbar-chip">📱 412 × 892 · Android</span>
-      <span class="wp-toolbar-chip" style="opacity:.65">Safe Content: 380 × 810 px</span>
+      <div class="device-switch-group">
+        <button class="device-switch-btn ${isIphone ? 'active' : ''}" id="btn-device-iphone11">
+          🍎 iPhone 11 (iOS)
+        </button>
+        <button class="device-switch-btn ${!isIphone ? 'active' : ''}" id="btn-device-android">
+          🤖 Android
+        </button>
+      </div>
+      <span class="wp-toolbar-chip">${isIphone ? '📱 414 × 896 · iOS 18.3' : '📱 412 × 892 · Android 14'}</span>
+      <span class="wp-toolbar-chip" style="opacity:.7">${isIphone ? 'Safe Content: 382 × 814 px' : 'Safe Content: 380 × 810 px'}</span>
       <button class="toolbar-safe-toggle ${s.showSafeArea ? 'active' : ''}" id="btn-toggle-safe-area" title="Toggle Visual Safe Area Inset Guides">
         📐 Safe Area Guides: <strong>${s.showSafeArea ? 'ON' : 'OFF'}</strong>
       </button>
     </div>
-    <div class="android-frame">
-      <div class="android-speaker-slit" title="Earpiece Speaker Slit"></div>
-      <div class="android-screen">
-        <div class="android-status-bar">
-          <span style="font-size:12px;font-weight:700">9:41</span>
-          <div class="android-camera-punch" title="Front Camera Cutout (Safe Inset: 48px)"></div>
-          <div class="android-status-icons">
-            <span class="android-net-type">5G</span>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
-            <svg width="18" height="12" viewBox="0 0 24 16" fill="none"><rect x="0.5" y="0.5" width="20" height="15" rx="3.5" stroke="currentColor" stroke-opacity=".35"/><rect x="2" y="2" width="${Math.round(this.activeWallet > 0 ? 16 : 9)}" height="12" rx="2" fill="currentColor"/><path d="M22 5.5h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1" stroke="currentColor" stroke-opacity=".35"/></svg>
+
+    ${isIphone ? `
+      <!-- iPhone 11 Native Simulator Frame -->
+      <div class="phone-frame iphone11-frame">
+        <div class="iphone-mute-switch" title="Silent Mode Switch"></div>
+        <div class="iphone-vol-up" title="Volume Up"></div>
+        <div class="iphone-vol-down" title="Volume Down"></div>
+        <div class="iphone-power-btn" title="Side Power / Siri Button"></div>
+
+        <div class="phone-screen iphone-screen">
+          <!-- iPhone 11 Notch & Status Bar -->
+          <div class="iphone-notch-bar">
+            <div class="iphone-notch-left">
+              <span class="iphone-time">9:41</span>
+            </div>
+            <div class="iphone-notch-cutout" title="iPhone 11 Sensor Notch (TrueDepth + Speaker)">
+              <div class="iphone-speaker-slit"></div>
+              <div class="iphone-camera-lens"></div>
+            </div>
+            <div class="iphone-notch-right">
+              <div class="iphone-cell-bars">
+                <span></span><span></span><span></span><span></span>
+              </div>
+              <span class="iphone-net-type">5G</span>
+              <div class="iphone-battery-icon">
+                <div class="iphone-battery-fill" style="width:${Math.round(this.activeWallet > 0 ? 88 : 55)}%"></div>
+              </div>
+            </div>
           </div>
-        </div>
-        ${s.showSafeArea ? `
-          <div class="safe-area-overlay">
-            <div class="safe-area-zone-top">
-              <span>Top Inset · 48px</span>
-              <span>Status Bar & Cutout Zone</span>
+
+          ${s.showSafeArea ? `
+            <!-- Visual Safe Area & Side Inset Overlay -->
+            <div class="safe-area-overlay safe-area-ios">
+              <div class="safe-area-zone-top">
+                <span>Top Inset · 48px</span>
+                <span>iPhone 11 Notch & Status Bar</span>
+              </div>
+              <div class="safe-area-zone-sides">
+                <div class="safe-area-side-gutter safe-area-gutter-left">
+                  <span class="safe-area-gutter-label">16px Left Side Margin</span>
+                </div>
+                <div class="safe-area-center-box">
+                  <div class="safe-area-center-badge">iPhone 11 Safe Content Box · 382 × 814 px</div>
+                </div>
+                <div class="safe-area-side-gutter safe-area-gutter-right">
+                  <span class="safe-area-gutter-label">16px Right Side Margin</span>
+                </div>
+              </div>
+              <div class="safe-area-zone-bottom">
+                <span>iOS Home Indicator Gesture Zone</span>
+                <span>Bottom Inset · 34px</span>
+              </div>
             </div>
-            <div class="safe-area-zone-sides">
-              <div class="safe-area-line-left"></div>
-              <div class="safe-area-line-right"></div>
-              <div class="safe-area-center-badge">380 × 810 px Safe Content Box</div>
-            </div>
-            <div class="safe-area-zone-bottom">
-              <span>Gesture Bar Safe Zone</span>
-              <span>Bottom Inset · 34px</span>
-            </div>
+          ` : ''}
+
+          <div class="scr" id="screen-root">
+            ${this._htmlScreen(s.screen)}
           </div>
-        ` : ''}
-        <div class="scr" id="screen-root">
-          ${this._htmlScreen(s.screen)}
+          <div class="iphone-home-bar"><div class="iphone-home-indicator"></div></div>
         </div>
-        <div class="android-home-bar"><div class="android-home-pill"></div></div>
       </div>
-    </div>
+    ` : `
+      <!-- Android Frame -->
+      <div class="android-frame">
+        <div class="android-speaker-slit" title="Earpiece Speaker Slit"></div>
+        <div class="android-screen">
+          <div class="android-status-bar">
+            <span style="font-size:12px;font-weight:700">9:41</span>
+            <div class="android-camera-punch" title="Front Camera Cutout (Safe Inset: 40px)"></div>
+            <div class="android-status-icons">
+              <span class="android-net-type">5G</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+              <svg width="18" height="12" viewBox="0 0 24 16" fill="none"><rect x="0.5" y="0.5" width="20" height="15" rx="3.5" stroke="currentColor" stroke-opacity=".35"/><rect x="2" y="2" width="${Math.round(this.activeWallet > 0 ? 16 : 9)}" height="12" rx="2" fill="currentColor"/><path d="M22 5.5h1a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-1" stroke="currentColor" stroke-opacity=".35"/></svg>
+            </div>
+          </div>
+          ${s.showSafeArea ? `
+            <div class="safe-area-overlay safe-area-android">
+              <div class="safe-area-zone-top">
+                <span>Top Inset · 40px</span>
+                <span>Status Bar & Cutout Zone</span>
+              </div>
+              <div class="safe-area-zone-sides">
+                <div class="safe-area-side-gutter safe-area-gutter-left">
+                  <span class="safe-area-gutter-label">16px Left Side Margin</span>
+                </div>
+                <div class="safe-area-center-box">
+                  <div class="safe-area-center-badge">Android Safe Content Box · 380 × 810 px</div>
+                </div>
+                <div class="safe-area-side-gutter safe-area-gutter-right">
+                  <span class="safe-area-gutter-label">16px Right Side Margin</span>
+                </div>
+              </div>
+              <div class="safe-area-zone-bottom">
+                <span>Gesture Bar Safe Zone</span>
+                <span>Bottom Inset · 28px</span>
+              </div>
+            </div>
+          ` : ''}
+          <div class="scr" id="screen-root">
+            ${this._htmlScreen(s.screen)}
+          </div>
+          <div class="android-home-bar"><div class="android-home-pill"></div></div>
+        </div>
+      </div>
+    `}
   </div>
 </div>`;
   }
@@ -1728,6 +1808,16 @@ class WelliPayApp {
 <div class="wp-rail">
   <div class="wp-rail-brand">WelliPay</div>
   <div class="wp-rail-subtitle">Design Handoff · Interactive</div>
+  <div class="wp-rail-simulator-card">
+    <div class="rail-sim-title">Simulator & Side Area View</div>
+    <div class="rail-sim-switch">
+      <button class="rail-sim-btn ${s.deviceView !== 'android' ? 'active' : ''}" id="rail-btn-iphone11">🍎 iPhone 11</button>
+      <button class="rail-sim-btn ${s.deviceView === 'android' ? 'active' : ''}" id="rail-btn-android">🤖 Android</button>
+    </div>
+    <button class="rail-safe-toggle ${s.showSafeArea ? 'active' : ''}" id="rail-btn-safe-area">
+      📐 Side & Safe Area Guides: <strong>${s.showSafeArea ? 'ON' : 'OFF'}</strong>
+    </button>
+  </div>
   <div class="wp-rail-divider"></div>
   <div class="wp-rail-list">${groups}</div>
   <div class="wp-rail-restart">
