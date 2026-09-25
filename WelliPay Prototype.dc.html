@@ -1,0 +1,2032 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+
+<helmet>
+  <link rel="stylesheet" href="_ds/broadsheet-33e1abc0-c76e-4efe-9cc0-1407cbd4a61e/styles.css">
+  <script src="_ds/broadsheet-33e1abc0-c76e-4efe-9cc0-1407cbd4a61e/_ds_bundle.js"></script>
+  <script src="./image-slot.js"></script>
+  <style>
+    body{margin:0;background:var(--color-bg);font-family:var(--font-body);color:var(--color-text)}
+    a{color:var(--color-accent-700)} a:hover{color:var(--color-accent-800)}
+    .wp-shell{display:flex;gap:var(--space-8);align-items:flex-start;padding:var(--space-8) var(--space-6);max-width:1280px;margin:0 auto;flex-wrap:wrap}
+    .wp-rail{width:220px;flex:none}
+    .wp-rail h1{font-size:20px;margin:0 0 4px}
+    .wp-rail .kick{font-size:11px;letter-spacing:.1em;text-transform:uppercase;opacity:.55;margin-bottom:var(--space-2)}
+    .wp-rail-list{display:flex;flex-direction:column;gap:2px;max-height:78vh;overflow:auto;padding-right:8px}
+    .wp-rail-group{font-size:11px;letter-spacing:.06em;text-transform:uppercase;opacity:.5;margin:var(--space-3) 0 2px}
+    .wp-rail-link{display:flex;gap:8px;align-items:baseline;padding:5px 6px;border-radius:var(--radius-sm);cursor:pointer;font-size:13px;text-decoration:none;color:var(--color-text)}
+    .wp-rail-link:hover{background:var(--color-accent-100)}
+    .wp-rail-link.active{background:var(--color-accent-100);color:var(--color-accent-800);font-weight:600}
+    .wp-rail-id{font:600 10px ui-monospace,Menlo,monospace;opacity:.5;min-width:26px}
+    .wp-stage{flex:1;min-width:412px;display:flex;flex-direction:column;align-items:center;gap:var(--space-4)}
+    .wp-toolbar{display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap;justify-content:center}
+    .scr{height:100%;display:flex;flex-direction:column;background:var(--color-bg);font-family:var(--font-body)}
+    .scr-body{flex:1;overflow:auto;padding:var(--space-4) var(--space-4) var(--space-8)}
+    .scr-top{display:flex;align-items:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);}
+    .scr-back{cursor:pointer;display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%}
+    .scr-back:hover{background:var(--color-accent-100)}
+    .scr-title{font-size:18px;font-weight:600;margin:0}
+    .sticky-cta{position:sticky;bottom:0;background:var(--color-bg);padding:var(--space-3) var(--space-4) var(--space-4);box-shadow:0 -8px 16px -8px color-mix(in srgb,#000 10%,transparent)}
+    .tabbar{display:flex;border-top:1px solid var(--color-divider);background:var(--color-bg)}
+    .tabbar-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0 10px;cursor:pointer;font-size:11px;color:var(--color-neutral-600);min-height:48px}
+    .tabbar-item.active{color:var(--color-accent-700)}
+    .header-row{display:flex;align-items:center;justify-content:space-between;padding:var(--space-3) var(--space-4) 0}
+    .person-chip{display:flex;align-items:center;gap:8px;cursor:pointer;padding:4px 8px 4px 4px;border-radius:100px}
+    .person-chip:hover{background:var(--color-accent-100)}
+    .avatar{width:34px;height:34px;border-radius:50%;overflow:hidden;flex:none;background:var(--color-neutral-300)}
+    .bell-btn{position:relative;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer}
+    .bell-btn:hover{background:var(--color-accent-100)}
+    .bell-dot{position:absolute;top:8px;right:9px;width:8px;height:8px;border-radius:50%;background:var(--color-accent-2)}
+    .amount-lg{font-size:34px;font-weight:600;font-family:var(--font-heading);line-height:1.15}
+    .amount-md{font-size:22px;font-weight:600;font-family:var(--font-heading)}
+    .status-pill{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:100px}
+    .row-tap{cursor:pointer}
+    .row-tap:hover{background:var(--color-accent-100)}
+    .otp-box{width:42px;height:52px;border:1px solid var(--color-divider);border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;font-size:22px;font-family:var(--font-heading);background:var(--color-surface)}
+    .otp-box.filled{border-color:var(--color-accent)}
+    .otp-box.error{border-color:var(--color-accent-2-600)}
+    .pin-dot{width:14px;height:14px;border-radius:50%;border:1.5px solid var(--color-text);background:transparent}
+    .pin-dot.filled{background:var(--color-text)}
+    .keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--space-3)}
+    .keypad button{height:56px;border-radius:50%;border:none;background:transparent;font-size:22px;font-family:var(--font-heading);cursor:pointer}
+    .keypad button:hover{background:var(--color-accent-100)}
+    .offline-banner{background:var(--color-neutral-800);color:#fff;font-size:12px;text-align:center;padding:6px 12px}
+    .banner{padding:10px 12px;border-radius:var(--radius-md);font-size:13px;display:flex;gap:8px;align-items:flex-start}
+    .banner.warn{background:var(--color-process-yellow);color:var(--color-neutral-900)}
+    .banner.err{background:var(--color-accent-2-100);color:var(--color-accent-2-800)}
+    .banner.info{background:var(--color-accent-100);color:var(--color-accent-800)}
+    .toast{position:absolute;bottom:90px;left:50%;transform:translateX(-50%);background:var(--color-neutral-900);color:#fff;font-size:13px;padding:8px 16px;border-radius:100px;box-shadow:var(--shadow-md)}
+    .divider-line{height:1px;background:var(--color-divider);margin:var(--space-3) 0}
+    .skel{background:linear-gradient(90deg,var(--color-neutral-200),var(--color-neutral-100),var(--color-neutral-200));border-radius:var(--radius-md)}
+    .scr{position:relative}
+    .chip{display:inline-flex;align-items:center;padding:6px 14px;border-radius:100px;font-size:13px;cursor:pointer;background:var(--color-neutral-200)}
+    .chip.active{background:var(--color-accent-700);color:#fff}
+    .spinner{width:40px;height:40px;border-radius:50%;border:3px solid var(--color-neutral-200);border-top-color:var(--color-accent-600);animation:wpspin .8s linear infinite}
+    @keyframes wpspin{to{transform:rotate(360deg)}}
+    .icon-circle{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto}
+    .card-mock{border:1px solid var(--color-divider);border-radius:var(--radius-lg);padding:var(--space-4);background:var(--color-surface)}
+  </style>
+</helmet>
+<div class="wp-shell">
+  <div class="wp-rail">
+    <h1>WelliPay</h1>
+    <div class="kick">Stage 1 prototype · <a href="#" onClick="{{ setLangEn }}" style="{{ vm.railLangEnStyle }}">EN</a> / <a href="#" onClick="{{ setLangPcm }}" style="{{ vm.railLangPcmStyle }}">Pidgin</a></div>
+    <div class="wp-rail-list">
+      <sc-for list="{{ vm.railGroups }}" as="g" hint-placeholder-count="6">
+        <div class="wp-rail-group">{{ g.label }}</div>
+        <sc-for list="{{ g.items }}" as="it" hint-placeholder-count="4">
+          <a class="wp-rail-link {{ it.cls }}" onClick="{{ it.go }}"><span class="wp-rail-id">{{ it.id }}</span>{{ it.name }}</a>
+        </sc-for>
+      </sc-for>
+    </div>
+  </div>
+  <div class="wp-stage">
+    <div class="wp-toolbar">
+      <button type="button" class="btn btn-ghost" style="font-size:12px" onClick="{{ resetProto }}">↺ Restart</button>
+    </div>
+<x-import component-from-global-scope="AndroidDevice" from="./android-frame.jsx" width="412" height="892" hint-size="412px,892px" style="{{ deviceStyle }}">
+  <div class="scr">
+    <sc-if value="{{ vm.showOffline }}"><div class="offline-banner">{{ vm.offlineText }}</div></sc-if>
+
+    <sc-if value="{{ vm.scr.welcome }}">
+      <div class="scr-body" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:var(--space-4);height:100%">
+        <div style="font-family:var(--font-heading);font-weight:600;font-size:30px;letter-spacing:-0.02em">WelliPay</div>
+        <div style="font-style:italic;opacity:.7;font-size:15px">{{ t.tagline }}</div>
+        <p style="max-width:280px;font-size:15px;line-height:1.5">{{ t.welcomeBody }}</p>
+        <div style="display:flex;gap:var(--space-3);margin-top:var(--space-3)">
+          <button type="button" class="btn {{ vm.langBtnEnClass }}" onClick="{{ setLangEn }}" style="min-width:120px;justify-content:center">English</button>
+          <button type="button" class="btn {{ vm.langBtnPcmClass }}" onClick="{{ setLangPcm }}" style="min-width:120px;justify-content:center">Pidgin</button>
+        </div>
+        <button type="button" class="btn btn-primary btn-block" style="margin-top:var(--space-4);max-width:280px" onClick="{{ goPhone }}">{{ t.continue }}</button>
+        <a href="#" style="font-size:12px" onClick="{{ noop }}">{{ t.terms }}</a>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.phone }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div></div>
+      <div class="scr-body">
+        <h1 class="scr-title">{{ t.phoneTitle }}</h1>
+        <p style="font-size:13px;opacity:.65;margin-top:4px">{{ t.phoneHelper }}</p>
+        <div class="field" style="margin-top:var(--space-4)">
+          <label for="ph">{{ t.phoneLabel }}</label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:16px;padding:0 4px">+234</span>
+            <input class="input" id="ph" value="{{ state.phone }}" onChange="{{ onPhoneChange }}" placeholder="803 000 0000" />
+          </div>
+        </div>
+        <sc-if value="{{ vm.phoneError }}"><p style="color:var(--color-accent-2-700);font-size:13px">{{ vm.phoneError }}</p></sc-if>
+      </div>
+      <div class="sticky-cta"><button type="button" class="btn btn-primary btn-block" onClick="{{ sendCode }}">{{ t.sendCode }}</button></div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.otp }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div></div>
+      <div class="scr-body">
+        <h1 class="scr-title">{{ t.otpTitle }}</h1>
+        <p style="font-size:13px;opacity:.65;margin-top:4px">{{ t.otpHelper }}</p>
+        <div style="display:flex;gap:8px;margin-top:var(--space-4)">
+          <sc-for list="{{ vm.otpBoxes }}" as="b" hint-placeholder-count="6">
+            <div class="otp-box {{ b.cls }}">{{ b.val }}</div>
+          </sc-for>
+        </div>
+        <sc-if value="{{ vm.otpErrorMsg }}"><p style="color:var(--color-accent-2-700);font-size:13px;margin-top:var(--space-3)">{{ vm.otpErrorMsg }}</p></sc-if>
+        <sc-if value="{{ vm.otpLocked }}">
+          <div class="banner warn" style="margin-top:var(--space-3)">{{ t.otpLockedMsg }}</div>
+        </sc-if>
+        <div style="display:flex;gap:8px;margin-top:var(--space-4)">
+          <button type="button" class="btn btn-ghost" style="font-size:13px" onClick="{{ fillOtpGood }}">{{ t.demoCorrect }}</button>
+          <button type="button" class="btn btn-ghost" style="font-size:13px" onClick="{{ fillOtpBad }}">{{ t.demoWrong }}</button>
+        </div>
+        <div style="margin-top:var(--space-4);display:flex;justify-content:space-between;align-items:center">
+          <a href="#" onClick="{{ resend }}" style="{{ vm.resendStyle }}">{{ vm.resendLabel }}</a>
+          <a href="#" onClick="{{ goPhone }}" style="font-size:13px">{{ t.changeNumber }}</a>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.profile }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div></div>
+      <div class="scr-body">
+        <h1 class="scr-title">{{ t.profileTitle }}</h1>
+        <div class="field" style="margin-top:var(--space-4)"><label>{{ t.fullName }}</label><input class="input" value="{{ state.profName }}" onChange="{{ onProfNameChange }}" /></div>
+        <div class="field"><label>{{ t.dob }}</label>
+          <div style="display:flex;gap:8px">
+            <input class="input" placeholder="DD" style="width:70px" />
+            <input class="input" placeholder="MM" style="width:70px" />
+            <input class="input" placeholder="YYYY" style="width:90px" />
+          </div>
+          <p style="font-size:12px;opacity:.6;margin-top:4px">{{ t.dobHelper }}</p>
+        </div>
+        <div class="field"><label>{{ t.emailOpt }}</label><input class="input" placeholder="you@example.com" /></div>
+      </div>
+      <div class="sticky-cta"><button type="button" class="btn btn-primary btn-block" onClick="{{ goApplock }}">{{ t.continue }}</button></div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.applock }}">
+      <div class="scr-top"></div>
+      <div class="scr-body" style="text-align:center">
+        <h1 class="scr-title">{{ t.lockTitle }}</h1>
+        <p style="font-size:13px;opacity:.65;margin:4px 0 var(--space-4)">{{ t.lockHelper }}</p>
+        <sc-if value="{{ vm.pinMismatch }}"><div class="banner err" style="margin-bottom:var(--space-3)">{{ t.pinMismatchMsg }}</div></sc-if>
+        <div style="display:flex;justify-content:center;gap:12px;margin-bottom:var(--space-4)">
+          <sc-for list="{{ vm.pinDots }}" as="d" hint-placeholder-count="6"><div class="pin-dot {{ d.cls }}"></div></sc-for>
+        </div>
+        <p style="font-size:13px;opacity:.7">{{ vm.pinStageLabel }}</p>
+        <div class="keypad" style="max-width:260px;margin:var(--space-4) auto 0">
+          <sc-for list="{{ vm.keypadKeys }}" as="k" hint-placeholder-count="12">
+            <button type="button" onClick="{{ k.onPress }}" style="{{ k.style }}">{{ k.label }}</button>
+          </sc-for>
+        </div>
+        <button type="button" class="btn btn-secondary" style="margin-top:var(--space-4)" onClick="{{ useBiometric }}">{{ t.useBiometric }}</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.linkwr }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div></div>
+      <div class="scr-body">
+        <h1 class="scr-title">{{ t.linkTitle }}</h1>
+        <p style="font-size:14px;line-height:1.5;margin-top:var(--space-3)"><strong>{{ t.linkDoesLabel }}</strong> {{ t.linkDoes }}</p>
+        <p style="font-size:14px;line-height:1.5;margin-top:var(--space-3)"><strong>{{ t.linkNotLabel }}</strong> {{ t.linkNot }}</p>
+        <sc-if value="{{ vm.linkedSuccess }}"><div class="banner info" style="margin-top:var(--space-4)">{{ t.linkedSuccessMsg }}</div></sc-if>
+      </div>
+      <div class="sticky-cta" style="display:flex;flex-direction:column;gap:8px">
+        <button type="button" class="btn btn-primary btn-block" onClick="{{ linkNow }}">{{ t.linkNow }}</button>
+        <button type="button" class="btn btn-ghost btn-block" onClick="{{ goWalletIntro }}">{{ t.skipForNow }}</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.walletintro }}">
+      <div class="scr-body" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;gap:var(--space-4);height:100%">
+        <div class="icon-circle" style="background:var(--color-accent-100);color:var(--color-accent-800);font-size:30px">₦</div>
+        <h1 class="scr-title">{{ t.walletIntroTitle }}</h1>
+        <p style="max-width:280px;font-size:14px;line-height:1.5;opacity:.75">{{ t.walletIntroBody }}</p>
+        <button type="button" class="btn btn-primary btn-block" style="max-width:280px" onClick="{{ createWallet }}">{{ t.createWallet }}</button>
+        <button type="button" class="btn btn-ghost btn-block" style="max-width:280px" onClick="{{ goHome }}">{{ t.skipForNow }}</button>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.home }}">
+      <div class="header-row">
+        <div class="person-chip" onClick="{{ openPersonSheet }}">
+          <image-slot id="ava-{{ vm.activePerson }}" shape="circle" placeholder="Photo" style="width:34px;height:34px;flex:none"></image-slot>
+          <div style="font-size:14px;font-weight:600">{{ vm.activePersonName }}</div>
+          <sc-if value="{{ vm.multiPerson }}"><span style="opacity:.5;font-size:11px">▾</span></sc-if>
+        </div>
+        <div class="bell-btn" onClick="{{ goNotifs }}">
+          <svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M221.8,175.94C214.11,162.16,208,139.55,208,112a80,80,0,1,0-160,0c0,27.55-6.11,50.16-13.8,63.94-8.5,15-8.5,28.06,0,43.06A16,16,0,0,0,48,224H96a32,32,0,0,0,64,0h48a16,16,0,0,0,13.8-8C229.5,204,229.5,190.94,221.8,175.94Z"/></svg>
+          <sc-if value="{{ vm.hasUnread }}"><div class="bell-dot"></div></sc-if>
+        </div>
+      </div>
+      <div class="scr-body">
+        <div class="card">
+          <div class="card-kicker">{{ t.summaryKicker }}</div>
+          <div class="amount-lg" style="margin-top:4px">{{ vm.owingHeadline }}</div>
+          <sc-if value="{{ vm.hasBreakdown }}">
+            <div style="display:flex;flex-direction:column;gap:3px;margin-top:10px">
+              <sc-for list="{{ vm.perPersonBreakdown }}" as="pb" hint-placeholder-count="3">
+                <div style="display:flex;justify-content:space-between;font-size:13px;opacity:.75"><span>{{ pb.name }}</span><span>{{ pb.amount }}</span></div>
+              </sc-for>
+            </div>
+          </sc-if>
+        </div>
+        <sc-if value="{{ vm.hasNextDue }}">
+          <div class="card" style="margin-top:var(--space-3)">
+            <div class="card-kicker">{{ t.nextDueKicker }}</div>
+            <div class="card-title" style="font-size:16px">{{ vm.nextDue.facility }}</div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+              <div class="amount-md">{{ vm.nextDue.amount }}</div>
+              <div style="font-size:12px;opacity:.65">{{ t.due }} {{ vm.nextDue.date }}</div>
+            </div>
+            <button type="button" class="btn btn-primary btn-block" style="margin-top:var(--space-3)" onClick="{{ payNextDue }}">{{ t.payNow }}</button>
+          </div>
+        </sc-if>
+        <div class="card row-tap" style="margin-top:var(--space-3)" onClick="{{ goWalletTab }}">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><div class="card-kicker">{{ t.walletKicker }}</div><div class="amount-md" style="margin-top:4px">{{ vm.walletBalanceLabel }}</div></div>
+            <span style="opacity:.4">›</span>
+          </div>
+        </div>
+        <div style="margin-top:var(--space-4)">
+          <div class="wp-rail-group" style="margin-bottom:6px;opacity:.55;font-size:11px;letter-spacing:.06em;text-transform:uppercase">{{ t.recentBills }}</div>
+          <sc-for list="{{ vm.recentBills }}" as="b" hint-placeholder-count="3">
+            <div class="card row-tap" style="margin-bottom:8px" onClick="{{ b.open }}">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                <div style="min-width:0"><div class="card-title" style="font-size:15px">{{ b.facility }}</div><div style="font-size:12px;opacity:.6;margin-top:2px">{{ b.date }}</div></div>
+                <div style="text-align:right;flex:none">
+                  <div style="font-weight:600">{{ b.amount }}</div>
+                  <span class="status-pill" style="background:{{ b.bg }};color:{{ b.fg }};margin-top:4px">{{ b.icon }}{{ b.label }}</span>
+                </div>
+              </div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ vm.noRecentBills }}"><p style="font-size:13px;opacity:.6">{{ t.noBillsYet }}</p></sc-if>
+        </div>
+        <button type="button" class="btn btn-secondary btn-block" style="margin-top:var(--space-3)" onClick="{{ goAddBill }}">{{ t.addBill }}</button>
+      </div>
+      <div class="tabbar">
+        <div class="tabbar-item active" onClick="{{ goHome }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M218.83,103.77l-80-75.6a12,12,0,0,0-16.3,0l-80,75.6A20,20,0,0,0,36,118.91V208a20,20,0,0,0,20,20H100a12,12,0,0,0,12-12V168h32v48a12,12,0,0,0,12,12h44a20,20,0,0,0,20-20V118.91A20,20,0,0,0,218.83,103.77Z"/></svg>{{ t.tabHome }}</div>
+        <div class="tabbar-item" onClick="{{ goBillsTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M200,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.42,6.67L96,213.2l27.58,17.47a8,8,0,0,0,8.84,0L160,213.2l27.58,17.47A8,8,0,0,0,200,224V48A16,16,0,0,0,200,32ZM160,144H96a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Zm0-32H96a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Z"/></svg>{{ t.tabBills }}</div>
+        <div class="tabbar-item" onClick="{{ goWalletTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,64H72a8,8,0,1,1,0-16H192a8,8,0,0,0,0-16H72A24,24,0,0,0,48,56V184a24,24,0,0,0,24,24H216a16,16,0,0,0,16-16V80A16,16,0,0,0,216,64Zm-40,88a12,12,0,1,1,12-12A12,12,0,0,1,176,152Z"/></svg>{{ t.tabWallet }}</div>
+        <div class="tabbar-item" onClick="{{ goInsightsTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M224,200h-8V40a8,8,0,0,0-8-8H160a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H40a8,8,0,0,0-8,8v64H24a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z"/></svg>{{ t.tabInsights }}</div>
+        <div class="tabbar-item" onClick="{{ goHistoryTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.12,104.12,0,0,0,128,24Zm8,104a8,8,0,0,1-8,8,24,24,0,0,1,0-48,8,8,0,0,1,0,16,8,8,0,0,0,0,16A8,8,0,0,1,136,128Z"/></svg>{{ t.tabPay }}</div>
+        <div class="tabbar-item" onClick="{{ goProfileTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.8,40.31,185.68,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8Z"/></svg>{{ t.tabProfile }}</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.notifs }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div><h1 class="scr-title">{{ t.notifsTitle }}</h1></div>
+      <div class="scr-body">
+        <sc-for list="{{ vm.notifGroups }}" as="grp" hint-placeholder-count="2">
+          <div class="wp-rail-group" style="opacity:.55;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin:var(--space-3) 0 6px">{{ grp.label }}</div>
+          <sc-for list="{{ grp.items }}" as="n" hint-placeholder-count="3">
+            <div class="row-tap" style="display:flex;gap:10px;padding:10px 6px;border-radius:var(--radius-sm);align-items:flex-start" onClick="{{ n.open }}">
+              <div style="width:32px;height:32px;border-radius:50%;background:{{ n.bg }};color:{{ n.fg }};display:flex;align-items:center;justify-content:center;flex:none">{{ n.icon }}</div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:14px;font-weight:{{ n.weight }}">{{ n.title }}</div>
+                <div style="font-size:12px;opacity:.65;margin-top:1px">{{ n.body }}</div>
+                <div style="font-size:11px;opacity:.5;margin-top:2px">{{ n.time }}</div>
+              </div>
+              <sc-if value="{{ n.unread }}"><div class="bell-dot" style="position:static;margin-top:6px"></div></sc-if>
+            </div>
+          </sc-for>
+        </sc-for>
+        <sc-if value="{{ vm.noNotifs }}"><p style="font-size:13px;opacity:.6;text-align:center;margin-top:var(--space-6)">{{ t.noNotifs }}</p></sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.bills }}">
+      <div class="scr-top"><h1 class="scr-title">{{ t.billsTitle }}</h1></div>
+      <div class="scr-body">
+        <div style="display:flex;gap:8px;margin-bottom:var(--space-3)">
+          <div class="chip {{ vm.filterAllCls }}" onClick="{{ setFilterAll }}">{{ t.filterAll }}</div>
+          <div class="chip {{ vm.filterUnpaidCls }}" onClick="{{ setFilterUnpaid }}">{{ t.filterUnpaid }}</div>
+          <div class="chip {{ vm.filterPaidCls }}" onClick="{{ setFilterPaid }}">{{ t.filterPaid }}</div>
+        </div>
+        <sc-for list="{{ vm.billRows }}" as="b" hint-placeholder-count="4">
+          <div class="card row-tap" style="margin-bottom:8px" onClick="{{ b.open }}">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+              <div style="min-width:0"><div class="card-title" style="font-size:15px">{{ b.facility }}</div><div style="font-size:12px;opacity:.6;margin-top:2px">{{ b.date }}</div></div>
+              <div style="text-align:right;flex:none">
+                <div style="font-weight:600">{{ b.amount }}</div>
+                <span class="status-pill" style="background:{{ b.bg }};color:{{ b.fg }};margin-top:4px">{{ b.icon }}{{ b.label }}</span>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{ vm.noBillsForFilter }}"><p style="font-size:13px;opacity:.6;text-align:center;margin-top:var(--space-6)">{{ vm.emptyFilterMsg }}</p></sc-if>
+      </div>
+      <div class="tabbar">
+        <div class="tabbar-item" onClick="{{ goHome }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M218.83,103.77l-80-75.6a12,12,0,0,0-16.3,0l-80,75.6A20,20,0,0,0,36,118.91V208a20,20,0,0,0,20,20H100a12,12,0,0,0,12-12V168h32v48a12,12,0,0,0,12,12h44a20,20,0,0,0,20-20V118.91A20,20,0,0,0,218.83,103.77Z"/></svg>{{ t.tabHome }}</div>
+        <div class="tabbar-item active" onClick="{{ goBillsTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M200,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.42,6.67L96,213.2l27.58,17.47a8,8,0,0,0,8.84,0L160,213.2l27.58,17.47A8,8,0,0,0,200,224V48A16,16,0,0,0,200,32ZM160,144H96a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Zm0-32H96a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Z"/></svg>{{ t.tabBills }}</div>
+        <div class="tabbar-item" onClick="{{ goWalletTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,64H72a8,8,0,1,1,0-16H192a8,8,0,0,0,0-16H72A24,24,0,0,0,48,56V184a24,24,0,0,0,24,24H216a16,16,0,0,0,16-16V80A16,16,0,0,0,216,64Zm-40,88a12,12,0,1,1,12-12A12,12,0,0,1,176,152Z"/></svg>{{ t.tabWallet }}</div>
+        <div class="tabbar-item" onClick="{{ goInsightsTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M224,200h-8V40a8,8,0,0,0-8-8H160a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H40a8,8,0,0,0-8,8v64H24a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z"/></svg>{{ t.tabInsights }}</div>
+        <div class="tabbar-item" onClick="{{ goHistoryTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.12,104.12,0,0,0,128,24Zm8,104a8,8,0,0,1-8,8,24,24,0,0,1,0-48,8,8,0,0,1,0,16,8,8,0,0,0,0,16A8,8,0,0,1,136,128Z"/></svg>{{ t.tabPay }}</div>
+        <div class="tabbar-item" onClick="{{ goProfileTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.8,40.31,185.68,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8Z"/></svg>{{ t.tabProfile }}</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.billdetail }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div><div style="flex:1"></div><div class="scr-back" onClick="{{ noop }}">⋯</div></div>
+      <div class="scr-body">
+        <sc-if value="{{ vm.bd }}">
+          <div style="font-size:12px;opacity:.6">{{ vm.bd.date }} · {{ vm.bd.billNo }}</div>
+          <div style="font-size:17px;font-weight:600;margin-top:2px;line-height:1.3">{{ vm.bd.facility }}</div>
+          <span class="status-pill" style="background:{{ vm.bd.bg }};color:{{ vm.bd.fg }};margin-top:8px">{{ vm.bd.icon }}{{ vm.bd.label }}</span>
+
+          <sc-if value="{{ vm.bd.isVoid }}"><div class="banner err" style="margin-top:var(--space-3)">{{ t.voidBanner }}</div></sc-if>
+
+          <sc-if value="{{ vm.bd.showAmount }}">
+            <div style="margin-top:var(--space-4)">
+              <div class="amount-lg">{{ vm.bd.amountLabel }}</div>
+              <div style="font-size:13px;opacity:.6;margin-top:2px">{{ vm.bd.dueLabel }}</div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ vm.bd.hasSplit }}">
+            <div class="card" style="margin-top:var(--space-3)">
+              <div class="card-kicker">{{ t.payerSplit }}</div>
+              <div style="display:flex;justify-content:space-between;font-size:14px;margin-top:6px"><span>{{ t.youPay }}</span><span style="font-weight:600">{{ vm.bd.youPayAmt }}</span></div>
+              <div style="display:flex;justify-content:space-between;font-size:14px;margin-top:4px;opacity:.75"><span>{{ t.hmoPays }}</span><span>{{ vm.bd.hmoPaysAmt }}</span></div>
+              <div class="divider-line"></div>
+              <div style="display:flex;justify-content:space-between;font-size:13px;opacity:.6"><span>{{ t.billTotal }}</span><span>{{ vm.bd.totalAmt }}</span></div>
+            </div>
+          </sc-if>
+
+          <div style="margin-top:var(--space-4)">
+            <sc-for list="{{ vm.bd.visibleLines }}" as="ln" hint-placeholder-count="5">
+              <div style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--color-divider)">
+                <div style="font-size:13px;min-width:0">{{ ln.name }}<span style="opacity:.5"> × {{ ln.qty }}</span></div>
+                <div style="font-size:13px;font-weight:600;color:{{ ln.color }};flex:none">{{ ln.total }}</div>
+              </div>
+            </sc-for>
+            <sc-if value="{{ vm.bd.hasMoreLines }}">
+              <div class="row-tap" style="text-align:center;padding:10px 0;font-size:13px;color:var(--color-accent-700)" onClick="{{ showAllLines }}">{{ vm.bd.showAllLabel }}</div>
+            </sc-if>
+            <div style="display:flex;justify-content:space-between;padding-top:10px;font-weight:600">
+              <span>{{ t.total }}</span><span>{{ vm.bd.totalAmt }}</span>
+            </div>
+          </div>
+
+          <sc-if value="{{ vm.bd.showUpdateNotice }}">
+            <div class="banner warn" style="margin-top:var(--space-3)">{{ t.billChangedMsg }}</div>
+          </sc-if>
+
+          <div style="margin-top:var(--space-4);display:flex;gap:var(--space-4)">
+            <a href="#" onClick="{{ noop }}" style="font-size:13px">{{ t.shareStatement }}</a>
+            <a href="#" onClick="{{ goReport }}" style="font-size:13px">{{ t.reportProblem }}</a>
+          </div>
+        </sc-if>
+      </div>
+      <sc-if value="{{ vm.bd.showPayCta }}">
+        <div class="sticky-cta"><button type="button" class="btn btn-primary btn-block" onClick="{{ payThisBill }}">{{ vm.bd.payCtaLabel }}</button></div>
+      </sc-if>
+      <sc-if value="{{ vm.bd.showReceiptCta }}">
+        <div class="sticky-cta"><button type="button" class="btn btn-primary btn-block" onClick="{{ goReceipt }}">{{ t.viewReceipt }}</button></div>
+      </sc-if>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.addbill }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div><h1 class="scr-title">{{ t.addBillTitle }}</h1></div>
+      <div class="scr-body">
+        <sc-if value="{{ vm.ab.showScan }}">
+          <div style="height:220px;border:2px dashed var(--color-neutral-400);border-radius:var(--radius-lg);display:flex;align-items:center;justify-content:center;color:var(--color-neutral-500);font-size:13px;text-align:center;padding:var(--space-4)">{{ t.scanFrameHelp }}</div>
+          <a href="#" onClick="{{ showManualEntry }}" style="display:block;text-align:center;margin-top:var(--space-3);font-size:14px">{{ t.enterCodeInstead }}</a>
+        </sc-if>
+        <sc-if value="{{ vm.ab.showManual }}">
+          <div class="field"><label>{{ t.billCode }}</label><input class="input" style="text-transform:uppercase;letter-spacing:2px;font-family:ui-monospace,monospace" value="{{ state.addBillCode }}" onChange="{{ onCodeChange }}" placeholder="ABCD-1234" /></div>
+          <sc-if value="{{ vm.ab.errorMsg }}"><div class="banner err">{{ vm.ab.errorMsg }}</div></sc-if>
+          <div style="display:flex;gap:8px;margin-top:var(--space-3);flex-wrap:wrap">
+            <button type="button" class="btn btn-ghost" style="font-size:12px" onClick="{{ demoValid }}">{{ t.demoValid }}</button>
+            <button type="button" class="btn btn-ghost" style="font-size:12px" onClick="{{ demoExpired }}">{{ t.demoExpired }}</button>
+            <button type="button" class="btn btn-ghost" style="font-size:12px" onClick="{{ demoAlready }}">{{ t.demoAlready }}</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ vm.ab.showSuccess }}">
+          <div style="text-align:center;padding-top:var(--space-6)">
+            <div style="font-size:40px">✓</div>
+            <div style="font-size:16px;font-weight:600;margin-top:var(--space-3)">{{ t.billAdded }}</div>
+          </div>
+        </sc-if>
+      </div>
+      <sc-if value="{{ vm.ab.showManual }}"><div class="sticky-cta"><button type="button" class="btn btn-primary btn-block" onClick="{{ submitCode }}">{{ t.continue }}</button></div></sc-if>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.amount }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div><h1 class="scr-title">{{ t.amountTitle }}</h1></div>
+      <div class="scr-body">
+        <div style="font-size:13px;opacity:.65">{{ vm.pay.facility }}</div>
+        <div class="amount-md" style="margin-top:2px">{{ vm.pay.amountDueLabel }}</div>
+        <div style="margin-top:var(--space-4);display:flex;flex-direction:column;gap:8px">
+          <div class="card row-tap" style="{{ vm.pay.fullSelStyle }}" onClick="{{ selectFull }}">
+            <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600">{{ t.payFull }} {{ vm.pay.fullAmount }}</span><span class="dot" style="{{ vm.pay.fullDotStyle }}"></span></div>
+          </div>
+          <div class="card row-tap" style="{{ vm.pay.partSelStyle }}" onClick="{{ selectPart }}">
+            <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600">{{ t.payPart }}</span><span class="dot" style="{{ vm.pay.partDotStyle }}"></span></div>
+            <sc-if value="{{ vm.pay.showPartInput }}">
+              <input class="input" style="margin-top:10px" value="{{ state.payPartAmount }}" onChange="{{ onPartAmountChange }}" placeholder="₦0" onClick="{{ stopClick }}" />
+              <p style="font-size:12px;opacity:.6;margin-top:6px">{{ vm.pay.minPartHelper }}</p>
+              <sc-if value="{{ vm.pay.balanceAfter }}"><p style="font-size:12px;margin-top:4px">{{ vm.pay.balanceAfter }}</p></sc-if>
+              <sc-if value="{{ vm.pay.amountError }}"><p style="font-size:12px;color:var(--color-accent-2-700);margin-top:4px">{{ vm.pay.amountError }}</p></sc-if>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+      <div class="sticky-cta"><button type="button" class="btn btn-primary btn-block" onClick="{{ continueAmount }}">{{ t.continue }}</button></div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.method }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div><h1 class="scr-title">{{ t.methodTitle }}</h1></div>
+      <div class="scr-body">
+        <div class="amount-md">{{ vm.pay.chosenAmount }}</div>
+        <sc-if value="{{ vm.pay.cancelledBanner }}"><div class="banner info" style="margin-top:var(--space-3)">{{ t.paymentCancelledMsg }}</div></sc-if>
+        <div style="margin-top:var(--space-4);display:flex;flex-direction:column;gap:8px">
+          <sc-if value="{{ vm.pay.showWalletOption }}">
+            <div class="card row-tap" style="{{ vm.pay.walletOptStyle }}" onClick="{{ vm.pay.chooseWallet }}">
+              <div class="card-title" style="font-size:15px">{{ t.payWithWallet }}</div>
+              <div class="card-body" style="font-size:13px">{{ vm.pay.walletOptSub }}</div>
+            </div>
+          </sc-if>
+          <div class="card row-tap" onClick="{{ chooseCard }}">
+            <div class="card-title" style="font-size:15px">{{ t.payWithCard }}</div>
+            <div class="card-body" style="font-size:13px">{{ t.payWithCardSub }}</div>
+          </div>
+          <div class="card row-tap" onClick="{{ chooseTransfer }}">
+            <div class="card-title" style="font-size:15px">{{ t.payWithTransfer }}</div>
+            <div class="card-body" style="font-size:13px">{{ t.payWithTransferSub }}</div>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.confirm }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div><h1 class="scr-title">{{ t.confirmTitle }}</h1></div>
+      <div class="scr-body">
+        <sc-if value="{{ vm.pay.confirmIdle }}">
+          <div style="font-size:13px;opacity:.7">{{ vm.pay.confirmHeading }}</div>
+          <div class="amount-lg" style="margin-top:2px">{{ vm.pay.chosenAmount }}</div>
+          <div style="font-size:14px;margin-top:4px">{{ vm.pay.confirmSubtitle }}</div>
+          <div class="divider-line"></div>
+          <div style="display:flex;justify-content:space-between;font-size:14px"><span>{{ t.method }}</span><span>{{ vm.pay.methodLabel }}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:14px;margin-top:6px"><span>{{ t.totalCharge }}</span><span style="font-weight:600">{{ vm.pay.chosenAmount }}</span></div>
+          <button type="button" class="btn btn-primary btn-block" style="margin-top:var(--space-4)" onClick="{{ startConfirm }}">{{ t.confirmBtn }}</button>
+          <button type="button" class="btn btn-ghost btn-block" style="margin-top:8px" onClick="{{ goBack }}">{{ t.cancel }}</button>
+        </sc-if>
+        <sc-if value="{{ vm.pay.confirmPinning }}">
+          <div style="text-align:center">
+            <p style="font-size:14px;opacity:.75">{{ t.confirmPinPrompt }}</p>
+            <div style="display:flex;justify-content:center;gap:12px;margin:var(--space-3) 0">
+              <sc-for list="{{ vm.pay.confirmDots }}" as="d" hint-placeholder-count="6"><div class="pin-dot {{ d.cls }}"></div></sc-for>
+            </div>
+            <div class="keypad" style="max-width:260px;margin:0 auto">
+              <sc-for list="{{ vm.pay.confirmKeys }}" as="k" hint-placeholder-count="12">
+                <button type="button" onClick="{{ k.onPress }}" style="{{ k.style }}">{{ k.label }}</button>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ vm.pay.confirmFailed }}">
+          <div class="banner err">{{ t.confirmFailedMsg }}</div>
+          <button type="button" class="btn btn-primary btn-block" style="margin-top:var(--space-4)" onClick="{{ startConfirm }}">{{ t.tryAgain }}</button>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.cardpay }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ cardCancel }}">←</div></div>
+      <sc-if value="{{ vm.pay.cardLoading }}">
+        <div class="scr-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;gap:var(--space-3)">
+          <div class="spinner"></div>
+          <p style="font-size:14px;opacity:.75">{{ t.openingSecure }}</p>
+        </div>
+      </sc-if>
+      <sc-if value="{{ vm.pay.cardChecking }}">
+        <div class="scr-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;text-align:center;gap:var(--space-3)">
+          <div class="spinner"></div>
+          <p style="font-size:14px;opacity:.75">{{ t.checkingPayment }}</p>
+        </div>
+      </sc-if>
+      <sc-if value="{{ vm.pay.cardReady }}">
+        <div class="scr-body" style="display:flex;flex-direction:column;height:100%">
+          <div style="text-align:center;padding:var(--space-2) 0 var(--space-4)">
+            <div class="card-kicker">{{ t.securePaymentKicker }}</div>
+            <div class="amount-lg" style="margin-top:4px">{{ vm.pay.chosenAmount }}</div>
+            <div style="font-size:13px;opacity:.6;margin-top:2px">{{ vm.pay.facility }}</div>
+          </div>
+          <div class="card-mock">
+            <div class="field"><label>{{ t.cardNumberLabel }}</label><input class="input" value="•••• •••• •••• 4242" disabled="{{ true }}" /></div>
+            <div style="display:flex;gap:8px">
+              <div class="field" style="flex:1"><label>{{ t.expiryLabel }}</label><input class="input" value="09/29" disabled="{{ true }}" /></div>
+              <div class="field" style="flex:1"><label>{{ t.cvvLabel }}</label><input class="input" value="•••" disabled="{{ true }}" /></div>
+            </div>
+            <button type="button" class="btn btn-primary btn-block" style="margin-top:var(--space-2)" onClick="{{ cardSucceed }}">{{ vm.pay.payCtaLabel }}</button>
+          </div>
+          <div style="margin-top:auto;padding-top:var(--space-4)">
+            <div class="wp-rail-group" style="opacity:.5;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px">{{ t.prototypeControls }}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <button type="button" class="btn btn-ghost" style="font-size:12px" onClick="{{ cardThreeDS }}">{{ t.demoThreeDS }}</button>
+              <button type="button" class="btn btn-ghost" style="font-size:12px" onClick="{{ cardDecline }}">{{ t.demoDecline }}</button>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.transfer }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div><h1 class="scr-title">{{ t.transferTitle }}</h1></div>
+      <div class="scr-body">
+        <sc-if value="{{ vm.pay.transferExpired }}">
+          <div class="banner warn">{{ t.transferExpiredMsg }}</div>
+          <button type="button" class="btn btn-primary btn-block" style="margin-top:var(--space-4)" onClick="{{ newAccountNumber }}">{{ t.getNewAccount }}</button>
+        </sc-if>
+        <sc-if value="{{ vm.pay.transferActive }}">
+          <p style="font-size:14px;line-height:1.5">{{ t.transferInstruction }}</p>
+          <div class="card" style="margin-top:var(--space-3)">
+            <div style="display:flex;justify-content:space-between;padding:6px 0"><span style="font-size:12px;opacity:.6">{{ t.bankName }}</span><span style="font-size:14px;font-weight:600">Any Bank</span></div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;align-items:center"><span style="font-size:12px;opacity:.6">{{ t.accountNumber }}</span><span style="display:flex;gap:8px;align-items:center"><span style="font-size:18px;font-weight:600;font-family:ui-monospace,monospace">9021445678</span><a href="#" onClick="{{ copyAcct }}" style="font-size:12px">{{ t.copy }}</a></span></div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0"><span style="font-size:12px;opacity:.6">{{ t.accountName }}</span><span style="font-size:13px;font-weight:600">WELLIPAY-JAY UMAR</span></div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;align-items:center"><span style="font-size:12px;opacity:.6">{{ t.amount }}</span><span style="display:flex;gap:8px;align-items:center"><span style="font-size:14px;font-weight:600">{{ vm.pay.chosenAmount }}</span><a href="#" onClick="{{ copyAmt }}" style="font-size:12px">{{ t.copy }}</a></span></div>
+          </div>
+          <div style="text-align:center;margin-top:var(--space-3);font-size:13px;font-weight:600;color:{{ vm.pay.countdownColor }}">{{ t.expiresIn }} {{ vm.pay.countdownLabel }}</div>
+          <p style="font-size:12px;opacity:.6;margin-top:var(--space-3)">{{ t.transferNote }}</p>
+        </sc-if>
+      </div>
+      <sc-if value="{{ vm.pay.transferActive }}">
+        <div class="sticky-cta" style="display:flex;flex-direction:column;gap:8px">
+          <button type="button" class="btn btn-primary btn-block" onClick="{{ iHavePaid }}">{{ t.iHavePaid }}</button>
+          <a href="#" onClick="{{ goMethod }}" style="text-align:center;font-size:13px">{{ t.chooseAnotherMethod }}</a>
+        </div>
+      </sc-if>
+      <sc-if value="{{ vm.pay.toast }}"><div class="toast">{{ vm.pay.toast }}</div></sc-if>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.status }}">
+      <div class="scr-body" style="display:flex;flex-direction:column;justify-content:center;height:100%;text-align:center;gap:var(--space-3)">
+        <sc-if value="{{ vm.pay.outPending }}">
+          <div class="icon-circle" style="background:var(--color-process-yellow);color:var(--color-neutral-900)">⏱</div>
+          <p style="font-size:14px;line-height:1.5;max-width:280px;margin:0 auto">{{ t.pendingMsg }}</p>
+          <div style="display:flex;gap:8px;justify-content:center;margin-top:var(--space-3)">
+            <button type="button" class="btn btn-ghost" style="font-size:12px" onClick="{{ vm.pay.demoResolveSuccessFn }}">{{ t.demoResolveSuccess }}</button>
+            <button type="button" class="btn btn-ghost" style="font-size:12px" onClick="{{ vm.pay.demoResolveReviewFn }}">{{ t.demoResolveReview }}</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ vm.pay.outSuccess }}">
+          <div class="icon-circle" style="background:var(--color-accent-100);color:var(--color-accent-800)">✓</div>
+          <div style="font-size:17px;font-weight:600">{{ vm.pay.successHeading }}</div>
+          <div style="font-size:14px;opacity:.7">{{ vm.pay.paidAmountLabel }} · {{ vm.pay.facility }}</div>
+          <div style="font-size:12px;opacity:.55">{{ vm.pay.dateTimeRef }}</div>
+          <sc-if value="{{ vm.pay.stillToPay }}"><div class="banner warn" style="margin-top:var(--space-2)">{{ vm.pay.stillToPay }}</div></sc-if>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:var(--space-4)">
+            <sc-if value="{{ vm.pay.isTopup }}"><button type="button" class="btn btn-primary btn-block" onClick="{{ vm.pay.exitHandler }}">{{ vm.pay.exitLabel }}</button></sc-if>
+            <sc-if value="{{ vm.notIsTopup }}"><button type="button" class="btn btn-primary btn-block" onClick="{{ goReceipt }}">{{ t.viewReceipt }}</button></sc-if>
+            <sc-if value="{{ vm.pay.stillToPay }}"><button type="button" class="btn btn-secondary btn-block" onClick="{{ payBalance }}">{{ t.payBalanceBtn }}</button></sc-if>
+            <sc-if value="{{ vm.notIsTopup }}"><button type="button" class="btn btn-ghost btn-block" onClick="{{ goBillsTab }}">{{ t.backToBills }}</button></sc-if>
+          </div>
+        </sc-if>
+        <sc-if value="{{ vm.pay.outFailed }}">
+          <div class="icon-circle" style="background:var(--color-accent-2-100);color:var(--color-accent-2-800)">✕</div>
+          <div style="font-size:17px;font-weight:600">{{ vm.pay.failReasonMsg }}</div>
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:var(--space-4)">
+            <button type="button" class="btn btn-primary btn-block" onClick="{{ startConfirm2 }}">{{ t.tryAgain }}</button>
+            <button type="button" class="btn btn-secondary btn-block" onClick="{{ goMethod }}">{{ t.useAnotherMethod }}</button>
+          </div>
+        </sc-if>
+        <sc-if value="{{ vm.pay.outExpired }}">
+          <div class="icon-circle" style="background:var(--color-neutral-200);color:var(--color-neutral-700)">⏱</div>
+          <p style="font-size:14px">{{ t.expiredMsg }}</p>
+          <button type="button" class="btn btn-primary btn-block" style="margin-top:var(--space-3)" onClick="{{ goMethod }}">{{ t.tryAgain }}</button>
+        </sc-if>
+        <sc-if value="{{ vm.pay.outReview }}">
+          <div class="icon-circle" style="background:var(--color-accent-100);color:var(--color-accent-800)">⏱</div>
+          <p style="font-size:14px">{{ t.underReviewMsg }}</p>
+          <div style="font-size:12px;opacity:.55">{{ vm.pay.dateTimeRef }}</div>
+          <button type="button" class="btn btn-secondary btn-block" style="margin-top:var(--space-3)" onClick="{{ goContact }}">{{ t.contactSupport }}</button>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.receipt }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div><h1 class="scr-title">{{ t.receiptTitle }}</h1></div>
+      <div class="scr-body">
+        <sc-if value="{{ vm.pay.receiptGenerating }}">
+          <div style="text-align:center;padding-top:var(--space-8)"><p style="font-size:14px;opacity:.7">{{ t.preparingReceipt }}</p></div>
+        </sc-if>
+        <sc-if value="{{ vm.pay.receiptReady }}">
+          <div class="card">
+            <div style="font-size:12px;opacity:.6">{{ vm.pay.receiptNo }}</div>
+            <div style="font-size:12px;opacity:.6;margin-top:2px">{{ vm.pay.dateTimeRef }}</div>
+            <div class="divider-line"></div>
+            <div style="display:flex;justify-content:space-between;font-size:14px;margin-top:4px"><span>{{ t.facilityLabel }}</span><span style="font-weight:600;text-align:right;max-width:60%">{{ vm.pay.facility }}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:14px;margin-top:6px"><span>{{ t.personLabel }}</span><span>{{ vm.activePersonName }}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:14px;margin-top:6px"><span>{{ t.methodLabel2 }}</span><span>{{ vm.pay.methodLabel }}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:16px;margin-top:10px;font-weight:600"><span>{{ t.amountPaid }}</span><span>{{ vm.pay.paidAmountLabel }}</span></div>
+            <sc-if value="{{ vm.pay.stillToPay }}"><div style="display:flex;justify-content:space-between;font-size:13px;margin-top:4px;opacity:.7"><span>{{ t.balanceLabel }}</span><span>{{ vm.pay.balanceLeft }}</span></div></sc-if>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;margin-top:var(--space-4);gap:6px">
+            <div style="width:96px;height:96px;background:repeating-conic-gradient(var(--color-text) 0% 25%, transparent 0% 50%) 0 0/12px 12px;border-radius:var(--radius-md)"></div>
+            <div style="font-size:11px;opacity:.55;font-family:ui-monospace,monospace">{{ vm.pay.verifyCode }}</div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:var(--space-4)">
+            <button type="button" class="btn btn-secondary btn-block" onClick="{{ noop }}">{{ t.share }}</button>
+            <button type="button" class="btn btn-secondary btn-block" onClick="{{ noop }}">{{ t.download }}</button>
+          </div>
+        </sc-if>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.history }}">
+      <div class="scr-top"><h1 class="scr-title">{{ t.historyTitle }}</h1></div>
+      <div class="scr-body">
+        <div style="display:flex;gap:8px;margin-bottom:var(--space-3)">
+          <div class="chip {{ vm.histAllCls }}" onClick="{{ setHistAll }}">{{ t.filterAll }}</div>
+          <div class="chip {{ vm.histMonthCls }}" onClick="{{ setHistMonth }}">{{ t.thisMonth }}</div>
+        </div>
+        <sc-for list="{{ vm.histGroups }}" as="grp" hint-placeholder-count="2">
+          <div style="opacity:.55;font-size:11px;letter-spacing:.06em;text-transform:uppercase;margin:var(--space-3) 0 6px">{{ grp.label }}</div>
+          <sc-for list="{{ grp.items }}" as="p" hint-placeholder-count="3">
+            <div class="card row-tap" style="margin-bottom:8px" onClick="{{ p.open }}">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+                <div style="min-width:0"><div class="card-title" style="font-size:15px">{{ p.facility }}</div><div style="font-size:12px;opacity:.6;margin-top:2px">{{ p.date }} · {{ p.methodLabel }}</div></div>
+                <div style="text-align:right;flex:none"><div style="font-weight:600">{{ p.amount }}</div><span class="status-pill" style="background:{{ p.bg }};color:{{ p.fg }};margin-top:4px">{{ p.icon }}{{ p.label }}</span></div>
+              </div>
+            </div>
+          </sc-for>
+        </sc-for>
+        <sc-if value="{{ vm.histEmpty }}"><p style="font-size:13px;opacity:.6;text-align:center;margin-top:var(--space-6)">{{ t.noPaymentsYet }}</p></sc-if>
+      </div>
+      <div class="tabbar">
+        <div class="tabbar-item" onClick="{{ goHome }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M218.83,103.77l-80-75.6a12,12,0,0,0-16.3,0l-80,75.6A20,20,0,0,0,36,118.91V208a20,20,0,0,0,20,20H100a12,12,0,0,0,12-12V168h32v48a12,12,0,0,0,12,12h44a20,20,0,0,0,20-20V118.91A20,20,0,0,0,218.83,103.77Z"/></svg>{{ t.tabHome }}</div>
+        <div class="tabbar-item" onClick="{{ goBillsTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M200,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.42,6.67L96,213.2l27.58,17.47a8,8,0,0,0,8.84,0L160,213.2l27.58,17.47A8,8,0,0,0,200,224V48A16,16,0,0,0,200,32ZM160,144H96a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Zm0-32H96a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Z"/></svg>{{ t.tabBills }}</div>
+        <div class="tabbar-item" onClick="{{ goWalletTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,64H72a8,8,0,1,1,0-16H192a8,8,0,0,0,0-16H72A24,24,0,0,0,48,56V184a24,24,0,0,0,24,24H216a16,16,0,0,0,16-16V80A16,16,0,0,0,216,64Zm-40,88a12,12,0,1,1,12-12A12,12,0,0,1,176,152Z"/></svg>{{ t.tabWallet }}</div>
+        <div class="tabbar-item" onClick="{{ goInsightsTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M224,200h-8V40a8,8,0,0,0-8-8H160a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H40a8,8,0,0,0-8,8v64H24a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z"/></svg>{{ t.tabInsights }}</div>
+        <div class="tabbar-item active" onClick="{{ goHistoryTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.12,104.12,0,0,0,128,24Zm8,104a8,8,0,0,1-8,8,24,24,0,0,1,0-48,8,8,0,0,1,0,16,8,8,0,0,0,0,16A8,8,0,0,1,136,128Z"/></svg>{{ t.tabPay }}</div>
+        <div class="tabbar-item" onClick="{{ goProfileTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.8,40.31,185.68,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8Z"/></svg>{{ t.tabProfile }}</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.report }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div><h1 class="scr-title">{{ t.reportTitle }}</h1></div>
+      <div class="scr-body">
+        <sc-if value="{{ vm.rep.submitted }}">
+          <div style="text-align:center;padding-top:var(--space-6)">
+            <div style="font-size:40px">✓</div>
+            <div style="font-size:16px;font-weight:600;margin-top:var(--space-3)">{{ t.reportSubmittedMsg }}</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ vm.notRepSubmitted }}">
+          <div style="font-size:13px;opacity:.65">{{ vm.rep.facility }} · {{ vm.rep.billNo }}</div>
+          <div class="field" style="margin-top:var(--space-4)">
+            <label>{{ t.reportCategoryLabel }}</label>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">
+              <sc-for list="{{ vm.rep.categories }}" as="c" hint-placeholder-count="4">
+                <div class="card row-tap" style="{{ c.selStyle }}" onClick="{{ c.select }}"><span>{{ c.label }}</span></div>
+              </sc-for>
+            </div>
+          </div>
+          <div class="field"><label>{{ t.reportDescLabel }}</label><textarea class="input" style="height:90px;resize:none" value="{{ state.reportDesc }}" onChange="{{ onReportDescChange }}" placeholder="{{ t.reportDescPlaceholder }}"></textarea></div>
+        </sc-if>
+      </div>
+      <sc-if value="{{ vm.notRepSubmitted }}"><div class="sticky-cta"><button type="button" class="btn btn-primary btn-block" onClick="{{ vm.rep.submit }}">{{ t.reportSubmit }}</button></div></sc-if>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.reportdetail }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBillsTab }}">←</div><h1 class="scr-title">{{ t.reportdetailTitle }}</h1></div>
+      <div class="scr-body">
+        <div class="card">
+          <div class="card-kicker">{{ t.ticketLabel }}</div>
+          <div style="font-size:16px;font-weight:600;margin-top:2px">{{ vm.repd.ticket }}</div>
+          <div class="divider-line"></div>
+          <div style="display:flex;justify-content:space-between;font-size:14px"><span>{{ t.statusLabel }}</span><span class="status-pill" style="background:var(--color-process-yellow);color:var(--color-neutral-900)">⏱ {{ vm.repd.status }}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:14px;margin-top:8px"><span>{{ t.facilityLabel }}</span><span>{{ vm.repd.facility }}</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:14px;margin-top:8px"><span>{{ t.reportCategoryLabel }}</span><span>{{ vm.repd.category }}</span></div>
+        </div>
+        <p style="font-size:13px;opacity:.65;margin-top:var(--space-3)">{{ t.reportFollowupNote }}</p>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.people }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goProfileTab }}">←</div><h1 class="scr-title">{{ t.peopleTitle }}</h1></div>
+      <div class="scr-body">
+        <sc-for list="{{ vm.peopleRows }}" as="p" hint-placeholder-count="3">
+          <div class="row-tap" style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-radius:var(--radius-sm)" onClick="{{ p.select }}">
+            <image-slot id="ava-{{ p.id }}" shape="circle" placeholder="Photo" style="width:40px;height:40px;flex:none"></image-slot>
+            <div style="flex:1"><div style="font-weight:600;font-size:15px">{{ p.name }}</div><div style="font-size:12px;opacity:.6">{{ p.relation }}</div></div>
+            <sc-if value="{{ p.active }}"><span style="color:var(--color-accent-700)">✓</span></sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div class="sticky-cta"><button type="button" class="btn btn-secondary btn-block" onClick="{{ goAddDependant }}">{{ t.addPerson }}</button></div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.adddep }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div><h1 class="scr-title">{{ t.addDepTitle }}</h1></div>
+      <div class="scr-body">
+        <div class="field"><label>{{ t.depNameLabel }}</label><input class="input" value="{{ state.depName }}" onChange="{{ onDepNameChange }}" /></div>
+        <div class="field">
+          <label>{{ t.depRelationLabel }}</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+            <sc-for list="{{ vm.dep.relationOptions }}" as="r" hint-placeholder-count="4">
+              <div class="chip {{ r.cls }}" onClick="{{ r.select }}">{{ r.label }}</div>
+            </sc-for>
+          </div>
+        </div>
+        <div class="field"><label>{{ t.depDobLabel }}</label><input class="input" value="{{ state.depDob }}" onChange="{{ onDepDobChange }}" placeholder="DD/MM/YYYY" /></div>
+        <sc-if value="{{ vm.dep.error }}"><div class="banner err">{{ vm.dep.error }}</div></sc-if>
+      </div>
+      <div class="sticky-cta"><button type="button" class="btn btn-primary btn-block" onClick="{{ vm.dep.save }}">{{ t.depSave }}</button></div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.profile2 }}">
+      <div class="scr-top"><h1 class="scr-title">{{ t.profile2Title }}</h1></div>
+      <div class="scr-body">
+        <div style="display:flex;align-items:center;gap:12px;padding:8px 4px">
+          <image-slot id="ava-{{ vm.activePerson }}" shape="circle" placeholder="Photo" style="width:56px;height:56px;flex:none"></image-slot>
+          <div><div style="font-size:17px;font-weight:600">{{ state.profName }}</div><div style="font-size:13px;opacity:.6">+234 {{ state.phone }}</div></div>
+        </div>
+        <div class="divider-line"></div>
+        <sc-for list="{{ vm.settingsMenu }}" as="m" hint-placeholder-count="8">
+          <div class="row-tap" style="display:flex;justify-content:space-between;align-items:center;padding:12px 4px" onClick="{{ m.go }}">
+            <span style="font-size:15px">{{ m.label }}</span><span style="opacity:.4">›</span>
+          </div>
+        </sc-for>
+        <div class="divider-line"></div>
+        <div class="row-tap" style="display:flex;justify-content:space-between;align-items:center;padding:12px 4px;color:var(--color-accent-2-700)" onClick="{{ goDelete }}">
+          <span style="font-size:15px">{{ t.deleteAccountLabel }}</span><span style="opacity:.4">›</span>
+        </div>
+        <button type="button" class="btn btn-ghost btn-block" style="margin-top:var(--space-4)" onClick="{{ resetProto }}">{{ t.logOut }}</button>
+      </div>
+      <div class="tabbar">
+        <div class="tabbar-item" onClick="{{ goHome }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M218.83,103.77l-80-75.6a12,12,0,0,0-16.3,0l-80,75.6A20,20,0,0,0,36,118.91V208a20,20,0,0,0,20,20H100a12,12,0,0,0,12-12V168h32v48a12,12,0,0,0,12,12h44a20,20,0,0,0,20-20V118.91A20,20,0,0,0,218.83,103.77Z"/></svg>{{ t.tabHome }}</div>
+        <div class="tabbar-item" onClick="{{ goBillsTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M200,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.42,6.67L96,213.2l27.58,17.47a8,8,0,0,0,8.84,0L160,213.2l27.58,17.47A8,8,0,0,0,200,224V48A16,16,0,0,0,200,32ZM160,144H96a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Zm0-32H96a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Z"/></svg>{{ t.tabBills }}</div>
+        <div class="tabbar-item" onClick="{{ goWalletTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,64H72a8,8,0,1,1,0-16H192a8,8,0,0,0,0-16H72A24,24,0,0,0,48,56V184a24,24,0,0,0,24,24H216a16,16,0,0,0,16-16V80A16,16,0,0,0,216,64Zm-40,88a12,12,0,1,1,12-12A12,12,0,0,1,176,152Z"/></svg>{{ t.tabWallet }}</div>
+        <div class="tabbar-item" onClick="{{ goInsightsTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M224,200h-8V40a8,8,0,0,0-8-8H160a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H40a8,8,0,0,0-8,8v64H24a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z"/></svg>{{ t.tabInsights }}</div>
+        <div class="tabbar-item" onClick="{{ goHistoryTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.12,104.12,0,0,0,128,24Zm8,104a8,8,0,0,1-8,8,24,24,0,0,1,0-48,8,8,0,0,1,0,16,8,8,0,0,0,0,16A8,8,0,0,1,136,128Z"/></svg>{{ t.tabPay }}</div>
+        <div class="tabbar-item active" onClick="{{ goProfileTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.8,40.31,185.68,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8Z"/></svg>{{ t.tabProfile }}</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.security }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goProfileTab }}">←</div><h1 class="scr-title">{{ t.securityTitle }}</h1></div>
+      <div class="scr-body">
+        <div class="row-tap" style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px" onClick="{{ vm.sec.toggleBio }}">
+          <div><div style="font-size:14px;font-weight:600">{{ t.biometricLabel }}</div><div style="font-size:12px;opacity:.6">{{ t.biometricSub }}</div></div>
+          <div style="{{ vm.sec.bioTrack }}"><div style="{{ vm.sec.bioThumb }}"></div></div>
+        </div>
+        <div class="divider-line"></div>
+        <div class="row-tap" style="display:flex;justify-content:space-between;align-items:center;padding:12px 4px" onClick="{{ vm.sec.changePin }}">
+          <span style="font-size:15px">{{ t.changePinLabel }}</span><span style="opacity:.4">›</span>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.privacy }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goProfileTab }}">←</div><h1 class="scr-title">{{ t.privacyTitle }}</h1></div>
+      <div class="scr-body">
+        <div class="row-tap" style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px" onClick="{{ vm.priv.toggleHmo }}">
+          <div><div style="font-size:14px;font-weight:600">{{ t.hmoShareLabel }}</div><div style="font-size:12px;opacity:.6">{{ t.hmoShareSub }}</div></div>
+          <div style="{{ vm.priv.hmoTrack }}"><div style="{{ vm.priv.hmoThumb }}"></div></div>
+        </div>
+        <div class="divider-line"></div>
+        <div class="row-tap" style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px" onClick="{{ vm.priv.toggleMkt }}">
+          <div><div style="font-size:14px;font-weight:600">{{ t.marketingLabel }}</div><div style="font-size:12px;opacity:.6">{{ t.marketingSub }}</div></div>
+          <div style="{{ vm.priv.mktTrack }}"><div style="{{ vm.priv.mktThumb }}"></div></div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.notifprefs }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goProfileTab }}">←</div><h1 class="scr-title">{{ t.notifprefsTitle }}</h1></div>
+      <div class="scr-body">
+        <div class="row-tap" style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px" onClick="{{ vm.np.toggleBill }}">
+          <span style="font-size:14px;font-weight:600">{{ t.billAlertsLabel }}</span>
+          <div style="{{ vm.np.billTrack }}"><div style="{{ vm.np.billThumb }}"></div></div>
+        </div>
+        <div class="divider-line"></div>
+        <div class="row-tap" style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px" onClick="{{ vm.np.toggleRcpt }}">
+          <span style="font-size:14px;font-weight:600">{{ t.receiptsLabel }}</span>
+          <div style="{{ vm.np.rcptTrack }}"><div style="{{ vm.np.rcptThumb }}"></div></div>
+        </div>
+        <div class="divider-line"></div>
+        <div class="row-tap" style="display:flex;justify-content:space-between;align-items:center;padding:10px 4px" onClick="{{ vm.np.togglePromo }}">
+          <span style="font-size:14px;font-weight:600">{{ t.promoLabel }}</span>
+          <div style="{{ vm.np.promoTrack }}"><div style="{{ vm.np.promoThumb }}"></div></div>
+        </div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.language }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goProfileTab }}">←</div><h1 class="scr-title">{{ t.languageTitle }}</h1></div>
+      <div class="scr-body">
+        <div class="card row-tap" style="{{ vm.langCardEnStyle }}" onClick="{{ setLangEn }}">English</div>
+        <div class="card row-tap" style="margin-top:8px;{{ vm.langCardPcmStyle }}" onClick="{{ setLangPcm }}">Pidgin</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.help }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goProfileTab }}">←</div><h1 class="scr-title">{{ t.helpTitle }}</h1></div>
+      <div class="scr-body">
+        <sc-for list="{{ vm.faqs }}" as="f" hint-placeholder-count="3">
+          <div style="padding:10px 0"><div style="font-size:14px;font-weight:600">{{ f.q }}</div><div style="font-size:13px;opacity:.7;margin-top:2px">{{ f.a }}</div></div>
+          <div class="divider-line"></div>
+        </sc-for>
+        <a href="#" onClick="{{ goContact }}" style="display:block;margin-top:var(--space-3);font-size:14px">{{ t.contactSupport }}</a>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.contact }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div><h1 class="scr-title">{{ t.contactTitle }}</h1></div>
+      <div class="scr-body">
+        <div class="card row-tap" style="margin-bottom:8px"><div class="card-title" style="font-size:15px">{{ t.callSupport }}</div><div class="card-body" style="font-size:13px">0800 111 2222</div></div>
+        <div class="card row-tap" style="margin-bottom:8px"><div class="card-title" style="font-size:15px">{{ t.whatsappSupport }}</div><div class="card-body" style="font-size:13px">+234 803 000 0000</div></div>
+        <div class="card row-tap"><div class="card-title" style="font-size:15px">{{ t.emailSupport }}</div><div class="card-body" style="font-size:13px">support@wellipay.ng</div></div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.legal }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goProfileTab }}">←</div><h1 class="scr-title">{{ t.legalTitle }}</h1></div>
+      <div class="scr-body">
+        <div class="row-tap" style="display:flex;justify-content:space-between;padding:12px 4px"><span style="font-size:15px">{{ t.termsLink }}</span><span style="opacity:.4">›</span></div>
+        <div class="divider-line"></div>
+        <div class="row-tap" style="display:flex;justify-content:space-between;padding:12px 4px"><span style="font-size:15px">{{ t.privacyLink }}</span><span style="opacity:.4">›</span></div>
+        <div class="divider-line"></div>
+        <div class="row-tap" style="display:flex;justify-content:space-between;padding:12px 4px"><span style="font-size:15px">{{ t.refundLink }}</span><span style="opacity:.4">›</span></div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.delete }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goProfileTab }}">←</div><h1 class="scr-title">{{ t.deleteTitle }}</h1></div>
+      <div class="scr-body">
+        <sc-if value="{{ vm.del.idle }}"><div class="banner err">{{ t.deleteWarning }}</div></sc-if>
+        <sc-if value="{{ vm.del.confirming }}"><div class="banner err">{{ t.deleteFinalWarning }}</div></sc-if>
+        <sc-if value="{{ vm.del.done }}"><div style="text-align:center;padding-top:var(--space-6)"><div style="font-size:16px;font-weight:600">{{ t.deleteDoneMsg }}</div></div></sc-if>
+      </div>
+      <sc-if value="{{ vm.del.idle }}"><div class="sticky-cta"><button type="button" class="btn btn-secondary btn-block" onClick="{{ vm.del.confirm }}">{{ t.deleteConfirmBtn }}</button></div></sc-if>
+      <sc-if value="{{ vm.del.confirming }}"><div class="sticky-cta" style="display:flex;flex-direction:column;gap:8px"><button type="button" class="btn btn-primary btn-block" onClick="{{ vm.del.finalize }}">{{ t.deleteFinalBtn }}</button><button type="button" class="btn btn-ghost btn-block" onClick="{{ vm.del.cancel }}">{{ t.deleteCancel }}</button></div></sc-if>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.wallet }}">
+      <div class="scr-top"><h1 class="scr-title">{{ t.walletTitle }}</h1></div>
+      <div class="scr-body">
+        <div class="card">
+          <div class="card-kicker">{{ vm.activePersonName }} · {{ t.walletKicker }}</div>
+          <div class="amount-lg" style="margin-top:4px">{{ vm.walletBalanceLabel }}</div>
+          <button type="button" class="btn btn-primary btn-block" style="margin-top:var(--space-3)" onClick="{{ goTopup }}">{{ t.topUpBtn }}</button>
+        </div>
+        <div class="row-tap" style="display:flex;justify-content:space-between;align-items:center;padding:12px 4px;margin-top:var(--space-3)" onClick="{{ vm.wal.toggleAutoPay }}">
+          <div><div style="font-size:14px;font-weight:600">{{ t.autoPayLabel }}</div><div style="font-size:12px;opacity:.6">{{ t.autoPaySub }}</div></div>
+          <div style="{{ vm.wal.autoTrack }}"><div style="{{ vm.wal.autoThumb }}"></div></div>
+        </div>
+        <sc-if value="{{ vm.wal.showRunAutoPay }}">
+          <button type="button" class="btn btn-secondary btn-block" style="margin-top:var(--space-2)" onClick="{{ vm.wal.runAutoPay }}">{{ vm.wal.runAutoPayLabel }}</button>
+        </sc-if>
+        <sc-if value="{{ vm.wal.toast }}"><div class="banner info" style="margin-top:var(--space-3)">{{ vm.wal.toast }}</div></sc-if>
+        <div style="margin-top:var(--space-4)">
+          <div class="wp-rail-group" style="margin-bottom:6px;opacity:.55;font-size:11px;letter-spacing:.06em;text-transform:uppercase">{{ t.walletActivity }}</div>
+          <sc-for list="{{ vm.wal.txns }}" as="x" hint-placeholder-count="2">
+            <div class="card" style="margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div><div style="font-size:14px;font-weight:600">{{ x.label }}</div><div style="font-size:12px;opacity:.6;margin-top:2px">{{ x.date }}</div></div>
+                <div style="font-weight:600;color:{{ x.color }}">{{ x.amount }}</div>
+              </div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ vm.wal.noTxns }}"><p style="font-size:13px;opacity:.6">{{ t.noWalletActivity }}</p></sc-if>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tabbar-item" onClick="{{ goHome }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M218.83,103.77l-80-75.6a12,12,0,0,0-16.3,0l-80,75.6A20,20,0,0,0,36,118.91V208a20,20,0,0,0,20,20H100a12,12,0,0,0,12-12V168h32v48a12,12,0,0,0,12,12h44a20,20,0,0,0,20-20V118.91A20,20,0,0,0,218.83,103.77Z"/></svg>{{ t.tabHome }}</div>
+        <div class="tabbar-item" onClick="{{ goBillsTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M200,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.42,6.67L96,213.2l27.58,17.47a8,8,0,0,0,8.84,0L160,213.2l27.58,17.47A8,8,0,0,0,200,224V48A16,16,0,0,0,200,32ZM160,144H96a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Zm0-32H96a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Z"/></svg>{{ t.tabBills }}</div>
+        <div class="tabbar-item active" onClick="{{ goWalletTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,64H72a8,8,0,1,1,0-16H192a8,8,0,0,0,0-16H72A24,24,0,0,0,48,56V184a24,24,0,0,0,24,24H216a16,16,0,0,0,16-16V80A16,16,0,0,0,216,64Zm-40,88a12,12,0,1,1,12-12A12,12,0,0,1,176,152Z"/></svg>{{ t.tabWallet }}</div>
+        <div class="tabbar-item" onClick="{{ goInsightsTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M224,200h-8V40a8,8,0,0,0-8-8H160a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H40a8,8,0,0,0-8,8v64H24a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z"/></svg>{{ t.tabInsights }}</div>
+        <div class="tabbar-item" onClick="{{ goHistoryTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.12,104.12,0,0,0,128,24Zm8,104a8,8,0,0,1-8,8,24,24,0,0,1,0-48,8,8,0,0,1,0,16,8,8,0,0,0,0,16A8,8,0,0,1,136,128Z"/></svg>{{ t.tabPay }}</div>
+        <div class="tabbar-item" onClick="{{ goProfileTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.8,40.31,185.68,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8Z"/></svg>{{ t.tabProfile }}</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.topupamount }}">
+      <div class="scr-top"><div class="scr-back" onClick="{{ goBack }}">←</div><h1 class="scr-title">{{ vm.wal.topupScreenTitle }}</h1></div>
+      <div class="scr-body">
+        <p style="font-size:13px;opacity:.65">{{ vm.wal.balanceHint }}</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:var(--space-3)">
+          <sc-for list="{{ vm.wal.presets }}" as="p" hint-placeholder-count="4">
+            <div class="chip {{ p.cls }}" onClick="{{ p.select }}">{{ p.label }}</div>
+          </sc-for>
+        </div>
+        <div class="field" style="margin-top:var(--space-4)"><label>{{ t.customAmountLabel }}</label><input class="input" value="{{ state.topupAmount }}" onChange="{{ onTopupAmountChange }}" placeholder="₦0" /></div>
+      </div>
+      <div class="sticky-cta"><button type="button" class="btn btn-primary btn-block" onClick="{{ continueTopup }}">{{ t.continue }}</button></div>
+    </sc-if>
+
+    <sc-if value="{{ vm.scr.insights }}">
+      <div class="scr-top"><h1 class="scr-title">{{ t.insightsTitle }}</h1></div>
+      <div class="scr-body">
+        <div style="display:flex;gap:8px;margin-bottom:var(--space-4)">
+          <div class="chip {{ vm.ins.meCls }}" onClick="{{ setScopeMe }}">{{ t.scopeMe }}</div>
+          <div class="chip {{ vm.ins.familyCls }}" onClick="{{ setScopeFamily }}">{{ t.scopeFamily }}</div>
+        </div>
+
+        <div class="card">
+          <div class="card-kicker">{{ t.spendingKicker }}</div>
+          <div class="amount-md" style="margin-top:4px">{{ vm.ins.totalSpendLabel }}</div>
+          <div style="display:flex;align-items:flex-end;gap:8px;height:110px;margin-top:var(--space-3)">
+            <sc-for list="{{ vm.ins.spendBars }}" as="b" hint-placeholder-count="4">
+              <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end">
+                <div style="font-size:10px;opacity:.6">{{ b.amountShort }}</div>
+                <div style="width:100%;border-radius:4px 4px 0 0;background:var(--color-accent-600);{{ b.heightStyle }}"></div>
+                <div style="font-size:11px;opacity:.6">{{ b.label }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+
+        <sc-if value="{{ vm.ins.showFamily }}">
+          <div class="card" style="margin-top:var(--space-3)">
+            <div class="card-kicker">{{ t.familySpendKicker }}</div>
+            <div style="margin-top:var(--space-3)">
+              <sc-for list="{{ vm.ins.familyBars }}" as="f" hint-placeholder-count="3">
+                <div style="margin-bottom:10px">
+                  <div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>{{ f.name }}</span><span style="font-weight:600">{{ f.amount }}</span></div>
+                  <div style="height:8px;border-radius:4px;background:var(--color-neutral-200)"><div style="height:8px;border-radius:4px;background:var(--color-accent-600);{{ f.widthStyle }}"></div></div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <div style="margin-top:var(--space-4)">
+          <div class="wp-rail-group" style="margin-bottom:6px;opacity:.55;font-size:11px;letter-spacing:.06em;text-transform:uppercase">{{ t.upcomingKicker }}</div>
+          <sc-for list="{{ vm.ins.upcoming }}" as="u" hint-placeholder-count="2">
+            <div class="card row-tap" style="margin-bottom:8px" onClick="{{ u.open }}">
+              <div style="display:flex;justify-content:space-between;align-items:center">
+                <div><div style="font-size:14px;font-weight:600">{{ u.facility }}</div><div style="font-size:12px;opacity:.6;margin-top:2px">{{ u.dueLabel }}</div></div>
+                <div style="font-weight:600">{{ u.amount }}</div>
+              </div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ vm.ins.noUpcoming }}"><p style="font-size:13px;opacity:.6">{{ t.noUpcoming }}</p></sc-if>
+          <a href="#" onClick="{{ goNotifPrefsFromInsights }}" style="font-size:13px;display:block;margin-top:4px">{{ t.manageReminders }}</a>
+        </div>
+
+        <sc-if value="{{ vm.ins.hasHmoData }}">
+          <div class="card" style="margin-top:var(--space-4)">
+            <div class="card-kicker">{{ t.insuranceKicker }}</div>
+            <div style="height:10px;border-radius:4px;overflow:hidden;display:flex;margin-top:10px">
+              <div style="{{ vm.ins.hmoBarStyle }}"></div>
+              <div style="{{ vm.ins.selfBarStyle }}"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px">
+              <span>{{ t.hmoPaidLabel }} {{ vm.ins.hmoPaidAmt }}</span>
+              <span>{{ t.youPaidLabel }} {{ vm.ins.selfPaidAmt }}</span>
+            </div>
+          </div>
+        </sc-if>
+
+        <div class="card" style="margin-top:var(--space-4)">
+          <div class="card-kicker">{{ t.savingsKicker }}</div>
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:4px">
+            <div style="font-size:16px;font-weight:600">{{ vm.ins.savingsGoalName }}</div>
+            <div style="font-size:13px;opacity:.6">{{ vm.ins.savingsPct }}%</div>
+          </div>
+          <div style="height:10px;border-radius:4px;background:var(--color-neutral-200);margin-top:8px"><div style="height:10px;border-radius:4px;background:var(--color-accent-2-600);{{ vm.ins.savingsBarStyle }}"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-top:6px;opacity:.7"><span>{{ vm.ins.savingsSavedLabel }}</span><span>{{ vm.ins.savingsTargetLabel }}</span></div>
+          <button type="button" class="btn btn-secondary btn-block" style="margin-top:var(--space-3)" onClick="{{ goContributeSavings }}">{{ t.contributeBtn }}</button>
+        </div>
+
+        <div style="margin-top:var(--space-4)">
+          <div class="wp-rail-group" style="margin-bottom:6px;opacity:.55;font-size:11px;letter-spacing:.06em;text-transform:uppercase">{{ t.financingKicker }}</div>
+          <sc-for list="{{ vm.ins.plans }}" as="p" hint-placeholder-count="1">
+            <div class="card" style="margin-bottom:8px">
+              <div class="card-title" style="font-size:15px">{{ p.facility }}</div>
+              <div style="font-size:12px;opacity:.6;margin-top:2px">{{ p.progressLabel }}</div>
+              <div style="height:8px;border-radius:4px;background:var(--color-neutral-200);margin-top:8px"><div style="height:8px;border-radius:4px;background:var(--color-accent-600);{{ p.barStyle }}"></div></div>
+              <div style="font-size:12px;opacity:.6;margin-top:8px">{{ t.nextInstallment }} {{ p.perInstallmentLabel }} · {{ p.nextDue }}</div>
+              <button type="button" class="btn btn-secondary btn-block" style="margin-top:8px" onClick="{{ p.payNext }}">{{ t.payInstallmentBtn }}</button>
+            </div>
+          </sc-for>
+          <sc-if value="{{ vm.ins.noPlans }}"><p style="font-size:13px;opacity:.6">{{ t.noPlans }}</p></sc-if>
+        </div>
+      </div>
+      <div class="tabbar">
+        <div class="tabbar-item" onClick="{{ goHome }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M218.83,103.77l-80-75.6a12,12,0,0,0-16.3,0l-80,75.6A20,20,0,0,0,36,118.91V208a20,20,0,0,0,20,20H100a12,12,0,0,0,12-12V168h32v48a12,12,0,0,0,12,12h44a20,20,0,0,0,20-20V118.91A20,20,0,0,0,218.83,103.77Z"/></svg>{{ t.tabHome }}</div>
+        <div class="tabbar-item" onClick="{{ goBillsTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M200,32H72A16,16,0,0,0,56,48V224a8,8,0,0,0,12.42,6.67L96,213.2l27.58,17.47a8,8,0,0,0,8.84,0L160,213.2l27.58,17.47A8,8,0,0,0,200,224V48A16,16,0,0,0,200,32ZM160,144H96a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Zm0-32H96a8,8,0,0,1,0-16h64a8,8,0,0,1,0,16Z"/></svg>{{ t.tabBills }}</div>
+        <div class="tabbar-item" onClick="{{ goWalletTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M216,64H72a8,8,0,1,1,0-16H192a8,8,0,0,0,0-16H72A24,24,0,0,0,48,56V184a24,24,0,0,0,24,24H216a16,16,0,0,0,16-16V80A16,16,0,0,0,216,64Zm-40,88a12,12,0,1,1,12-12A12,12,0,0,1,176,152Z"/></svg>{{ t.tabWallet }}</div>
+        <div class="tabbar-item active" onClick="{{ goInsightsTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M224,200h-8V40a8,8,0,0,0-8-8H160a8,8,0,0,0-8,8V80H96a8,8,0,0,0-8,8v40H40a8,8,0,0,0-8,8v64H24a8,8,0,0,0,0,16H224a8,8,0,0,0,0-16Z"/></svg>{{ t.tabInsights }}</div>
+        <div class="tabbar-item" onClick="{{ goHistoryTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M128,24A104,104,0,1,0,232,128,104.12,104.12,0,0,0,128,24Zm8,104a8,8,0,0,1-8,8,24,24,0,0,1,0-48,8,8,0,0,1,0,16,8,8,0,0,0,0,16A8,8,0,0,1,136,128Z"/></svg>{{ t.tabPay }}</div>
+        <div class="tabbar-item" onClick="{{ goProfileTab }}"><svg width="20" height="20" viewBox="0 0 256 256" fill="currentColor"><path d="M230.92,212c-15.23-26.33-38.7-45.21-66.09-54.16a72,72,0,1,0-73.66,0C63.78,166.8,40.31,185.68,25.08,212a8,8,0,1,0,13.85,8c18.84-32.56,52.14-52,89.07-52s70.23,19.44,89.07,52a8,8,0,1,0,13.85-8Z"/></svg>{{ t.tabProfile }}</div>
+      </div>
+    </sc-if>
+
+    <sc-if value="{{ vm.showPersonSheetFlag }}">
+      <div style="position:absolute;inset:0;background:color-mix(in srgb, #000 40%, transparent);display:flex;flex-direction:column;justify-content:flex-end;z-index:20" onClick="{{ closePersonSheet }}">
+        <div class="card" style="border-radius:var(--radius-lg) var(--radius-lg) 0 0;margin:0;box-shadow:var(--shadow-lg)" onClick="{{ stopClick }}">
+          <div class="card-kicker">{{ t.people }}</div>
+          <sc-for list="{{ vm.peopleRows }}" as="p" hint-placeholder-count="3">
+            <div class="row-tap" style="display:flex;align-items:center;gap:10px;padding:10px 4px;border-radius:var(--radius-sm)" onClick="{{ p.select }}">
+              <image-slot id="ava-{{ p.id }}" shape="circle" placeholder="Photo" style="width:38px;height:38px;flex:none"></image-slot>
+              <div style="flex:1"><div style="font-weight:600;font-size:14px">{{ p.name }}</div><div style="font-size:12px;opacity:.6">{{ p.relation }}</div></div>
+              <sc-if value="{{ p.active }}"><span style="color:var(--color-accent-700)">✓</span></sc-if>
+            </div>
+          </sc-for>
+          <button type="button" class="btn btn-ghost btn-block" style="margin-top:8px" onClick="{{ goAddDependant }}">{{ t.addPerson }}</button>
+        </div>
+      </div>
+    </sc-if>
+
+  </div>
+</x-import>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+
+const NAIRA = n => {
+  if (n === null || n === undefined) return '—';
+  const whole = Math.floor(Math.abs(n));
+  const hasCents = Math.round((Math.abs(n) - whole) * 100) > 0;
+  const s = n < 0 ? '-' : '';
+  return s + '₦' + (hasCents ? Math.abs(n).toFixed(2) : whole).toString().replace(/\d(?=(\d{3})+(?:\.\d+)?$)/g, '$&,');
+};
+
+const SCREENS = ['welcome','phone','otp','profile','applock','linkwr','walletintro','home','notifs','bills','billdetail','addbill','amount','method','confirm','cardpay','transfer','status','receipt','history','report','reportdetail','people','adddep','profile2','security','privacy','notifprefs','language','help','contact','legal','delete','wallet','topupamount','insights'];
+
+const SCREEN_META = [
+  { key: 'welcome', id: 'S01', name: 'Welcome', group: 'Sign in & onboarding' },
+  { key: 'phone', id: 'S02', name: 'Phone entry', group: 'Sign in & onboarding' },
+  { key: 'otp', id: 'S03', name: 'OTP', group: 'Sign in & onboarding' },
+  { key: 'profile', id: 'S04', name: 'Profile setup', group: 'Sign in & onboarding' },
+  { key: 'applock', id: 'S05', name: 'App lock', group: 'Sign in & onboarding' },
+  { key: 'linkwr', id: 'S06', name: 'Link WelliRecord', group: 'Sign in & onboarding' },
+  { key: 'walletintro', id: 'S06b', name: 'Create wallet', group: 'Sign in & onboarding' },
+  { key: 'home', id: 'S07', name: 'Home', group: 'Home & bills' },
+  { key: 'notifs', id: 'S08', name: 'Notifications', group: 'Home & bills' },
+  { key: 'bills', id: 'S09', name: 'Bill list', group: 'Home & bills' },
+  { key: 'billdetail', id: 'S10', name: 'Bill detail', group: 'Home & bills' },
+  { key: 'addbill', id: 'S12', name: 'Add bill', group: 'Home & bills' },
+  { key: 'amount', id: 'S13', name: 'Choose amount', group: 'Payment' },
+  { key: 'method', id: 'S14', name: 'Choose method', group: 'Payment' },
+  { key: 'confirm', id: 'S17', name: 'Confirm payment', group: 'Payment' },
+  { key: 'cardpay', id: 'S15', name: 'Card payment', group: 'Payment' },
+  { key: 'transfer', id: 'S16', name: 'Bank transfer', group: 'Payment' },
+  { key: 'status', id: 'S18', name: 'Payment status', group: 'Payment' },
+  { key: 'receipt', id: 'S19', name: 'Receipt', group: 'Payment' },
+  { key: 'history', id: 'S20', name: 'Payment history', group: 'Payment' },
+  { key: 'wallet', id: 'S23', name: 'Wallet', group: 'Wallet' },
+  { key: 'topupamount', id: 'S24', name: 'Top up amount', group: 'Wallet' },
+  { key: 'insights', id: 'S25', name: 'Insights', group: 'Insights' },
+  { key: 'people', id: 'S36', name: 'People switcher', group: 'People & profile' },
+  { key: 'adddep', id: 'S37', name: 'Add dependant', group: 'People & profile' },
+  { key: 'profile2', id: 'S42', name: 'Profile', group: 'People & profile' },
+  { key: 'security', id: 'S43', name: 'Security', group: 'People & profile' },
+  { key: 'privacy', id: 'S44', name: 'Privacy & consent', group: 'People & profile' },
+  { key: 'notifprefs', id: 'S45', name: 'Notification prefs', group: 'People & profile' },
+  { key: 'language', id: 'S46', name: 'Language', group: 'Support & legal' },
+  { key: 'help', id: 'S47', name: 'Help center', group: 'Support & legal' },
+  { key: 'contact', id: 'S48', name: 'Contact support', group: 'Support & legal' },
+  { key: 'legal', id: 'S49', name: 'Legal', group: 'Support & legal' },
+  { key: 'delete', id: 'S50', name: 'Delete account', group: 'Support & legal' },
+  { key: 'report', id: 'S21', name: 'Report a problem', group: 'Support & legal' },
+  { key: 'reportdetail', id: 'S22', name: 'Report detail', group: 'Support & legal' },
+];
+
+const PAYMENTS_SEED = [
+  { id: 'WP512340', billId: 'b4', facility: "St. Augustine's Medical Centre and Maternity Annex", amount: 45000, method: 'card', date: '02 Sep 2026', time: '11:20 am', status: 'successful' },
+  { id: 'WP512298', billId: 'b8', facility: 'Grace Family Clinic', amount: 9000, method: 'transfer', date: '02 Sep 2026', time: '3:05 pm', status: 'successful' },
+  { id: 'WP511870', billId: 'b5', facility: 'Grace Family Clinic', amount: 0, method: 'card', date: '28 Aug 2026', time: '9:00 am', status: 'failed' },
+  { id: 'WP511500', billId: 'b3', facility: 'Lagoon Diagnostics Centre', amount: 9000, method: 'transfer', date: '18 Sep 2026', time: '1:15 pm', status: 'successful' },
+  { id: 'WP508110', billId: 'b1', facility: 'Dovers Hospitals', amount: 12000, method: 'card', date: '10 Jun 2026', time: '10:00 am', status: 'successful' },
+  { id: 'WP509220', billId: 'b7', facility: 'Dovers Hospitals', amount: 18000, method: 'transfer', date: '22 Jul 2026', time: '2:30 pm', status: 'successful' },
+  { id: 'WP510440', billId: 'b2', facility: 'Redeemer Specialist Clinic', amount: 6000, method: 'card', date: '14 Aug 2026', time: '4:15 pm', status: 'successful' },
+];
+
+const PEOPLE = [
+  { id: 'self', name: 'Jay Umar', relation: 'You', age: 34 },
+  { id: 'ade', name: 'Ade Okoro', relation: 'Son, 9', age: 9 },
+  { id: 'faith', name: 'Faith Oghene', relation: 'Spouse', age: 31 },
+];
+
+function mkLines(n) {
+  const names = ['Consultation','Lab test — Full blood count','X-ray — Chest','Nursing care','Ward admission (per night)','Dressing and wound care','IV fluids','Paracetamol 500mg','Amoxicillin 500mg','Physiotherapy session'];
+  const prices = [1500,3000,5000,8000,12000];
+  const items = [];
+  for (let i = 0; i < n; i++) {
+    const price = prices[i % prices.length];
+    const rep = Math.floor(i / names.length);
+    items.push({ name: names[i % names.length] + (rep > 0 ? ` (${rep + 1})` : ''), qty: 1, price, total: price });
+  }
+  if (n > 2) items.push({ name: 'Facility discount', qty: 1, price: -3000, total: -3000, discount: true });
+  return items;
+}
+
+const BILLS = [
+  { id: 'b1', personId: 'self', facility: 'Dovers Hospitals', date: '21 Sep 2026', billNo: 'DH-88213', status: 'unpaid', amountDue: 20000, amountTotal: 20000, overdue: false, minPart: 5000, lines: mkLines(23), changed: true },
+  { id: 'b2', personId: 'self', facility: 'Redeemer Specialist Clinic', date: '10 Sep 2026', billNo: 'RSC-33021', status: 'overdue', amountDue: 8500, amountTotal: 8500, overdue: true, minPart: 2000, lines: mkLines(4) },
+  { id: 'b3', personId: 'ade', facility: 'Lagoon Diagnostics Centre', date: '18 Sep 2026', billNo: 'LDC-90211', status: 'partly_paid', amountDue: 6000, amountTotal: 15000, overdue: false, minPart: 2000, lines: mkLines(3) },
+  { id: 'b4', personId: 'self', facility: "St. Augustine's Medical Centre and Maternity Annex", date: '02 Sep 2026', billNo: 'SAMC-70142', status: 'paid', amountDue: 0, amountTotal: 45000, overdue: false, lines: mkLines(5) },
+  { id: 'b5', personId: 'faith', facility: 'Grace Family Clinic', date: '28 Aug 2026', billNo: 'GFC-10938', status: 'void', amountDue: 0, amountTotal: 12000, overdue: false, lines: mkLines(2) },
+  { id: 'b6', personId: 'self', facility: 'Sunrise Medical Diagnostics Limited', date: '20 Sep 2026', billNo: 'SMD-55210', status: 'awaiting_hmo', amountDue: 20000, amountTotal: 45000, hmoAmount: 25000, overdue: false, hasSplit: true, minPart: 5000, lines: mkLines(6) },
+  { id: 'b7', personId: 'ade', facility: 'Dovers Hospitals', date: '10 Sep 2026', billNo: 'DH-88401', status: 'unpaid', amountDue: 5000, amountTotal: 5000, overdue: false, minPart: 2000, lines: mkLines(2) },
+  { id: 'b8', personId: 'faith', facility: 'Grace Family Clinic', date: '02 Sep 2026', billNo: 'GFC-10877', status: 'paid', amountDue: 0, amountTotal: 9000, overdue: false, lines: mkLines(3) },
+  { id: 'b9', personId: 'self', facility: 'Redeemer Specialist Clinic', date: '25 Sep 2026', billNo: 'RSC-33199', status: 'unpaid', amountDue: 15000, amountTotal: 15000, overdue: false, minPart: 5000, lines: mkLines(4) },
+];
+
+function statusMeta(status, L) {
+  const map = {
+    unpaid: { label: L('Unpaid','Unpaid'), bg: 'var(--color-neutral-200)', fg: 'var(--color-neutral-800)', icon: '● ' },
+    overdue: { label: L('Overdue','Overdue'), bg: 'var(--color-process-yellow)', fg: 'var(--color-neutral-900)', icon: '⚠ ' },
+    partly_paid: { label: L('Part paid','Part paid'), bg: 'var(--color-accent-100)', fg: 'var(--color-accent-800)', icon: '◐ ' },
+    paid: { label: L('Paid','Paid'), bg: 'var(--color-accent-100)', fg: 'var(--color-accent-800)', icon: '✓ ' },
+    void: { label: L('Cancelled','Cancelled'), bg: 'var(--color-neutral-200)', fg: 'var(--color-neutral-700)', icon: '✕ ' },
+    awaiting_hmo: { label: L('Waiting for HMO','Waiting for HMO'), bg: 'var(--color-accent-100)', fg: 'var(--color-accent-800)', icon: '⏱ ' },
+    pending: { label: L('Confirming','Confirming'), bg: 'var(--color-process-yellow)', fg: 'var(--color-neutral-900)', icon: '⏱ ' },
+    failed: { label: L('Not completed','Not completed'), bg: 'var(--color-accent-2-100)', fg: 'var(--color-accent-2-800)', icon: '✕ ' },
+    expired: { label: L('Timed out','Timed out'), bg: 'var(--color-neutral-200)', fg: 'var(--color-neutral-700)', icon: '⏱ ' },
+    under_review: { label: L('Being checked','Being checked'), bg: 'var(--color-accent-100)', fg: 'var(--color-accent-800)', icon: '⏱ ' },
+    successful: { label: L('Successful','Successful'), bg: 'var(--color-accent-100)', fg: 'var(--color-accent-800)', icon: '✓ ' },
+  };
+  return map[status] || map.unpaid;
+}
+
+class Component extends DCLogic {
+  state = {
+    screen: 'welcome',
+    prevScreen: 'welcome',
+    lang: 'en',
+    phone: '',
+    phoneErr: '',
+    otp: '',
+    otpTries: 5,
+    otpLocked: false,
+    resendCooldown: 0,
+    profName: 'Jay Umar',
+    pinStage: 'set',
+    pin: '',
+    pinFirst: '',
+    pinMismatch: false,
+    activePerson: 'self',
+    selectedBillId: 'b1',
+    showPersonSheet: false,
+    unreadCount: 2,
+    billFilter: 'all',
+    showAllLinesFor: {},
+    addBillMode: 'scan',
+    addBillCode: '',
+    addBillError: '',
+    payAmountMode: 'full',
+    payPartAmount: '',
+    payAmountErrorFlag: false,
+    payMethod: null,
+    methodBanner: false,
+    confirmSubStage: 'idle',
+    confirmPin: '',
+    cardStage: 'loading',
+    paymentOutcome: null,
+    failReason: '',
+    transferState: 'active',
+    transferSecondsLeft: 3600,
+    toastMsg: '',
+    sessionPayments: [],
+    historyFilter: 'all',
+    lastPaymentRef: '',
+    lastPaymentAmount: 0,
+    lastPaymentRemaining: 0,
+    reportBillId: null,
+    reportCategory: '',
+    reportDesc: '',
+    reportSubmitted: false,
+    depName: '', depRelation: 'Child', depDob: '', depError: '',
+    biometricEnabled: true,
+    notifBillAlerts: true, notifReceipts: true, notifPromo: false,
+    consentHmoShare: true, consentMarketing: false,
+    deleteStage: 'idle',
+    wallets: { self: 15000, ade: 0, faith: 0 },
+    walletAutoPay: { self: false, ade: false, faith: false },
+    walletTxns: [{ personId: 'self', kind: 'topup', amount: 15000, method: 'transfer', date: '15 Sep 2026', time: '2:10 pm' }],
+    walletToast: '',
+    payContext: 'bill',
+    topupAmount: '',
+    insightsScope: 'me',
+    savingsGoal: { name: 'Surgery fund', target: 100000, saved: 32000 },
+    financingPlans: [
+      { id: 'fp1', personId: 'self', facility: 'Sunrise Medical Diagnostics Limited', totalAmount: 40000, installments: 4, paidInstallments: 1, perInstallment: 10000, nextDue: '25 Sep 2026' },
+    ],
+    selectedPlanId: null,
+  };
+
+  L(en, pcm) { return this.state.lang === 'pcm' ? pcm : en; }
+
+  nav(screen) {
+    this.setState(s => ({ prevScreen: s.screen, screen }));
+    window.scrollTo && window.scrollTo(0,0);
+    if (screen === 'cardpay') { this.setState({ cardStage: 'loading' }); setTimeout(() => this.setState({ cardStage: 'ready' }), 900); }
+    if (screen === 'status') { setTimeout(() => this.setState(s => s.paymentOutcome ? {} : { paymentOutcome: 'pending' }), 0); }
+  }
+
+  componentDidMount() {
+    this._cooldownTimer = setInterval(() => {
+      if (this.state.resendCooldown > 0) this.setState(s => ({ resendCooldown: s.resendCooldown - 1 }));
+      if (this.state.screen === 'transfer' && this.state.transferState === 'active' && this.state.transferSecondsLeft > 0) {
+        this.setState(s => {
+          const left = s.transferSecondsLeft - 1;
+          return left <= 0 ? { transferSecondsLeft: 0, transferState: 'expired' } : { transferSecondsLeft: left };
+        });
+      }
+    }, 1000);
+  }
+
+  applyPaymentSuccess() {
+    const s = this.state;
+    const ref = 'WP' + Math.floor(100000 + Math.random() * 900000);
+    if (s.payContext === 'topup') {
+      const amt = parseInt((s.topupAmount || '0').replace(/\D/g,''), 10) || 0;
+      this.setState(st => ({
+        paymentOutcome: 'successful', lastPaymentRef: ref, lastPaymentAmount: amt, lastPaymentRemaining: 0,
+        wallets: { ...st.wallets, [st.activePerson]: (st.wallets[st.activePerson] || 0) + amt },
+        walletTxns: [{ personId: st.activePerson, kind: 'topup', amount: amt, method: st.payMethod, date: '22 Sep 2026', time: '10:42 am' }, ...st.walletTxns],
+      }));
+      return;
+    }
+    if (s.payContext === 'savings') {
+      const amt = parseInt((s.topupAmount || '0').replace(/\D/g,''), 10) || 0;
+      this.setState(st => ({
+        paymentOutcome: 'successful', lastPaymentRef: ref, lastPaymentAmount: amt, lastPaymentRemaining: 0,
+        savingsGoal: { ...st.savingsGoal, saved: st.savingsGoal.saved + amt },
+      }));
+      return;
+    }
+    if (s.payContext === 'installment') {
+      const plan = s.financingPlans.find(p => p.id === s.selectedPlanId);
+      if (!plan) return;
+      const amt = plan.perInstallment;
+      const walletDeduct = s.payMethod === 'wallet' ? { wallets: { ...s.wallets, [s.activePerson]: (s.wallets[s.activePerson] || 0) - amt } } : {};
+      this.setState(st => ({
+        paymentOutcome: 'successful', lastPaymentRef: ref, lastPaymentAmount: amt, lastPaymentRemaining: 0,
+        financingPlans: st.financingPlans.map(p => p.id === plan.id ? { ...p, paidInstallments: p.paidInstallments + 1 } : p),
+        ...walletDeduct,
+      }));
+      return;
+    }
+    const bill = BILLS.find(b => b.id === s.selectedBillId);
+    if (!bill) return;
+    const partVal = parseInt((s.payPartAmount || '0').replace(/\D/g,''), 10) || 0;
+    const amt = s.payAmountMode === 'part' ? partVal : bill.amountDue;
+    const remaining = Math.max(0, bill.amountDue - amt);
+    bill.amountDue = remaining;
+    bill.status = remaining > 0 ? 'partly_paid' : 'paid';
+    const rec = { id: ref, billId: bill.id, facility: bill.facility, amount: amt, method: s.payMethod, date: '21 Sep 2026', time: '10:42 am', status: 'successful' };
+    const walletDeduct = s.payMethod === 'wallet' ? { wallets: { ...s.wallets, [s.activePerson]: (s.wallets[s.activePerson] || 0) - amt } } : {};
+    this.setState(st => ({ paymentOutcome: 'successful', lastPaymentRef: ref, lastPaymentAmount: amt, lastPaymentRemaining: remaining, sessionPayments: [rec, ...st.sessionPayments], ...walletDeduct }));
+  }
+
+  pressConfirmKey(d) {
+    const s = this.state;
+    if (d === '⌫') { this.setState({ confirmPin: s.confirmPin.slice(0,-1) }); return; }
+    if (d === '') return;
+    const next = (s.confirmPin + d).slice(0,6);
+    this.setState({ confirmPin: next });
+    if (next.length === 6) setTimeout(() => {
+      if (next === '000000') { this.setState({ confirmSubStage: 'failed', confirmPin: '' }); }
+      else {
+        this.setState({ confirmSubStage: 'idle', confirmPin: '', cardStage: 'loading', transferState: 'active', transferSecondsLeft: 3600 });
+        if (s.payMethod === 'wallet') { this.applyPaymentSuccess(); this.nav('status'); return; }
+        this.nav(s.payMethod === 'card' ? 'cardpay' : 'transfer');
+        if (s.payMethod === 'card') setTimeout(() => this.setState({ cardStage: 'ready' }), 900);
+      }
+    }, 150);
+  }
+  componentWillUnmount() { clearInterval(this._cooldownTimer); }
+
+  renderVals() {
+    const s = this.state;
+    const L = this.L.bind(this);
+    const t = {
+      tagline: L('One bill, every payer.', 'One bill, every payer.'),
+      welcomeBody: L('See your hospital bills and pay them in one place.', 'See your hospital bill and pay am, all for one place.'),
+      continue: L('Continue', 'Continue'),
+      terms: L('Terms and privacy notice', 'Terms and privacy notice'),
+      phoneTitle: L('Enter your phone number', 'Put your phone number'),
+      phoneHelper: L('We will send a code by SMS.', 'We go send code give you via SMS.'),
+      phoneLabel: L('Phone number', 'Phone number'),
+      sendCode: L('Send code', 'Send code'),
+      otpTitle: L('Enter the code', 'Put the code'),
+      otpHelper: L('We sent a 6-digit code to +234 ' + (s.phone || '803 000 0000') + '.', 'We don send 6-number code go +234 ' + (s.phone || '803 000 0000') + '.'),
+      otpLockedMsg: L('Too many wrong tries. Try again in 15 minutes.', 'Too many wrong try. Try again after 15 minutes.'),
+      demoCorrect: L('Demo: fill correct code', 'Demo: put correct code'),
+      demoWrong: L('Demo: fill wrong code', 'Demo: put wrong code'),
+      changeNumber: L('Change number', 'Change number'),
+      profileTitle: L('Set up your profile', 'Set up your profile'),
+      fullName: L('Full name', 'Full name'),
+      dob: L('Date of birth', 'Date wey you born'),
+      dobHelper: L('We use this to keep your records right and to add family later.', 'We dey use this make your record correct, and to add family later.'),
+      emailOpt: L('Email (optional)', 'Email (optional)'),
+      lockTitle: L('Set your app lock', 'Set your app lock'),
+      lockHelper: L('You will use this each time you pay.', 'You go use this anytime you want pay.'),
+      pinMismatchMsg: L('The PINs do not match.', 'The two PIN no match.'),
+      useBiometric: L('Use fingerprint instead', 'Use fingerprint instead'),
+      linkTitle: L('Link your WelliRecord', 'Link your WelliRecord'),
+      linkDoesLabel: L('What linking does: ', 'Wetin linking do: '),
+      linkDoes: L('bills from WelliRecord hospitals appear here.', 'bill from WelliRecord hospital go show here.'),
+      linkNotLabel: L('What it does not do: ', 'Wetin e no do: '),
+      linkNot: L('WelliPay does not get your medical records.', 'WelliPay no dey collect your medical record.'),
+      linkedSuccessMsg: L('Linked. Bills from WelliRecord hospitals will appear here.', 'Linked. Bill from WelliRecord hospital go show here now.'),
+      linkNow: L('Link my WelliRecord', 'Link my WelliRecord'),
+      skipForNow: L('Skip for now', 'Skip for now'),
+      resendLabel: L('Resend code', 'Resend code'),
+      tabHome: L('Home','Home'), tabBills: L('Bills','Bills'), tabPay: L('Payments','Payments'), tabProfile: L('Profile','Profile'),
+      summaryKicker: L('Owing','Wetin you owe'),
+      nextDueKicker: L('Next due','Next wey due'),
+      due: L('Due','Due'),
+      payNow: L('Pay now','Pay now'),
+      recentBills: L('Recent bills','Recent bills'),
+      noBillsYet: L('No bills yet. When a hospital sends you a bill, it shows here.', 'No bill yet. Anytime hospital send bill, e go show here.'),
+      addBill: L('Add a bill','Add a bill'),
+      notifsTitle: L('Notifications','Notifications'),
+      noNotifs: L('Nothing here yet.','Nothing dey here yet.'),
+      billsTitle: L('Bills','Bills'),
+      filterAll: L('All','All'), filterUnpaid: L('Unpaid','Unpaid'), filterPaid: L('Paid','Paid'),
+      payerSplit: L('Who pays','Who pays'),
+      youPay: L('You pay','You pay'), hmoPays: L('HMO pays','HMO pays'), billTotal: L('Bill total','Bill total'), total: L('Total','Total'),
+      voidBanner: L('The hospital cancelled this bill.', 'The hospital cancel this bill.'),
+      billChangedMsg: L('The hospital changed this bill. Check the new amount before you pay.', 'The hospital change this bill. Check the new amount before you pay.'),
+      shareStatement: L('Share statement','Share statement'), reportProblem: L('Report a problem','Report a problem'),
+      viewReceipt: L('View receipt','View receipt'),
+      addBillTitle: L('Add a bill','Add a bill'),
+      scanFrameHelp: L('Point the camera at the QR code from the hospital.', 'Point the camera for the QR code wey the hospital give you.'),
+      enterCodeInstead: L('Enter a code instead','Enter code instead'),
+      billCode: L('Bill code','Bill code'),
+      demoValid: L('Demo: valid code','Demo: correct code'), demoExpired: L('Demo: expired code','Demo: code wey expire'), demoAlready: L('Demo: already added','Demo: e dey there already'),
+      billAdded: L('Bill added','Bill don add'),
+      people: L('People','People'),
+      addPerson: L('Add a person','Add person'),
+      payBillCta: (amt) => L(`Pay ${amt}`, `Pay ${amt}`),
+      amountTitle: L('Choose amount','Choose amount'),
+      payFull: L('Pay in full','Pay in full'),
+      payPart: L('Pay part of it','Pay part of am'),
+      methodTitle: L('Choose method','Choose method'),
+      payWithCard: L('Pay with card','Pay with card'),
+      payWithCardSub: L('Debit or credit card','Debit or credit card'),
+      payWithTransfer: L('Pay by bank transfer','Pay by bank transfer'),
+      payWithTransferSub: L('Send from your bank app to a one-time account number','Send from your bank app go one-time account number'),
+      paymentCancelledMsg: L('Payment cancelled. You were not charged.', 'Payment cancel. We no charge you.'),
+      confirmTitle: L('Confirm payment','Confirm payment'),
+      youArePaying: L('You are paying', 'You dey pay'),
+      method: L('Method','Method'),
+      totalCharge: L('Total to be charged','Total wey go charge'),
+      confirmBtn: L('Confirm','Confirm'),
+      cancel: L('Cancel','Cancel'),
+      confirmPinPrompt: L('Enter your PIN to confirm','Put your PIN to confirm'),
+      confirmFailedMsg: L('We could not confirm it is you.', 'We no fit confirm say na you.'),
+      tryAgain: L('Try again','Try again'),
+      openingSecure: L('Opening secure payment…','We dey open secure payment…'),
+      checkingPayment: L('Checking your payment…','We dey check your payment…'),
+      demoGateway: L('Demo — gateway sheet','Demo — gateway sheet'),
+      demoSuccess: L('Simulate: success','Simulate: success'),
+      demoThreeDS: L('Simulate: 3-D Secure','Simulate: 3-D Secure'),
+      demoDecline: L('Simulate: declined','Simulate: declined'),
+      demoCancelSheet: L('Simulate: cancel sheet','Simulate: cancel sheet'),
+      securePaymentKicker: L('Secure card payment','Secure card payment'),
+      cardNumberLabel: L('Card number','Card number'),
+      expiryLabel: L('Expiry','Expiry'),
+      cvvLabel: L('CVV','CVV'),
+      prototypeControls: L('Prototype controls','Prototype controls'),
+      transferTitle: L('Bank transfer','Bank transfer'),
+      transferExpiredMsg: L('This account number has expired. If you already sent money, we will check it. You do not need to send it again.', 'This account number don expire. If you don send money, we go check am. No need send am again.'),
+      getNewAccount: L('Get a new account number','Get new account number'),
+      transferInstruction: L('Send exactly this amount to this account. It works for 60 minutes.', 'Send this exact amount go this account. E go work for 60 minutes.'),
+      bankName: L('Bank','Bank'),
+      accountNumber: L('Account number','Account number'),
+      accountName: L('Account name','Account name'),
+      amount: L('Amount','Amount'),
+      copy: L('Copy','Copy'),
+      expiresIn: L('Expires in','E go expire for'),
+      transferNote: L("Use your bank's app. Send the exact amount.", "Use your bank app. Send the exact amount."),
+      iHavePaid: L('I have paid','I don pay'),
+      chooseAnotherMethod: L('Choose another method','Choose another method'),
+      pendingMsg: L('We are confirming your payment. This can take up to a minute. You can close the app. We will tell you.', 'We dey confirm your payment. E fit take one minute. You fit close the app. We go tell you.'),
+      demoResolveSuccess: L('Demo: mark as paid','Demo: mark as paid'),
+      demoResolveReview: L('Demo: mark under review','Demo: mark under review'),
+      paymentReceived: L('Payment received','Payment don enter'),
+      payBalanceBtn: L('Pay the balance','Pay the balance'),
+      backToBills: L('Back to bills','Back to bills'),
+      useAnotherMethod: L('Use another method','Use another method'),
+      expiredMsg: L('This payment timed out. You were not charged.', 'This payment don timeout. We no charge you.'),
+      underReviewMsg: L('We received your transfer and are checking it.', 'We don see your transfer and we dey check am.'),
+      contactSupport: L('Contact support','Contact support'),
+      declinedMsg: L('Your bank did not accept this card. Try another card or pay by bank transfer.', 'Your bank no accept this card. Try another card or pay by bank transfer.'),
+      receiptTitle: L('Receipt','Receipt'),
+      preparingReceipt: L('Preparing your receipt…','We dey prepare your receipt…'),
+      facilityLabel: L('Facility','Facility'),
+      personLabel: L('Person','Person'),
+      methodLabel2: L('Method','Method'),
+      amountPaid: L('Amount paid','Amount wey you pay'),
+      balanceLabel: L('Balance','Balance wey remain'),
+      share: L('Share','Share'),
+      download: L('Download','Download'),
+      historyTitle: L('Payments','Payments'),
+      thisMonth: L('This month','This month'),
+      noPaymentsYet: L('Payments you make will show here.', 'Payment wey you make go show here.'),
+      reportTitle: L('Report a problem','Report problem'),
+      reportCategoryLabel: L('What is the problem?','Wetin be the problem?'),
+      reportDescLabel: L('Tell us more (optional)','Tell us more (optional)'),
+      reportDescPlaceholder: L('Describe what happened','Talk wetin happen'),
+      reportSubmit: L('Submit report','Submit report'),
+      reportSubmittedMsg: L('Report sent. We will get back to you.','We don send report. We go come back to you.'),
+      reportdetailTitle: L('Report status','Report status'),
+      ticketLabel: L('Ticket','Ticket'),
+      statusLabel: L('Status','Status'),
+      reportFollowupNote: L('We usually reply within 24 hours.','We normally reply within 24 hours.'),
+      peopleTitle: L('People','People'),
+      addDepTitle: L('Add a person','Add person'),
+      depNameLabel: L('Full name','Full name'),
+      depRelationLabel: L('Relationship','Relationship'),
+      depDobLabel: L('Date of birth','Date wey dem born'),
+      depSave: L('Add person','Add person'),
+      profile2Title: L('Profile','Profile'),
+      logOut: L('Log out','Log out'),
+      deleteAccountLabel: L('Delete account','Delete account'),
+      securityTitle: L('Security','Security'),
+      biometricLabel: L('Use fingerprint / face','Use fingerprint / face'),
+      biometricSub: L('Unlock the app and confirm payments','Unlock the app and confirm payment'),
+      changePinLabel: L('Change PIN','Change PIN'),
+      privacyTitle: L('Privacy & consent','Privacy & consent'),
+      hmoShareLabel: L('Share bills with my HMO','Share bill with my HMO'),
+      hmoShareSub: L('Lets your HMO see and help pay your bills','E make your HMO see and help pay your bill'),
+      marketingLabel: L('Marketing messages','Marketing message'),
+      marketingSub: L('Offers and product updates','Offer and product update'),
+      notifprefsTitle: L('Notifications','Notifications'),
+      billAlertsLabel: L('New bill alerts','New bill alert'),
+      receiptsLabel: L('Payment receipts','Payment receipt'),
+      promoLabel: L('Promotions','Promotion'),
+      languageTitle: L('Language','Language'),
+      helpTitle: L('Help centre','Help centre'),
+      contactTitle: L('Contact support','Contact support'),
+      callSupport: L('Call us','Call us'),
+      whatsappSupport: L('WhatsApp us','WhatsApp us'),
+      emailSupport: L('Email us','Email us'),
+      legalTitle: L('Legal','Legal'),
+      termsLink: L('Terms of use','Terms of use'),
+      privacyLink: L('Privacy policy','Privacy policy'),
+      refundLink: L('Refund policy','Refund policy'),
+      deleteTitle: L('Delete account','Delete account'),
+      deleteWarning: L('This will permanently delete your WelliPay account and payment history.','This go delete your WelliPay account and payment history forever.'),
+      deleteConfirmBtn: L('Delete my account','Delete my account'),
+      deleteFinalWarning: L('This cannot be undone. Are you sure?','This one no fit undo. You sure?'),
+      deleteFinalBtn: L('Yes, delete permanently','Yes, delete am forever'),
+      deleteCancel: L('Cancel','Cancel'),
+      deleteDoneMsg: L('Your account has been deleted.','Your account don delete.'),
+      walletIntroTitle: L('Create your WelliPay wallet','Create your WelliPay wallet'),
+      walletIntroBody: L('Top up your wallet and pay hospital bills instantly, without a card or transfer every time.', 'Top up your wallet and pay hospital bill quick quick, without card or transfer every time.'),
+      createWallet: L('Create my wallet','Create my wallet'),
+      walletKicker: L('Wallet balance','Wallet balance'),
+      walletTitle: L('Wallet','Wallet'),
+      tabWallet: L('Wallet','Wallet'),
+      topUpBtn: L('Top up','Top up'),
+      autoPayLabel: L('Auto-pay bills when due','Auto-pay bill when due'),
+      autoPaySub: L('Pay from wallet balance automatically','Pay from wallet balance automatically'),
+      walletActivity: L('Wallet activity','Wallet activity'),
+      noWalletActivity: L('No wallet activity yet.','No wallet activity yet.'),
+      topupTitle: L('Top up wallet','Top up wallet'),
+      customAmountLabel: L('Or enter an amount','Or put amount'),
+      payWithWallet: L('Pay from wallet','Pay from wallet'),
+      youAreTopping: L('You are topping up','You dey top up'),
+      walletFundedMsg: L('Wallet funded','Wallet don fund'),
+      goToWallet: L('Go to wallet','Go to wallet'),
+      goToInsights: L('Go to insights','Go to insights'),
+      insightsTitle: L('Insights','Insights'),
+      tabInsights: L('Insights','Insights'),
+      scopeMe: L('Just me','Just me'),
+      scopeFamily: L('Whole family','Whole family'),
+      spendingKicker: L('Spending, last 4 months','Spending, last 4 months'),
+      familySpendKicker: L('Family healthcare spending','Family healthcare spending'),
+      upcomingKicker: L('Upcoming expenses','Upcoming expense'),
+      noUpcoming: L('No upcoming expenses.','No upcoming expense.'),
+      manageReminders: L('Manage reminders ›','Manage reminders ›'),
+      insuranceKicker: L('Insurance utilisation','Insurance utilisation'),
+      savingsKicker: L('Savings goal','Savings goal'),
+      hmoPaidLabel: L('HMO paid','HMO paid'),
+      youPaidLabel: L('You paid','You paid'),
+      contributeBtn: L('Contribute','Contribute'),
+      contributeTitle: L('Contribute to savings','Contribute to savings'),
+      youAreContributing: L('You are contributing','You dey contribute'),
+      contributionSavedMsg: L('Added to your savings','We don add to your savings'),
+      financingKicker: L('Financing obligations','Financing obligation'),
+      nextInstallment: L('Next:','Next:'),
+      payInstallmentBtn: L('Pay next installment','Pay next installment'),
+      noPlans: L('No active payment plans.','No active payment plan.'),
+      youArePayingInstallment: L('You are paying an installment','You dey pay installment'),
+      installmentPaidMsg: L('Installment paid','Installment don pay'),
+    };
+
+    const vm = { scr: {} };
+    SCREENS.forEach(k => vm.scr[k] = s.screen === k);
+    vm.showOffline = false;
+    vm.offlineText = L('No connection. Showing saved data.', 'No connection. We dey show saved data.');
+
+    vm.langBtnEnClass = s.lang === 'en' ? 'btn-primary' : 'btn-secondary';
+    vm.langBtnPcmClass = s.lang === 'pcm' ? 'btn-primary' : 'btn-secondary';
+    vm.railLangEnStyle = s.lang === 'en' ? 'font-weight:700' : 'opacity:.6';
+    vm.railLangPcmStyle = s.lang === 'pcm' ? 'font-weight:700' : 'opacity:.6';
+    {
+      const groups = {};
+      SCREEN_META.forEach(m => (groups[m.group] = groups[m.group] || []).push(m));
+      vm.railGroups = Object.keys(groups).map(g => ({ label: g, items: groups[g].map(m => ({
+        id: m.id, name: m.name, cls: s.screen === m.key ? 'active' : '',
+        go: () => this.nav(m.key),
+      })) }));
+    }
+
+    vm.phoneError = s.phoneErr ? L('Enter a valid phone number.', 'Put correct phone number.') : '';
+
+    const otpDigits = s.otp.split('');
+    vm.otpBoxes = Array.from({length:6}, (_,i) => ({ val: otpDigits[i] || '', cls: (s.otpLocked ? 'error' : (otpDigits[i] ? 'filled' : '')) }));
+    vm.otpErrorMsg = s.otpLocked ? '' : (s.otpTries < 5 && s.otp.length === 6 ? L(`That code is not right. Try again. ${s.otpTries} tries left.`, `That code no correct. Try again. ${s.otpTries} tries remain.`) : '');
+    vm.otpLocked = s.otpLocked;
+    vm.resendStyle = s.resendCooldown > 0 ? 'opacity:.4;pointer-events:none;font-size:13px' : 'font-size:13px';
+    vm.resendLabel = s.resendCooldown > 0 ? `${t.resendLabel} (${s.resendCooldown}s)` : t.resendLabel;
+
+    vm.pinDots = Array.from({length:6}, (_,i) => ({ cls: (s.pin.length > i ? 'filled' : '') }));
+    vm.pinMismatch = s.pinMismatch;
+    vm.pinStageLabel = s.pinStage === 'confirm' ? L('Confirm your PIN', 'Confirm your PIN') : L('Set a 6-digit PIN', 'Set 6-number PIN');
+    const digits = ['1','2','3','4','5','6','7','8','9','','0','⌫'];
+    vm.keypadKeys = digits.map(d => ({
+      label: d,
+      style: d === '' ? 'visibility:hidden' : '',
+      onPress: () => this.pressKey(d),
+    }));
+
+    vm.linkedSuccess = false;
+
+    // ---- people / active person ----
+    const activePersonObj = PEOPLE.find(p => p.id === s.activePerson) || PEOPLE[0];
+    vm.activePersonName = activePersonObj.name;
+    vm.activePersonInitial = activePersonObj.name.split(' ').map(w=>w[0]).slice(0,2).join('');
+    vm.multiPerson = PEOPLE.length > 1;
+    vm.hasUnread = s.unreadCount > 0;
+    vm.showPersonSheetFlag = s.showPersonSheet;
+    vm.peopleRows = PEOPLE.map(p => ({
+      id: p.id,
+      initial: p.name.split(' ').map(w=>w[0]).slice(0,2).join(''),
+      name: p.name, relation: p.relation, active: p.id === s.activePerson,
+      select: () => this.setState({ activePerson: p.id, showPersonSheet: false }),
+    }));
+    vm.activePerson = s.activePerson;
+
+    // ---- home ----
+    const allDue = BILLS.filter(b => b.amountDue > 0);
+    const totalDue = allDue.reduce((a,b) => a + b.amountDue, 0);
+    vm.owingHeadline = totalDue > 0
+      ? L(`You owe ${NAIRA(totalDue)} across ${allDue.length} bill${allDue.length>1?'s':''}`, `You owe ${NAIRA(totalDue)} for ${allDue.length} bill${allDue.length>1?'s':''}`)
+      : L('You are all paid up', 'You don pay everything');
+    const byPerson = {};
+    allDue.forEach(b => { byPerson[b.personId] = (byPerson[b.personId]||0) + b.amountDue; });
+    vm.hasBreakdown = Object.keys(byPerson).length > 1;
+    vm.perPersonBreakdown = Object.keys(byPerson).map(pid => ({ name: (PEOPLE.find(p=>p.id===pid)||{}).name, amount: NAIRA(byPerson[pid]) }));
+    const overdueBill = BILLS.find(b => b.overdue) || allDue[0];
+    vm.hasNextDue = !!overdueBill;
+    if (overdueBill) vm.nextDue = { facility: overdueBill.facility, amount: NAIRA(overdueBill.amountDue), date: overdueBill.date, id: overdueBill.id };
+    const recent = BILLS.slice().sort((a,b) => (a.date < b.date ? 1 : -1)).slice(0,3);
+    vm.recentBills = recent.map(b => { const m = statusMeta(b.status, L); return { facility: b.facility, date: b.date, amount: NAIRA(b.status==='paid'||b.status==='void' ? b.amountTotal : b.amountDue), bg: m.bg, fg: m.fg, icon: m.icon, label: m.label, open: () => { this.setState({ selectedBillId: b.id }); this.nav('billdetail'); } }; });
+    vm.noRecentBills = vm.recentBills.length === 0;
+
+    // ---- notifications ----
+    const NOTIFS_RAW = [
+      { day: L('Today','Today'), unread: true, title: L('New bill from Dovers Hospitals','New bill from Dovers Hospitals'), body: L('₦20,000 · Dovers Hospitals','₦20,000 · Dovers Hospitals'), time: L('9:12 am','9:12 am'), kind: 'bill' },
+      { day: L('Today','Today'), unread: true, title: L('Your bill is due soon','Your bill go due soon'), body: L('₦8,500 is due 25 Sep','₦8,500 go due 25 Sep'), time: L('7:40 am','7:40 am'), kind: 'due' },
+      { day: L('Yesterday','Yesterday'), unread: false, title: L('Payment received','We don receive payment'), body: L('₦9,000 · Grace Family Clinic','₦9,000 · Grace Family Clinic'), time: L('4:02 pm','4:02 pm'), kind: 'paid' },
+      { day: L('Yesterday','Yesterday'), unread: false, title: L('Receipt ready','Receipt don ready'), body: L('₦9,000 · Grace Family Clinic','₦9,000 · Grace Family Clinic'), time: L('4:03 pm','4:03 pm'), kind: 'receipt' },
+    ];
+    const kindMeta = { bill: {bg:'var(--color-accent-100)',fg:'var(--color-accent-800)',icon:'●'}, due: {bg:'var(--color-process-yellow)',fg:'var(--color-neutral-900)',icon:'⚠'}, paid: {bg:'var(--color-accent-100)',fg:'var(--color-accent-800)',icon:'✓'}, receipt: {bg:'var(--color-neutral-200)',fg:'var(--color-neutral-800)',icon:'▤'} };
+    const grouped = {};
+    NOTIFS_RAW.forEach(n => { (grouped[n.day] = grouped[n.day] || []).push(n); });
+    vm.notifGroups = Object.keys(grouped).map(day => ({ label: day, items: grouped[day].map(n => ({ ...n, ...kindMeta[n.kind], weight: n.unread ? 600 : 400, open: () => {} })) }));
+    vm.noNotifs = NOTIFS_RAW.length === 0;
+
+    // ---- bills list ----
+    const personBills = BILLS.filter(b => b.personId === s.activePerson);
+    let filtered = personBills;
+    if (s.billFilter === 'unpaid') filtered = personBills.filter(b => b.amountDue > 0);
+    if (s.billFilter === 'paid') filtered = personBills.filter(b => b.status === 'paid');
+    vm.billRows = filtered.map(b => { const m = statusMeta(b.status, L); return { facility: b.facility, date: b.date, amount: NAIRA(b.status==='paid'||b.status==='void' ? b.amountTotal : b.amountDue), bg: m.bg, fg: m.fg, icon: m.icon, label: m.label, open: () => { this.setState({ selectedBillId: b.id }); this.nav('billdetail'); } }; });
+    vm.noBillsForFilter = vm.billRows.length === 0;
+    vm.emptyFilterMsg = s.billFilter === 'unpaid' ? L('No unpaid bills.', 'No unpaid bill.') : s.billFilter === 'paid' ? L('No paid bills yet.', 'No paid bill yet.') : L('No bills yet.', 'No bill yet.');
+    vm.filterAllCls = s.billFilter === 'all' ? 'active' : '';
+    vm.filterUnpaidCls = s.billFilter === 'unpaid' ? 'active' : '';
+    vm.filterPaidCls = s.billFilter === 'paid' ? 'active' : '';
+
+    // ---- bill detail ----
+    const bill = BILLS.find(b => b.id === s.selectedBillId) || BILLS[0];
+    {
+      const m = statusMeta(bill.status, L);
+      const expanded = !!s.showAllLinesFor[bill.id];
+      const visibleLines = expanded ? bill.lines : bill.lines.slice(0, 8);
+      vm.bd = {
+        date: bill.date, billNo: bill.billNo, facility: bill.facility,
+        label: m.label, bg: m.bg, fg: m.fg, icon: m.icon,
+        isVoid: bill.status === 'void',
+        showAmount: bill.status !== 'void',
+        amountLabel: bill.amountDue > 0 ? L('Amount due ', 'Amount wey remain ') + NAIRA(bill.amountDue) : L('Amount paid ', 'Amount wey you pay ') + NAIRA(bill.amountTotal),
+        dueLabel: (bill.amountDue > 0 ? t.due + ' ' : '') + bill.date,
+        hasSplit: !!bill.hasSplit,
+        youPayAmt: NAIRA(bill.amountDue), hmoPaysAmt: NAIRA(bill.hmoAmount) + ' ' + L('(waiting for HMO)','(dey wait HMO)'), totalAmt: NAIRA(bill.amountTotal),
+        visibleLines: visibleLines.map(ln => ({ name: ln.name, qty: ln.qty, total: NAIRA(ln.total), color: ln.discount ? 'var(--color-accent-2-700)' : 'inherit' })),
+        hasMoreLines: !expanded && bill.lines.length > 8,
+        showAllLabel: L(`Show all ${bill.lines.length} lines`, `Show all ${bill.lines.length} lines`),
+        showUpdateNotice: !!bill.changed && bill.status !== 'paid' && bill.status !== 'void',
+        showPayCta: bill.amountDue > 0 && bill.status !== 'void',
+        payCtaLabel: t.payBillCta(NAIRA(bill.amountDue)),
+        showReceiptCta: bill.status === 'paid',
+      };
+    }
+
+    // ---- payment flow ----
+    {
+      const methodLabels = { card: L('Card','Card'), transfer: L('Bank transfer','Bank transfer'), wallet: L('Wallet','Wallet') };
+      const ctx = s.payContext; // 'bill' | 'topup' | 'savings' | 'installment'
+      const isTopup = ctx === 'topup' || ctx === 'savings';
+      const selectedPlan = s.financingPlans.find(p => p.id === s.selectedPlanId);
+      const partVal = parseInt((s.payPartAmount || '0').replace(/\D/g,''), 10) || 0;
+      const topupVal = parseInt((s.topupAmount || '0').replace(/\D/g,''), 10) || 0;
+      const chosenNumeric = ctx === 'topup' || ctx === 'savings' ? topupVal
+        : ctx === 'installment' ? (selectedPlan ? selectedPlan.perInstallment : 0)
+        : (s.payAmountMode === 'part' ? partVal : bill.amountDue);
+      const walletBal = s.wallets[s.activePerson] || 0;
+      let amountError = '';
+      if (ctx === 'bill' && s.payAmountMode === 'part' && s.payAmountErrorFlag) {
+        if (partVal < (bill.minPart || 1)) amountError = L(`The hospital accepts part payments from ${NAIRA(bill.minPart||0)}.`, `Hospital dey accept part payment from ${NAIRA(bill.minPart||0)}.`);
+        else if (partVal > bill.amountDue) amountError = L(`That is more than the balance of ${NAIRA(bill.amountDue)}.`, `That pass the balance of ${NAIRA(bill.amountDue)}.`);
+      }
+      const mm = Math.floor(s.transferSecondsLeft/60), ss = s.transferSecondsLeft%60;
+      vm.pay = {
+        isTopup: ctx !== 'bill',
+        exitLabel: ctx === 'topup' ? t.goToWallet : t.goToInsights,
+        exitHandler: ctx === 'topup' ? (() => this.nav('wallet')) : (() => this.nav('insights')),
+        facility: ctx === 'topup' ? t.walletTitle : ctx === 'savings' ? t.savingsKicker : ctx === 'installment' ? (selectedPlan ? selectedPlan.facility : '') : bill.facility,
+        confirmHeading: ctx === 'topup' ? t.youAreTopping : ctx === 'savings' ? t.youAreContributing : ctx === 'installment' ? t.youArePayingInstallment : t.youArePaying,
+        confirmSubtitle: ctx === 'topup' ? t.walletTitle : ctx === 'savings' ? s.savingsGoal.name : ctx === 'installment' ? (selectedPlan ? selectedPlan.facility : '') : (bill.facility + ' · ' + bill.billNo),
+        showWalletOption: ctx === 'bill' || ctx === 'installment',
+        walletOptStyle: walletBal >= chosenNumeric ? '' : 'opacity:.5',
+        walletOptSub: walletBal >= chosenNumeric ? L(`Balance ${NAIRA(walletBal)}`, `Balance ${NAIRA(walletBal)}`) : L(`Not enough balance (${NAIRA(walletBal)})`, `Balance no reach (${NAIRA(walletBal)})`),
+        chooseWallet: () => { if (walletBal < chosenNumeric) return; this.setState({ payMethod: 'wallet', methodBanner: false }); this.nav('confirm'); },
+        amountDueLabel: L('Amount due ', 'Amount wey remain ') + NAIRA(bill.amountDue),
+        fullAmount: NAIRA(bill.amountDue),
+        fullSelStyle: s.payAmountMode === 'full' ? 'border:1px solid var(--color-accent-600)' : '',
+        partSelStyle: s.payAmountMode === 'part' ? 'border:1px solid var(--color-accent-600)' : '',
+        fullDotStyle: `width:16px;height:16px;border-radius:50%;border:1.5px solid ${s.payAmountMode==='full'?'var(--color-accent-700)':'var(--color-neutral-400)'};background:${s.payAmountMode==='full'?'var(--color-accent-700)':'transparent'}`,
+        partDotStyle: `width:16px;height:16px;border-radius:50%;border:1.5px solid ${s.payAmountMode==='part'?'var(--color-accent-700)':'var(--color-neutral-400)'};background:${s.payAmountMode==='part'?'var(--color-accent-700)':'transparent'}`,
+        showPartInput: s.payAmountMode === 'part',
+        minPartHelper: L(`The hospital accepts part payments from ${NAIRA(bill.minPart||0)}.`, `Hospital dey accept part payment from ${NAIRA(bill.minPart||0)}.`),
+        balanceAfter: s.payAmountMode === 'part' && partVal > 0 ? L(`Balance after this payment: ${NAIRA(Math.max(0,bill.amountDue-partVal))}`, `Balance after this payment: ${NAIRA(Math.max(0,bill.amountDue-partVal))}`) : '',
+        amountError,
+        chosenAmount: NAIRA(chosenNumeric),
+        payCtaLabel: t.payBillCta(NAIRA(chosenNumeric)),
+        cancelledBanner: s.methodBanner,
+        confirmIdle: s.confirmSubStage === 'idle',
+        confirmPinning: s.confirmSubStage === 'pinning',
+        confirmFailed: s.confirmSubStage === 'failed',
+        billNoLabel: bill.billNo,
+        methodLabel: methodLabels[s.payMethod] || '—',
+        confirmDots: Array.from({length:6},(_,i)=>({ cls: s.confirmPin.length>i ? 'filled':'' })),
+        confirmKeys: ['1','2','3','4','5','6','7','8','9','','0','⌫'].map(d => ({ label: d, style: d===''?'visibility:hidden':'', onPress: () => this.pressConfirmKey(d) })),
+        cardLoading: s.cardStage === 'loading',
+        cardChecking: s.cardStage === 'checking',
+        cardReady: s.cardStage === 'ready',
+        transferExpired: s.transferState === 'expired',
+        transferActive: s.transferState === 'active',
+        countdownLabel: `${mm}:${ss<10?'0':''}${ss}`,
+        countdownColor: s.transferSecondsLeft < 60 ? 'var(--color-accent-2-700)' : 'var(--color-text)',
+        toast: s.toastMsg,
+        outPending: s.paymentOutcome === 'pending',
+        outSuccess: s.paymentOutcome === 'successful',
+        outFailed: s.paymentOutcome === 'failed',
+        outExpired: s.paymentOutcome === 'expired',
+        outReview: s.paymentOutcome === 'under_review',
+        successHeading: ctx === 'topup' ? t.walletFundedMsg : ctx === 'savings' ? t.contributionSavedMsg : ctx === 'installment' ? t.installmentPaidMsg : t.paymentReceived,
+        paidAmountLabel: NAIRA(s.lastPaymentAmount),
+        stillToPay: s.lastPaymentRemaining > 0 ? L(`${NAIRA(s.lastPaymentRemaining)} still to pay`, `${NAIRA(s.lastPaymentRemaining)} still remain`) : '',
+        dateTimeRef: '21 Sep 2026 · 10:42 am · ' + (s.lastPaymentRef || 'WP000000'),
+        failReasonMsg: s.failReason === 'declined' ? t.declinedMsg : t.confirmFailedMsg,
+        receiptGenerating: false,
+        receiptReady: true,
+        receiptNo: L('Receipt ', 'Receipt ') + (s.lastPaymentRef || 'WP000000'),
+        verifyCode: 'VRF-' + (s.lastPaymentRef || 'WP000000').slice(2),
+        balanceLeft: NAIRA(s.lastPaymentRemaining),
+      };
+      vm.pay.demoResolveSuccessFn = () => this.applyPaymentSuccess();
+      vm.pay.demoResolveReviewFn = () => this.setState({ paymentOutcome: 'under_review' });
+      vm.notIsTopup = ctx === 'bill';
+    }
+
+    // ---- wallet ----
+    {
+      const toggleStyle = (on) => ({
+        track: `width:44px;height:26px;border-radius:100px;background:${on?'var(--color-accent-700)':'var(--color-neutral-300)'};position:relative;flex:none`,
+        thumb: `width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;left:${on?'21px':'3px'};box-shadow:var(--shadow-sm)`,
+      });
+      const bal = s.wallets[s.activePerson] || 0;
+      const autoOn = !!s.walletAutoPay[s.activePerson];
+      const eligibleBill = BILLS.find(b => b.personId === s.activePerson && b.amountDue > 0 && b.amountDue <= bal);
+      const myTxns = s.walletTxns.filter(x => x.personId === s.activePerson);
+      vm.walletBalanceLabel = NAIRA(bal);
+      vm.wal = {
+        autoTrack: toggleStyle(autoOn).track, autoThumb: toggleStyle(autoOn).thumb,
+        toggleAutoPay: () => this.setState(st => ({ walletAutoPay: { ...st.walletAutoPay, [st.activePerson]: !st.walletAutoPay[st.activePerson] } })),
+        showRunAutoPay: autoOn && !!eligibleBill,
+        runAutoPayLabel: eligibleBill ? L(`Run auto-pay: ${eligibleBill.facility} (${NAIRA(eligibleBill.amountDue)})`, `Run auto-pay: ${eligibleBill.facility} (${NAIRA(eligibleBill.amountDue)})`) : '',
+        toast: s.walletToast,
+        runAutoPay: () => {
+          if (!eligibleBill) return;
+          const amt = eligibleBill.amountDue;
+          eligibleBill.amountDue = 0; eligibleBill.status = 'paid';
+          this.setState(st => ({
+            wallets: { ...st.wallets, [st.activePerson]: st.wallets[st.activePerson] - amt },
+            walletTxns: [{ personId: st.activePerson, kind: 'autopay', amount: -amt, method: 'wallet', date: '22 Sep 2026', time: '9:00 am', facility: eligibleBill.facility }, ...st.walletTxns],
+            walletToast: L(`Auto-paid ${NAIRA(amt)} to ${eligibleBill.facility}.`, `Auto-pay ${NAIRA(amt)} go ${eligibleBill.facility}.`),
+          }));
+          setTimeout(() => this.setState({ walletToast: '' }), 3000);
+        },
+        txns: myTxns.map(x => ({
+          label: x.kind === 'topup' ? L('Wallet top-up','Wallet top-up') : L(`Auto-pay · ${x.facility}`, `Auto-pay · ${x.facility}`),
+          date: x.date, amount: (x.amount >= 0 ? '+' : '') + NAIRA(x.amount), color: x.amount >= 0 ? 'var(--color-accent-800)' : 'var(--color-text)',
+        })),
+        noTxns: myTxns.length === 0,
+        balanceHint: L(`Current balance ${NAIRA(bal)}`, `Balance now na ${NAIRA(bal)}`),
+        presets: ['5000','10000','20000','50000'].map(v => ({ label: NAIRA(parseInt(v,10)), cls: s.topupAmount === v ? 'active' : '', select: () => this.setState({ topupAmount: v }) })),
+        topupScreenTitle: s.payContext === 'savings' ? t.contributeTitle : t.topupTitle,
+      };
+    }
+
+    // ---- insights ----
+    {
+      const monthKey = (dateStr) => dateStr.split(' ').slice(1).join(' ');
+      const allPay = s.sessionPayments.concat(PAYMENTS_SEED).filter(p => p.status === 'successful');
+      const scoped = s.insightsScope === 'family' ? allPay : allPay.filter(p => { const b = BILLS.find(x => x.id === p.billId); return b && b.personId === s.activePerson; });
+      const byMonth = {};
+      scoped.forEach(p => { const k = monthKey(p.date); byMonth[k] = (byMonth[k] || 0) + p.amount; });
+      const MONTH_ORDER = ['Jun 2026','Jul 2026','Aug 2026','Sep 2026'];
+      const maxVal = Math.max(1, ...MONTH_ORDER.map(k => byMonth[k] || 0));
+      const famTotals = {};
+      allPay.forEach(p => { const b = BILLS.find(x => x.id === p.billId); if (b) famTotals[b.personId] = (famTotals[b.personId] || 0) + p.amount; });
+      const famMax = Math.max(1, ...PEOPLE.map(pp => famTotals[pp.id] || 0));
+      const hmoBills = BILLS.filter(b => b.hasSplit);
+      const totalHmo = hmoBills.reduce((a,b) => a + (b.hmoAmount || 0), 0);
+      const totalSelfPaid = hmoBills.reduce((a,b) => a + (b.amountTotal - (b.hmoAmount || 0)), 0);
+      const totalHmoAll = Math.max(1, totalHmo + totalSelfPaid);
+      const sg = s.savingsGoal;
+      const savPct = Math.min(100, Math.round(sg.saved / sg.target * 100));
+      const upcomingBills = BILLS.filter(b => b.amountDue > 0 && (s.insightsScope === 'family' || b.personId === s.activePerson)).sort((a,b) => a.date < b.date ? -1 : 1).slice(0,5);
+      vm.ins = {
+        meCls: s.insightsScope === 'me' ? 'active' : '', familyCls: s.insightsScope === 'family' ? 'active' : '',
+        showFamily: s.insightsScope === 'family',
+        totalSpendLabel: NAIRA(MONTH_ORDER.reduce((a,k) => a + (byMonth[k] || 0), 0)),
+        spendBars: MONTH_ORDER.map(k => ({ label: k.split(' ')[0], amountShort: byMonth[k] ? NAIRA(byMonth[k]) : '—', heightStyle: `height:${Math.max(6, Math.round((byMonth[k] || 0) / maxVal * 100))}%` })),
+        familyBars: PEOPLE.map(pp => ({ name: pp.name, amount: NAIRA(famTotals[pp.id] || 0), widthStyle: `width:${Math.max(4, Math.round((famTotals[pp.id] || 0) / famMax * 100))}%` })),
+        hasHmoData: hmoBills.length > 0,
+        hmoPaidAmt: NAIRA(totalHmo), selfPaidAmt: NAIRA(totalSelfPaid),
+        hmoBarStyle: `width:${Math.round(totalHmo/totalHmoAll*100)}%;background:var(--color-accent-600)`,
+        selfBarStyle: `width:${Math.round(totalSelfPaid/totalHmoAll*100)}%;background:var(--color-neutral-300)`,
+        savingsGoalName: sg.name, savingsPct: savPct, savingsBarStyle: `width:${savPct}%`,
+        savingsSavedLabel: L(`Saved ${NAIRA(sg.saved)}`,`Wetin you save ${NAIRA(sg.saved)}`),
+        savingsTargetLabel: L(`Goal ${NAIRA(sg.target)}`,`Goal ${NAIRA(sg.target)}`),
+        upcoming: upcomingBills.map(b => ({ facility: b.facility, amount: NAIRA(b.amountDue), dueLabel: t.due + ' ' + b.date, open: () => { this.setState({ selectedBillId: b.id }); this.nav('billdetail'); } })),
+        noUpcoming: upcomingBills.length === 0,
+        plans: s.financingPlans.filter(p => s.insightsScope === 'family' || p.personId === s.activePerson).map(p => ({
+          facility: p.facility,
+          progressLabel: L(`${p.paidInstallments} of ${p.installments} installments paid`, `${p.paidInstallments} of ${p.installments} installment wey you don pay`),
+          barStyle: `width:${Math.round(p.paidInstallments/p.installments*100)}%`,
+          perInstallmentLabel: NAIRA(p.perInstallment), nextDue: p.nextDue,
+          payNext: () => { this.setState({ payContext: 'installment', selectedPlanId: p.id }); this.nav('method'); },
+        })),
+        noPlans: s.financingPlans.filter(p => s.insightsScope === 'family' || p.personId === s.activePerson).length === 0,
+      };
+    }
+
+    // ---- history ----
+    vm.histAllCls = s.historyFilter === 'all' ? 'active' : '';
+    vm.histMonthCls = s.historyFilter === 'month' ? 'active' : '';
+    {
+      const all = s.sessionPayments.concat(PAYMENTS_SEED);
+      const filtered2 = s.historyFilter === 'month' ? all.filter(p => p.date.endsWith('Sep 2026')) : all;
+      const groups = {};
+      filtered2.forEach(p => { const key = p.date.split(' ').slice(1).join(' '); (groups[key] = groups[key]||[]).push(p); });
+      vm.histGroups = Object.keys(groups).map(k => ({ label: k, items: groups[k].map(p => { const m = statusMeta(p.status, L); return { facility: p.facility, date: p.date, methodLabel: p.method === 'card' ? L('Card','Card') : L('Bank transfer','Bank transfer'), amount: NAIRA(p.amount), bg: m.bg, fg: m.fg, icon: m.icon, label: m.label, open: () => { if (p.status==='successful') { this.setState({ lastPaymentRef: p.id }); this.nav('receipt'); } else { this.setState({ paymentOutcome: p.status }); this.nav('status'); } } }; }) }));
+      vm.histEmpty = filtered2.length === 0;
+    }
+
+    // ---- toggles helper ----
+    const toggleStyle = (on) => ({
+      track: `width:44px;height:26px;border-radius:100px;background:${on?'var(--color-accent-700)':'var(--color-neutral-300)'};position:relative;flex:none`,
+      thumb: `width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:3px;left:${on?'21px':'3px'};box-shadow:var(--shadow-sm)`,
+    });
+
+    // ---- report a problem ----
+    {
+      const rb = BILLS.find(b => b.id === s.reportBillId) || bill;
+      const cats = [L('Wrong amount','Wrong amount'), L('I already paid this','I don pay this already'), L('Duplicate bill','Duplicate bill'), L('Other','Other')];
+      vm.rep = {
+        facility: rb.facility, billNo: rb.billNo,
+        categories: cats.map(c => ({ label: c, selStyle: s.reportCategory === c ? 'border:1px solid var(--color-accent-600)' : '', select: () => this.setState({ reportCategory: c }) })),
+        submitted: s.reportSubmitted,
+        submit: () => { if (!s.reportCategory) return; this.setState({ reportSubmitted: true }); setTimeout(() => this.nav('reportdetail'), 500); },
+      };
+      vm.notRepSubmitted = !s.reportSubmitted;
+      vm.repd = { ticket: 'RPT-' + rb.billNo, facility: rb.facility, category: s.reportCategory || cats[0], status: L('Under review','Dey under review') };
+    }
+
+    // ---- add dependant ----
+    vm.dep = {
+      error: s.depError,
+      relationOptions: ['Child','Spouse','Parent','Other'].map(r => ({ label: L(r,r), cls: s.depRelation === r ? 'active' : '', select: () => this.setState({ depRelation: r }) })),
+      save: () => {
+        if (!s.depName.trim()) { this.setState({ depError: L('Enter a name.','Put name.') }); return; }
+        PEOPLE.push({ id: 'dep' + Date.now(), name: s.depName.trim(), relation: s.depRelation, age: 0 });
+        this.setState({ depName: '', depRelation: 'Child', depDob: '', depError: '' });
+        this.nav('people');
+      },
+    };
+
+    // ---- settings hub ----
+    vm.settingsMenu = [
+      { label: L('People & dependants','People & dependants'), go: () => this.nav('people') },
+      { label: L('Security','Security'), go: () => this.nav('security') },
+      { label: L('Privacy & consent','Privacy & consent'), go: () => this.nav('privacy') },
+      { label: L('Notifications','Notifications'), go: () => this.nav('notifprefs') },
+      { label: L('Language','Language'), go: () => this.nav('language') },
+      { label: L('Help centre','Help centre'), go: () => this.nav('help') },
+      { label: L('Contact support','Contact support'), go: () => this.nav('contact') },
+      { label: L('Legal','Legal'), go: () => this.nav('legal') },
+    ];
+
+    vm.sec = {
+      bioTrack: toggleStyle(s.biometricEnabled).track, bioThumb: toggleStyle(s.biometricEnabled).thumb,
+      toggleBio: () => this.setState({ biometricEnabled: !s.biometricEnabled }),
+      changePin: () => { this.setState({ pinStage: 'set', pin: '', pinFirst: '' }); this.nav('applock'); },
+    };
+
+    vm.priv = {
+      hmoTrack: toggleStyle(s.consentHmoShare).track, hmoThumb: toggleStyle(s.consentHmoShare).thumb,
+      toggleHmo: () => this.setState({ consentHmoShare: !s.consentHmoShare }),
+      mktTrack: toggleStyle(s.consentMarketing).track, mktThumb: toggleStyle(s.consentMarketing).thumb,
+      toggleMkt: () => this.setState({ consentMarketing: !s.consentMarketing }),
+    };
+
+    vm.np = {
+      billTrack: toggleStyle(s.notifBillAlerts).track, billThumb: toggleStyle(s.notifBillAlerts).thumb, toggleBill: () => this.setState({ notifBillAlerts: !s.notifBillAlerts }),
+      rcptTrack: toggleStyle(s.notifReceipts).track, rcptThumb: toggleStyle(s.notifReceipts).thumb, toggleRcpt: () => this.setState({ notifReceipts: !s.notifReceipts }),
+      promoTrack: toggleStyle(s.notifPromo).track, promoThumb: toggleStyle(s.notifPromo).thumb, togglePromo: () => this.setState({ notifPromo: !s.notifPromo }),
+    };
+
+    vm.langCardEnStyle = s.lang === 'en' ? 'border:1px solid var(--color-accent-600)' : '';
+    vm.langCardPcmStyle = s.lang === 'pcm' ? 'border:1px solid var(--color-accent-600)' : '';
+
+    vm.faqs = [
+      { q: L('How do I pay a bill?','How I go pay bill?'), a: L('Open the bill, choose an amount, then choose card or bank transfer.','Open the bill, choose amount, then choose card or bank transfer.') },
+      { q: L('What if I pay the wrong amount?','Wetin if I pay wrong amount?'), a: L('Contact support and we will help you sort it out.','Contact support and we go help you sort am.') },
+      { q: L('Can I add my family?','I fit add my family?'), a: L('Yes. Go to People & dependants and add a person.','Yes. Go People & dependants and add person.') },
+    ];
+
+    vm.del = {
+      idle: s.deleteStage === 'idle', confirming: s.deleteStage === 'confirming', done: s.deleteStage === 'done',
+      confirm: () => this.setState({ deleteStage: 'confirming' }),
+      finalize: () => this.setState({ deleteStage: 'done' }),
+      cancel: () => this.setState({ deleteStage: 'idle' }),
+    };
+
+    // ---- add bill ----
+    vm.ab = {
+      showScan: s.addBillMode === 'scan',
+      showManual: s.addBillMode === 'manual',
+      showSuccess: s.addBillMode === 'success',
+      errorMsg: s.addBillError,
+    };
+
+    return {
+      state: s, t, vm,
+      deviceStyle: { flex: 'none' },
+      setLangEn: () => this.setState({ lang: 'en' }),
+      setLangPcm: () => this.setState({ lang: 'pcm' }),
+      noop: (e) => e && e.preventDefault && e.preventDefault(),
+      goPhone: () => this.nav('phone'),
+      goBack: () => this.nav(s.prevScreen === s.screen ? 'welcome' : s.prevScreen),
+      onPhoneChange: (e) => this.setState({ phone: e.target.value, phoneErr: false }),
+      sendCode: () => {
+        const digitsOnly = (s.phone || '').replace(/\D/g,'');
+        if (digitsOnly.length < 10) { this.setState({ phoneErr: true }); return; }
+        this.setState({ resendCooldown: 30 });
+        this.nav('otp');
+      },
+      fillOtpGood: () => { this.setState({ otp: '123456', otpTries: 5, otpLocked: false }); setTimeout(() => this.nav('profile'), 400); },
+      fillOtpBad: () => { this.setState(st => { const tries = st.otpTries - 1; return { otp: '000000', otpTries: tries, otpLocked: tries <= 0 }; }); },
+      resend: () => { if (s.resendCooldown > 0) return; this.setState({ resendCooldown: 30 }); },
+      onProfNameChange: (e) => this.setState({ profName: e.target.value }),
+      goApplock: () => this.nav('applock'),
+      useBiometric: () => this.nav('linkwr'),
+      linkNow: () => this.nav('walletintro'),
+      goHome: () => this.nav('home'),
+      openPersonSheet: () => this.setState({ showPersonSheet: true }),
+      closePersonSheet: () => this.setState({ showPersonSheet: false }),
+      stopClick: (e) => e && e.stopPropagation && e.stopPropagation(),
+      goNotifs: () => { this.setState({ unreadCount: 0 }); this.nav('notifs'); },
+      goBillsTab: () => this.nav('bills'),
+      goHistoryTab: () => this.nav('history'),
+      goProfileTab: () => this.nav('profile2'),
+      setFilterAll: () => this.setState({ billFilter: 'all' }),
+      setFilterUnpaid: () => this.setState({ billFilter: 'unpaid' }),
+      setFilterPaid: () => this.setState({ billFilter: 'paid' }),
+      showAllLines: () => this.setState(st => ({ showAllLinesFor: { ...st.showAllLinesFor, [st.selectedBillId]: true } })),
+      payThisBill: () => { this.setState({ payContext: 'bill' }); this.nav('amount'); },
+      goReceipt: () => this.nav('receipt'),
+      goReport: () => { this.setState({ reportBillId: s.selectedBillId, reportCategory: '', reportDesc: '', reportSubmitted: false }); this.nav('report'); },
+      goDelete: () => this.nav('delete'),
+      goWalletTab: () => this.nav('wallet'),
+      goInsightsTab: () => this.nav('insights'),
+      setScopeMe: () => this.setState({ insightsScope: 'me' }),
+      setScopeFamily: () => this.setState({ insightsScope: 'family' }),
+      goContributeSavings: () => { this.setState({ payContext: 'savings', topupAmount: '' }); this.nav('topupamount'); },
+      goNotifPrefsFromInsights: (e) => { e && e.preventDefault && e.preventDefault(); this.nav('notifprefs'); },
+      goWalletIntro: () => this.nav('walletintro'),
+      createWallet: () => this.nav('home'),
+      goTopup: () => { this.setState({ payContext: 'topup', topupAmount: '' }); this.nav('topupamount'); },
+      onTopupAmountChange: (e) => this.setState({ topupAmount: e.target.value.replace(/[^\d]/g,'') }),
+      continueTopup: () => {
+        const v = parseInt((this.state.topupAmount || '0').replace(/\D/g,''), 10) || 0;
+        if (v < 500) return;
+        this.setState({ payMethod: null, methodBanner: false });
+        this.nav('method');
+      },
+      onReportDescChange: (e) => this.setState({ reportDesc: e.target.value }),
+      onDepNameChange: (e) => this.setState({ depName: e.target.value, depError: '' }),
+      onDepDobChange: (e) => this.setState({ depDob: e.target.value }),
+      goAddBill: () => { this.setState({ addBillMode: 'scan', addBillCode: '', addBillError: '' }); this.nav('addbill'); },
+      showManualEntry: (e) => { e && e.preventDefault && e.preventDefault(); this.setState({ addBillMode: 'manual' }); },
+      onCodeChange: (e) => this.setState({ addBillCode: e.target.value.toUpperCase(), addBillError: '' }),
+      demoValid: () => this.setState({ addBillCode: 'WP4K-77QZ', addBillError: '' }),
+      demoExpired: () => this.setState({ addBillError: L('This code has expired. Ask the hospital for a new one.', 'This code don expire. Ask hospital for new one.') }),
+      demoAlready: () => this.setState({ addBillError: L('This bill is already on your account.', 'This bill dey your account already.') }),
+      submitCode: () => {
+        if (s.addBillError) return;
+        if (!s.addBillCode || s.addBillCode.length < 4) { this.setState({ addBillError: L('That code is not valid.', 'That code no correct.') }); return; }
+        this.setState({ addBillMode: 'success' });
+        setTimeout(() => { this.setState({ selectedBillId: 'b1' }); this.nav('billdetail'); }, 900);
+      },
+      payNextDue: () => { const nd = vm.nextDue; if (nd) { this.setState({ selectedBillId: nd.id, payContext: 'bill' }); this.nav('amount'); } },
+      goAddDependant: () => this.nav('adddep'),
+      selectFull: () => this.setState({ payAmountMode: 'full', payAmountErrorFlag: false }),
+      selectPart: () => this.setState({ payAmountMode: 'part' }),
+      onPartAmountChange: (e) => this.setState({ payPartAmount: e.target.value.replace(/[^\d]/g,''), payAmountErrorFlag: false }),
+      continueAmount: () => {
+        if (s.payAmountMode === 'part') { this.setState({ payAmountErrorFlag: true }); if (vm.pay.amountError) return; }
+        this.nav('method');
+      },
+      goMethod: () => this.nav('method'),
+      chooseCard: () => { this.setState({ payMethod: 'card', methodBanner: false }); this.nav('confirm'); },
+      chooseTransfer: () => { this.setState({ payMethod: 'transfer', methodBanner: false }); this.nav('confirm'); },
+      startConfirm: () => this.setState({ confirmSubStage: 'pinning', confirmPin: '' }),
+      startConfirm2: () => { this.setState({ confirmSubStage: 'idle' }); this.nav('confirm'); },
+      cardSucceed: () => { this.applyPaymentSuccess(); this.nav('status'); },
+      cardThreeDS: () => { this.setState({ cardStage: 'checking' }); setTimeout(() => { this.applyPaymentSuccess(); this.nav('status'); }, 1100); },
+      cardDecline: () => { this.setState({ paymentOutcome: 'failed', failReason: 'declined' }); this.nav('status'); },
+      cardCancel: () => { this.setState({ methodBanner: true }); this.nav('method'); },
+      copyAcct: (e) => { e && e.preventDefault && e.preventDefault(); this.setState({ toastMsg: L('Copied','Copy don happen') }); setTimeout(() => this.setState({ toastMsg: '' }), 1400); },
+      copyAmt: (e) => { e && e.preventDefault && e.preventDefault(); this.setState({ toastMsg: L('Copied','Copy don happen') }); setTimeout(() => this.setState({ toastMsg: '' }), 1400); },
+      newAccountNumber: () => this.setState({ transferState: 'active', transferSecondsLeft: 3600 }),
+      iHavePaid: () => { this.setState({ paymentOutcome: 'pending' }); this.nav('status'); },
+      payBalance: () => { this.setState({ payAmountMode: 'full', lastPaymentRemaining: 0, payContext: 'bill' }); this.nav('amount'); },
+      goContact: () => this.nav('contact'),
+      setHistAll: () => this.setState({ historyFilter: 'all' }),
+      setHistMonth: () => this.setState({ historyFilter: 'month' }),
+      resetProto: () => window.location.reload(),
+    };
+  }
+
+  pressKey(d) {
+    const s = this.state;
+    if (d === '') return;
+    if (d === '⌫') {
+      if (s.pinStage === 'set') this.setState({ pin: s.pin.slice(0,-1) });
+      else this.setState({ pin: s.pin.slice(0,-1) });
+      return;
+    }
+    if (s.pinStage === 'set') {
+      const next = (s.pin + d).slice(0,6);
+      this.setState({ pin: next });
+      if (next.length === 6) setTimeout(() => this.setState({ pinFirst: next, pin: '', pinStage: 'confirm' }), 150);
+    } else {
+      const next = (s.pin + d).slice(0,6);
+      this.setState({ pin: next });
+      if (next.length === 6) setTimeout(() => {
+        if (next === s.pinFirst) { this.nav('linkwr'); this.setState({ pin: '', pinStage: 'set', pinFirst: '', pinMismatch: false }); }
+        else { this.setState({ pin: '', pinMismatch: true, pinStage: 'set', pinFirst: '' }); }
+      }, 150);
+    }
+  }
+}
+
+</script>
+</body>
+</html>

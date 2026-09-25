@@ -1,0 +1,29 @@
+# Node dependencies
+node_modules/
+*/node_modules/
+package-lock.json.bak
+
+# Next.js build and cache
+.next/
+*/.next/
+out/
+*/out/
+
+# Environment files
+.env
+.env*.local
+*/.env
+*/.env*.local
+
+# Logs and debug
+*.log
+nohup.out
+
+# OS files
+.DS_Store
+*/.DS_Store
+Thumbs.db
+
+# Build caches & info
+*.tsbuildinfo
+*/tsconfig.tsbuildinfo
